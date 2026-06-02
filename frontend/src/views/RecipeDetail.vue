@@ -115,6 +115,7 @@ async function toggleFavorite() {
         v-else
         :detail="detail"
         :favorite="isFavorite"
+        :can-edit="userStore.isAdmin"
         @back="router.back()"
         @favorite="toggleFavorite"
         @edit="router.push(`/recipe/${route.params.id}/edit`)"

@@ -5,6 +5,21 @@ const request = axios.create({
   timeout: 15000,
 })
 
+request.interceptors.request.use((config) => {
+  const raw = localStorage.getItem('wgxhl_recipe_user')
+  if (raw) {
+    try {
+      const user = JSON.parse(raw)
+      if (user?.token) {
+        config.headers.Authorization = `Bearer ${user.token}`
+      }
+    } catch (error) {
+      localStorage.removeItem('wgxhl_recipe_user')
+    }
+  }
+  return config
+})
+
 request.interceptors.response.use(
   (response) => {
     const res = response.data

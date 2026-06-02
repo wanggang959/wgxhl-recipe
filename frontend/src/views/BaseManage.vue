@@ -8,10 +8,12 @@ import { createIngredient, deleteIngredient, pageIngredient, updateIngredient } 
 import { createSeasoning, deleteSeasoning, pageSeasoning, updateSeasoning } from '../api/seasoning'
 import BottomNav from '../components/BottomNav.vue'
 import ImageCropper from '../components/ImageCropper.vue'
+import { useUserStore } from '../stores/user'
 import { transcodeImageToWebp } from '../utils/image'
 import { getImageUrl, toObjectPath } from '../utils/imageUrl'
 
 const router = useRouter()
+const userStore = useUserStore()
 const active = ref('category')
 const uploading = ref(false)
 const imageCropperRef = ref(null)
@@ -257,9 +259,11 @@ async function removeSeasoning(item) {
   }
 }
 
-loadCategory().catch((e) => showFailToast(e.message || '分类加载失败'))
-loadIngredient().catch((e) => showFailToast(e.message || '食材加载失败'))
-loadSeasoning().catch((e) => showFailToast(e.message || '调料加载失败'))
+if (userStore.isAdmin) {
+  loadCategory().catch((e) => showFailToast(e.message || '分类加载失败'))
+  loadIngredient().catch((e) => showFailToast(e.message || '食材加载失败'))
+  loadSeasoning().catch((e) => showFailToast(e.message || '调料加载失败'))
+}
 </script>
 
 <template>
@@ -268,6 +272,13 @@ loadSeasoning().catch((e) => showFailToast(e.message || '调料加载失败'))
     <main class="page-wrap">
     <section class="page">
       <van-nav-bar title="基础数据管理" left-arrow @click-left="router.back()" />
+      <div v-if="!userStore.isAdmin" class="permission-card">
+        <van-icon name="warning-o" size="24" />
+        <strong>需要管理员权限</strong>
+        <p>分类、食材、调料管理只能由管理员「王师傅」操作。</p>
+        <van-button round type="warning" size="small" @click="router.push('/profile')">去登录</van-button>
+      </div>
+      <template v-else>
       <div v-if="uploadStatus" class="upload-status" :class="{ success: !uploading }">
         <van-loading v-if="uploading" size="16" color="#f59e0b" />
         <van-icon v-else name="success" />
@@ -406,6 +417,7 @@ loadSeasoning().catch((e) => showFailToast(e.message || '调料加载失败'))
           </div>
         </van-tab>
       </van-tabs>
+      </template>
     </section>
     </main>
     <BottomNav />
@@ -423,6 +435,31 @@ loadSeasoning().catch((e) => showFailToast(e.message || '调料加载失败'))
 
 .form-panel {
   padding: 12px;
+}
+
+.permission-card {
+  margin: 16px;
+  min-height: 220px;
+  border-radius: 18px;
+  background: #fff7ed;
+  color: #7c5c46;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.permission-card strong {
+  color: var(--app-text);
+  font-size: 18px;
+}
+
+.permission-card p {
+  margin: 0;
+  max-width: 260px;
+  line-height: 1.6;
 }
 
 .upload-status {

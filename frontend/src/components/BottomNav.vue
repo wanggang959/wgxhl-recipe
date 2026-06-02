@@ -1,9 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '../stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const active = computed(() => {
   if (route.path.startsWith('/recipes') && route.query.pick === 'today') return 'today'
@@ -13,13 +15,13 @@ const active = computed(() => {
   return '/recipes'
 })
 
-const items = [
+const items = computed(() => [
   { key: '/recipes', path: '/recipes', label: '首页', icon: 'wap-home-o' },
-  { key: '/manage/base', path: '/manage/base', label: '分类', icon: 'apps-o' },
+  ...(userStore.isAdmin ? [{ key: '/manage/base', path: '/manage/base', label: '分类', icon: 'apps-o' }] : []),
   { key: 'today', path: '/recipes?pick=today', label: '今天吃什么', icon: 'fire-o' },
   { key: '/favorites', path: '/favorites', label: '收藏', icon: 'star-o' },
   { key: '/profile', path: '/profile', label: '我的', icon: 'contact-o' },
-]
+])
 
 function go(item) {
   if (item.key === 'today') {
@@ -64,7 +66,7 @@ function go(item) {
   background: rgba(255, 250, 242, 0.96);
   border-top: 1px solid var(--app-border);
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   box-shadow: 0 -10px 28px rgba(154, 52, 18, 0.1);
   backdrop-filter: blur(14px);
 }

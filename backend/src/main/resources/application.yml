@@ -20,3 +20,8 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: input
+
+auth:
+  jwt:
+    secret: ${JWT_SECRET:wgxhl-recipe-secret-key}
+    expire-hours: ${JWT_EXPIRE_HOURS:168}

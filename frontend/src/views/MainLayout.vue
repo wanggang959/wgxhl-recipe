@@ -2,9 +2,11 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
+import { useUserStore } from '../stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const isShowcase = computed(() => route.query.mode === 'showcase')
 const isTodayMode = computed(() => route.query.pick === 'today')
 </script>
@@ -16,7 +18,14 @@ const isTodayMode = computed(() => route.query.pick === 'today')
         <span>王刚家</span>
         <strong>家常菜谱</strong>
       </button>
-      <van-button v-if="!isTodayMode" round type="warning" size="small" icon="plus" @click="router.push('/recipe/create')">
+      <van-button
+        v-if="!isTodayMode && userStore.isAdmin"
+        round
+        type="warning"
+        size="small"
+        icon="plus"
+        @click="router.push('/recipe/create')"
+      >
         添加
       </van-button>
     </header>

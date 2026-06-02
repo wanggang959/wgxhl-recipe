@@ -2,6 +2,11 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/LoginView.vue'),
+  },
+  {
     path: '/',
     component: () => import('../views/MainLayout.vue'),
     children: [
@@ -48,7 +53,49 @@ const routes = [
   },
 ]
 
-export default createRouter({
+const router = createRouter({
   history: createWebHashHistory(),
   routes,
 })
+
+function getCurrentUser() {
+  const raw = localStorage.getItem('wgxhl_recipe_user')
+  if (!raw) return null
+  try {
+    const user = JSON.parse(raw)
+    if (!user?.id || !user?.token || !user?.userRole) {
+      localStorage.removeItem('wgxhl_recipe_user')
+      return null
+    }
+    return user
+  } catch (error) {
+    localStorage.removeItem('wgxhl_recipe_user')
+    return null
+  }
+}
+
+router.beforeEach((to) => {
+  const user = getCurrentUser()
+  const isLogin = Boolean(user?.id && user?.token && user?.userRole)
+
+  if (to.path === '/login') {
+    if (isLogin) return '/recipes'
+    return true
+  }
+
+  if (!isLogin) {
+    return {
+      path: '/login',
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  const adminOnly = to.path === '/manage/base'
+    || to.path === '/recipe/create'
+    || /^\/recipe\/[^/]+\/edit$/.test(to.path)
+  if (!adminOnly) return true
+  if (user.userRole === 'admin') return true
+  return '/recipes'
+})
+
+export default router

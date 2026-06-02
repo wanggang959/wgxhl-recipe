@@ -11,6 +11,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  canEdit: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['back', 'favorite', 'edit'])
@@ -40,7 +44,7 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
     <section class="summary">
       <div class="title-line">
         <h1>{{ recipe.recipeName }}</h1>
-        <van-button round size="small" type="warning" icon="edit" @click="emit('edit')">
+        <van-button v-if="canEdit" round size="small" type="warning" icon="edit" @click="emit('edit')">
           编辑
         </van-button>
       </div>

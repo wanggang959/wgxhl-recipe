@@ -1,40 +1,36 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showFailToast, showSuccessToast } from 'vant'
-import { login, pageUser } from '../api/user'
+import { closeToast, showConfirmDialog } from 'vant'
+import { createUser, deleteUser, pageUser, updateUser } from '../api/user'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
-const loading = ref(false)
-const loginForm = reactive({
-  username: '',
-  password: '',
-})
+const savingUser = ref(false)
 const users = ref([])
+const actionStatus = ref('')
+const actionStatusType = ref('success')
+const showMemberForm = ref(false)
+let actionStatusTimer = null
 
-async function doLogin() {
-  if (!loginForm.username || !loginForm.password) {
-    showFailToast('请输入用户名和密码')
-    return
-  }
-  loading.value = true
-  try {
-    const res = await login({ ...loginForm })
-    userStore.setUser(res.data)
-    showSuccessToast('登录成功')
-    await loadUsers()
-  } catch (error) {
-    showFailToast(error.message || '登录失败')
-  } finally {
-    loading.value = false
-  }
-}
+const userForm = reactive({
+  id: '',
+  username: '',
+  nickname: '',
+  password: '',
+  userRole: 'user',
+})
+
+const isEditingUser = computed(() => Boolean(userForm.id))
 
 async function loadUsers() {
+  if (!userStore.isAdmin) {
+    users.value = []
+    return
+  }
   try {
-    const res = await pageUser({ current: 1, size: 20 })
+    const res = await pageUser({ current: 1, size: 50 })
     users.value = res.data.records || []
   } catch (error) {
     users.value = []
@@ -43,10 +39,114 @@ async function loadUsers() {
 
 function logout() {
   userStore.logout()
-  showSuccessToast('已退出登录')
+  users.value = []
+  resetUserForm()
+  showActionStatus('已退出登录')
 }
 
-loadUsers()
+function resetUserForm() {
+  userForm.id = ''
+  userForm.username = ''
+  userForm.nickname = ''
+  userForm.password = ''
+  userForm.userRole = 'user'
+  showMemberForm.value = false
+}
+
+function beginAddUser() {
+  userForm.id = ''
+  userForm.username = ''
+  userForm.nickname = ''
+  userForm.password = ''
+  userForm.userRole = 'user'
+  showMemberForm.value = true
+}
+
+function editUser(item) {
+  userForm.id = item.id
+  userForm.username = item.username
+  userForm.nickname = item.nickname || ''
+  userForm.password = ''
+  userForm.userRole = item.userRole || 'user'
+  showMemberForm.value = true
+}
+
+async function saveUser() {
+  if (!userStore.isAdmin) {
+    showActionStatus('只有管理员可以管理家庭成员', 'error')
+    return
+  }
+  if (!userForm.username.trim()) {
+    showActionStatus('请输入用户名', 'error')
+    return
+  }
+  if (!isEditingUser.value && !userForm.password.trim()) {
+    showActionStatus('新增用户需要设置密码', 'error')
+    return
+  }
+
+  savingUser.value = true
+  try {
+    const payload = {
+      ...userForm,
+      username: userForm.username.trim(),
+      nickname: userForm.nickname.trim() || userForm.username.trim(),
+      status: 'normal',
+    }
+    if (!payload.password) {
+      delete payload.password
+    }
+    if (isEditingUser.value) {
+      await updateUser(payload)
+      showActionStatus('成员已更新')
+    } else {
+      await createUser(payload)
+      showActionStatus('成员已新增')
+    }
+    resetUserForm()
+    await loadUsers()
+  } catch (error) {
+    showActionStatus(error.message || '成员保存失败', 'error')
+  } finally {
+    savingUser.value = false
+  }
+}
+
+async function removeUser(item) {
+  if (!userStore.isAdmin) {
+    showActionStatus('只有管理员可以删除家庭成员', 'error')
+    return
+  }
+  try {
+    await showConfirmDialog({
+      title: '删除成员',
+      message: `确认删除「${item.nickname || item.username}」吗？`,
+    })
+    await deleteUser(item.id)
+    showActionStatus('成员已删除')
+    await loadUsers()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  }
+}
+
+function roleText(role) {
+  return role === 'admin' ? '管理员' : '普通用户'
+}
+
+function showActionStatus(message, type = 'success') {
+  closeToast()
+  actionStatus.value = message
+  actionStatusType.value = type
+  window.clearTimeout(actionStatusTimer)
+  actionStatusTimer = window.setTimeout(() => {
+    actionStatus.value = ''
+  }, 2200)
+}
+
+if (userStore.isAdmin) {
+  loadUsers()
+}
 </script>
 
 <template>
@@ -58,11 +158,16 @@ loadUsers()
       <div>
         <p>我的</p>
         <h1>{{ userStore.user?.nickname || userStore.user?.username || '未登录' }}</h1>
-        <span>{{ userStore.user?.id || '登录后可收藏家里的菜单' }}</span>
+        <span>{{ userStore.isLogin ? userStore.roleText : '登录后可收藏家里的菜单' }}</span>
       </div>
     </div>
 
-    <div class="action-grid">
+    <div v-if="actionStatus" class="action-status" :class="{ error: actionStatusType === 'error' }">
+      <van-icon :name="actionStatusType === 'success' ? 'success' : 'warning-o'" />
+      <span>{{ actionStatus }}</span>
+    </div>
+
+    <div v-if="userStore.isAdmin" class="action-grid">
       <button type="button" @click="router.push('/recipe/create')">
         <van-icon name="plus" />
         添加菜谱
@@ -73,37 +178,67 @@ loadUsers()
       </button>
     </div>
 
-    <section v-if="!userStore.isLogin" class="form-card">
-      <h2>账号登录</h2>
-      <van-field v-model="loginForm.username" class="form-field" label="用户名" placeholder="请输入用户名" />
-      <van-field
-        v-model="loginForm.password"
-        class="form-field"
-        label="密码"
-        type="password"
-        placeholder="请输入密码"
-      />
-      <van-button type="warning" round block :loading="loading" @click="doLogin">登录</van-button>
-    </section>
-
-    <section v-else class="form-card">
+    <section class="form-card">
       <h2>账号</h2>
       <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
-      <van-cell title="用户ID" :value="userStore.user?.id" />
+      <van-cell title="权限" :value="userStore.roleText" />
       <van-button plain round type="danger" block @click="logout">退出登录</van-button>
     </section>
 
     <section class="form-card">
-      <h2>家里成员</h2>
-      <van-empty v-if="users.length === 0" description="暂无用户数据" />
-      <van-cell-group v-else>
+      <h2>家庭成员</h2>
+      <div v-if="userStore.isAdmin" class="member-form">
+        <div v-if="!showMemberForm" class="member-toolbar">
+          <van-button type="warning" round size="small" @click="beginAddUser">添加成员</van-button>
+        </div>
+        <div v-else>
+          <van-field v-model="userForm.username" class="form-field" label="用户名" placeholder="用户名唯一" />
+          <van-field v-model="userForm.nickname" class="form-field" label="昵称" placeholder="显示名称" />
+          <van-field
+            v-model="userForm.password"
+            class="form-field"
+            label="密码"
+            type="password"
+            :placeholder="isEditingUser ? '不填则不修改密码' : '请输入密码'"
+          />
+          <label class="role-field">
+            <span>权限</span>
+            <select v-model="userForm.userRole">
+              <option value="user">普通用户（查看、收藏）</option>
+              <option value="admin">管理员（完全控制，仅王师傅）</option>
+            </select>
+          </label>
+          <div class="form-actions">
+            <van-button type="warning" round size="small" :loading="savingUser" @click="saveUser">
+              {{ isEditingUser ? '保存成员' : '新增成员' }}
+            </van-button>
+            <van-button round size="small" @click="resetUserForm">取消</van-button>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="userStore.isLogin" class="permission-note">
+        普通用户可以查看菜谱和收藏菜谱，家庭成员管理由管理员「王师傅」操作。
+      </div>
+      <div v-else class="permission-note">
+        登录后可查看自己的权限，管理员可管理家庭成员。
+      </div>
+
+      <van-empty v-if="userStore.isAdmin && users.length === 0" description="暂无用户数据" />
+      <van-cell-group v-else-if="userStore.isAdmin">
         <van-cell
           v-for="u in users"
           :key="u.id"
           :title="u.nickname || u.username"
-          :label="u.id"
-          :value="u.status || '-'"
-        />
+          :label="u.username"
+          :value="roleText(u.userRole)"
+        >
+          <template #right-icon>
+            <div class="member-actions">
+              <van-button size="mini" plain type="warning" @click="editUser(u)">编辑</van-button>
+              <van-button size="mini" plain type="danger" @click="removeUser(u)">删除</van-button>
+            </div>
+          </template>
+        </van-cell>
       </van-cell-group>
     </section>
   </section>
@@ -166,7 +301,23 @@ h2 {
   margin-top: 4px;
   color: var(--app-muted);
   font-size: 12px;
-  overflow-wrap: anywhere;
+}
+
+.action-status {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #ecfdf3;
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.action-status.error {
+  background: #fff1f2;
+  color: #be123c;
 }
 
 .action-grid {
@@ -194,10 +345,56 @@ h2 {
   font-size: 17px;
 }
 
-:deep(.form-field) {
+::deep(.form-field) {
   margin-bottom: 10px;
   border: 1px solid var(--app-border);
   border-radius: 12px;
   background: #fffaf2;
+}
+
+.role-field {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.role-field span {
+  display: block;
+  margin-bottom: 6px;
+  color: #7c5c46;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.role-field select {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #fffaf2;
+  color: var(--app-text);
+}
+
+.form-actions,
+.member-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.member-toolbar {
+  margin-bottom: 10px;
+}
+
+.form-actions {
+  margin-bottom: 8px;
+}
+
+.permission-note {
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #7c5c46;
+  line-height: 1.6;
+  font-size: 14px;
 }
 </style>

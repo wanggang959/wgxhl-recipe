@@ -246,6 +246,7 @@ async function toggleFavorite(item) {
     <EmptyState
       v-else-if="list.length === 0"
       text="还没有菜谱，先添加一道拿手菜吧"
+      :show-button="userStore.isAdmin"
       @action="router.push('/recipe/create')"
     />
     <section v-else class="showcase-board">
@@ -324,6 +325,7 @@ async function toggleFavorite(item) {
       <EmptyState
         v-else-if="!loading"
         text="还没有菜谱，先添加一道拿手菜吧"
+        :show-button="userStore.isAdmin"
         @action="router.push('/recipe/create')"
       />
     </section>
@@ -377,7 +379,7 @@ async function toggleFavorite(item) {
           @favorite="toggleFavorite"
         />
       </div>
-      <EmptyState v-else-if="!loading" @action="router.push('/recipe/create')" />
+      <EmptyState v-else-if="!loading" :show-button="userStore.isAdmin" @action="router.push('/recipe/create')" />
     </van-list>
   </div>
 </template>
@@ -722,7 +724,7 @@ async function toggleFavorite(item) {
   background: #fff;
   box-shadow: 0 8px 22px rgba(154, 52, 18, 0.07);
   display: grid;
-  grid-template-columns: 22px 1fr 58px;
+  grid-template-columns: 22px minmax(0, 1fr) 64px;
   align-items: center;
   gap: 8px;
   color: var(--app-primary);
@@ -738,12 +740,16 @@ async function toggleFavorite(item) {
 }
 
 .search-card button {
+  width: 64px;
+  min-width: 64px;
   height: 34px;
   border: 0;
   border-radius: 999px;
   background: var(--app-primary-soft);
   color: #c2410c;
   font-weight: 800;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .save-banner,

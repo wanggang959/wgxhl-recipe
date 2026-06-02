@@ -50,82 +50,154 @@ loadUsers()
 </script>
 
 <template>
-  <section class="card-panel page">
-    <h3>我的</h3>
-    <van-cell-group inset>
-      <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username || '未登录'" />
-      <van-cell title="用户ID" :value="userStore.user?.id || '-'" />
-    </van-cell-group>
-
-    <div class="actions">
-      <van-button
-        v-if="userStore.isLogin"
-        plain
-        type="danger"
-        size="small"
-        @click="logout"
-      >
-        退出登录
-      </van-button>
-      <van-button plain type="warning" size="small" @click="router.push('/manage/base')">
-        管理分类/食材
-      </van-button>
+  <section class="profile-page">
+    <div class="profile-card">
+      <div class="avatar">
+        <van-icon name="contact-o" size="32" />
+      </div>
+      <div>
+        <p>我的</p>
+        <h1>{{ userStore.user?.nickname || userStore.user?.username || '未登录' }}</h1>
+        <span>{{ userStore.user?.id || '登录后可收藏家里的菜单' }}</span>
+      </div>
     </div>
 
-    <div v-if="!userStore.isLogin" class="login-box">
-      <h4>账号登录</h4>
-      <van-field v-model="loginForm.username" label="用户名" placeholder="请输入用户名" />
+    <div class="action-grid">
+      <button type="button" @click="router.push('/recipe/create')">
+        <van-icon name="plus" />
+        添加菜谱
+      </button>
+      <button type="button" @click="router.push('/manage/base')">
+        <van-icon name="apps-o" />
+        分类食材
+      </button>
+    </div>
+
+    <section v-if="!userStore.isLogin" class="form-card">
+      <h2>账号登录</h2>
+      <van-field v-model="loginForm.username" class="form-field" label="用户名" placeholder="请输入用户名" />
       <van-field
         v-model="loginForm.password"
+        class="form-field"
         label="密码"
         type="password"
         placeholder="请输入密码"
       />
-      <van-button type="primary" block :loading="loading" @click="doLogin">登录</van-button>
-    </div>
+      <van-button type="warning" round block :loading="loading" @click="doLogin">登录</van-button>
+    </section>
 
-    <div class="tip">
-      <h4>用户列表（便于调试）</h4>
+    <section v-else class="form-card">
+      <h2>账号</h2>
+      <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
+      <van-cell title="用户ID" :value="userStore.user?.id" />
+      <van-button plain round type="danger" block @click="logout">退出登录</van-button>
+    </section>
+
+    <section class="form-card">
+      <h2>家里成员</h2>
       <van-empty v-if="users.length === 0" description="暂无用户数据" />
-      <van-cell-group v-else inset>
+      <van-cell-group v-else>
         <van-cell
           v-for="u in users"
           :key="u.id"
           :title="u.nickname || u.username"
           :label="u.id"
-          :value="u.status || '-'" />
+          :value="u.status || '-'"
+        />
       </van-cell-group>
-    </div>
+    </section>
   </section>
 </template>
 
 <style scoped>
-.page {
-  padding: 16px;
-}
-
-h3 {
-  margin: 0 0 12px;
-}
-
-.actions {
-  margin: 14px 0;
+.profile-page {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.login-box {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid #f0f0f0;
+.profile-card,
+.form-card {
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid var(--app-border);
+  box-shadow: 0 10px 24px rgba(154, 52, 18, 0.06);
+}
+
+.profile-card {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  display: grid;
+  place-items: center;
+}
+
+.profile-card p,
+.profile-card h1,
+.profile-card span,
+h2 {
+  margin: 0;
+}
+
+.profile-card p {
+  color: var(--app-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.profile-card h1 {
+  margin-top: 2px;
+  color: var(--app-text);
+  font-size: 22px;
+}
+
+.profile-card span {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-grid button {
+  height: 52px;
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  background: #fff;
+  color: #7c5c46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+h2 {
+  margin-bottom: 12px;
+  color: var(--app-text);
+  font-size: 17px;
+}
+
+:deep(.form-field) {
+  margin-bottom: 10px;
+  border: 1px solid var(--app-border);
   border-radius: 12px;
-}
-
-h4 {
-  margin: 0 0 10px;
-}
-
-.tip {
-  margin-top: 16px;
+  background: #fffaf2;
 }
 </style>

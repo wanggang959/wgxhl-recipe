@@ -3,6 +3,7 @@ package com.wgxhl.recipe.recipe.dto;
 import com.wgxhl.recipe.image.entity.RecipeImage;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.relation.entity.RecipeIngredientRel;
+import com.wgxhl.recipe.seasoningrelation.entity.RecipeSeasoningRel;
 import com.wgxhl.recipe.step.entity.RecipeStep;
 import lombok.Data;
 
@@ -25,6 +26,11 @@ public class RecipeSaveDTO {
      * 食材关系列表
      */
     private List<RecipeIngredientRel> ingredientList;
+
+    /*
+     * 调料关系列表
+     */
+    private List<RecipeSeasoningRel> seasoningList;
 
     /*
      * 图片列表

@@ -1,0 +1,17 @@
+{
+  "name": "王刚家的家常菜谱",
+  "short_name": "家常菜谱",
+  "description": "记录家里的味道，像点菜一样浏览自己的家常菜谱。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff7ed",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

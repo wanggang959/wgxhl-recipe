@@ -56,6 +56,7 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
                 .orderByAsc(RecipeIngredientRel::getSortNo)
                 .orderByAsc(RecipeIngredientRel::getCreateTime)
                 .list();
+        list.forEach(this::fillIngredientView);
         return ApiResponse.success(list);
     }
 
@@ -195,6 +196,21 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
             return ApiResponse.fail("食材不存在");
         }
         entity.setIngredientName(ingredient.getIngredientName());
+        entity.setIngredientImage(ingredient.getIngredientImage());
         return null;
+    }
+
+    private void fillIngredientView(RecipeIngredientRel entity) {
+        if (entity == null || !StringUtils.hasText(entity.getIngredientId())) {
+            return;
+        }
+        Ingredient ingredient = ingredientService.lambdaQuery()
+                .eq(Ingredient::getId, entity.getIngredientId())
+                .one();
+        if (ingredient == null) {
+            return;
+        }
+        entity.setIngredientName(ingredient.getIngredientName());
+        entity.setIngredientImage(ingredient.getIngredientImage());
     }
 }

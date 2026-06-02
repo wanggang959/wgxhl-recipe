@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { deleteFavorite, pageFavorite } from '../api/favorite'
+import EmptyState from '../components/EmptyState.vue'
+import RecipeCard from '../components/RecipeCard.vue'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
@@ -26,7 +28,11 @@ async function loadFavorite() {
       size: 200,
       userId: userStore.userId,
     })
-    list.value = res.data.records || []
+    list.value = (res.data.records || []).map((item) => ({
+      ...item,
+      id: item.recipeId,
+      favoriteId: item.id,
+    }))
   } catch (error) {
     showFailToast(error.message || '收藏加载失败')
   } finally {
@@ -36,7 +42,7 @@ async function loadFavorite() {
 
 async function remove(item) {
   try {
-    await deleteFavorite(item.id)
+    await deleteFavorite(item.favoriteId)
     showSuccessToast('已取消收藏')
     await loadFavorite()
   } catch (error) {
@@ -46,115 +52,87 @@ async function remove(item) {
 </script>
 
 <template>
-  <section class="card-panel page">
-    <div class="header">
-      <h3>我的收藏</h3>
-      <span v-if="userStore.userId">共 {{ list.length }} 条</span>
+  <section class="favorite-page">
+    <div class="page-head">
+      <div>
+        <p>我的菜单</p>
+        <h1>收藏</h1>
+      </div>
+      <span v-if="userStore.userId">{{ list.length }} 道</span>
     </div>
 
-    <van-empty
+    <EmptyState
       v-if="!userStore.userId"
-      description="请先在“我的”页面登录"
-      class="empty-box"
+      text="请先在“我的”页面登录，再收藏家里的拿手菜"
+      button-text="去登录"
+      @action="router.push('/profile')"
     />
     <van-loading v-else-if="loading" size="24px" class="loading">加载中...</van-loading>
-    <van-empty v-else-if="list.length === 0" description="暂无收藏" class="empty-box" />
-    <div v-else class="grid">
-      <article v-for="item in list" :key="item.id" class="favorite-card">
-        <img
-          :src="item.coverImage || 'https://via.placeholder.com/300x220?text=No+Image'"
-          class="cover"
-          :alt="item.recipeName"
-          @click="router.push(`/recipe/${item.recipeId}`)"
-        />
-        <div class="body">
-          <div class="name" @click="router.push(`/recipe/${item.recipeId}`)">
-            {{ item.recipeName }}
-          </div>
-          <div class="ops">
-            <van-button size="small" plain type="primary" @click="router.push(`/recipe/${item.recipeId}`)">
-              查看
-            </van-button>
-            <van-button size="small" plain type="danger" @click="remove(item)">
-              取消收藏
-            </van-button>
-          </div>
-        </div>
-      </article>
+    <EmptyState
+      v-else-if="list.length === 0"
+      text="还没有收藏菜谱，先去菜单里挑一道吧"
+      button-text="去首页"
+      @action="router.push('/recipes')"
+    />
+    <div v-else class="cards">
+      <RecipeCard
+        v-for="item in list"
+        :key="item.favoriteId"
+        :recipe="item"
+        favorite
+        @open="router.push(`/recipe/${item.id}`)"
+        @favorite="remove"
+      />
     </div>
   </section>
 </template>
 
 <style scoped>
-.page {
-  padding: 16px;
-}
-
-.header {
+.favorite-page {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.page-head {
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid var(--app-border);
+  display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
+  align-items: end;
 }
 
-.header h3 {
+.page-head p,
+.page-head h1 {
   margin: 0;
-  font-size: 20px;
 }
 
-.header span {
+.page-head p {
+  color: var(--app-primary);
   font-size: 13px;
-  color: #9ca3af;
+  font-weight: 800;
+}
+
+.page-head h1 {
+  margin-top: 2px;
+  color: var(--app-text);
+  font-size: 26px;
+}
+
+.page-head span {
+  color: var(--app-muted);
+  font-size: 13px;
 }
 
 .loading {
   margin-top: 30px;
 }
 
-.grid {
+.cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.favorite-card {
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.cover {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
-  cursor: pointer;
-}
-
-.body {
-  padding: 10px;
-}
-
-.name {
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.ops {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
-}
-
-@media (max-width: 1024px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 </style>

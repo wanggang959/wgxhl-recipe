@@ -39,6 +39,14 @@ const imageStyle = computed(() => {
   }
 })
 
+const minScale = computed(() => {
+  const baseScale = getBaseScale()
+  if (!baseScale) {
+    return 1
+  }
+  return Math.max(0.2, Math.min(1, getContainScale() / baseScale))
+})
+
 function open(file, options = {}) {
   return new Promise((resolve, reject) => {
     if (!(file instanceof File) || !file.type.startsWith('image/')) {
@@ -82,6 +90,14 @@ function getBaseScale() {
     return 1
   }
   return Math.max(frame.width / imageSize.width, frame.height / imageSize.height)
+}
+
+function getContainScale() {
+  const frame = getFrameSize()
+  if (!frame.width || !frame.height || !imageSize.width || !imageSize.height) {
+    return 1
+  }
+  return Math.min(frame.width / imageSize.width, frame.height / imageSize.height)
 }
 
 function getDisplaySize() {
@@ -140,6 +156,7 @@ function endDrag() {
 }
 
 function handleScaleChange() {
+  transform.scale = Math.max(minScale.value, transform.scale)
   constrainOffset()
 }
 
@@ -153,12 +170,7 @@ async function confirmCrop() {
 
   const left = (frame.width - display.width) / 2 + transform.offsetX
   const top = (frame.height - display.height) / 2 + transform.offsetY
-  const sx = Math.max(0, (-left / display.width) * imageSize.width)
-  const sy = Math.max(0, (-top / display.height) * imageSize.height)
-  const sw = Math.min(imageSize.width - sx, (frame.width / display.width) * imageSize.width)
-  const sh = Math.min(imageSize.height - sy, (frame.height / display.height) * imageSize.height)
-
-  const outputWidth = Math.round(Math.min(1600, sw))
+  const outputWidth = Math.round(Math.min(1600, frame.width * 3))
   const outputHeight = Math.round(outputWidth / aspectRatio.value)
   const canvas = document.createElement('canvas')
   canvas.width = outputWidth
@@ -173,7 +185,14 @@ async function confirmCrop() {
   img.onload = async () => {
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outputWidth, outputHeight)
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, outputWidth, outputHeight)
+
+    const destWidth = (display.width / frame.width) * outputWidth
+    const destHeight = (display.height / frame.height) * outputHeight
+    const destX = (left / frame.width) * outputWidth
+    const destY = (top / frame.height) * outputHeight
+    ctx.drawImage(img, destX, destY, destWidth, destHeight)
     const blob = await new Promise((resolve) => {
       canvas.toBlob(resolve, 'image/webp', 0.92)
     })
@@ -246,7 +265,14 @@ defineExpose({
       </div>
       <div class="crop-controls">
         <span>缩放</span>
-        <input v-model.number="transform.scale" type="range" min="1" max="3" step="0.01" @input="handleScaleChange" />
+        <input
+          v-model.number="transform.scale"
+          type="range"
+          :min="minScale"
+          max="3"
+          step="0.01"
+          @input="handleScaleChange"
+        />
       </div>
       <div class="crop-actions">
         <van-button @click="cancelCrop">取消</van-button>

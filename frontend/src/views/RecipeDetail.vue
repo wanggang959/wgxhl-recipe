@@ -1,9 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
+import { pageIngredient } from '../api/ingredient'
 import { getRecipeDetail } from '../api/recipe'
+import { pageSeasoning } from '../api/seasoning'
+import RecipeDetail from '../components/RecipeDetail.vue'
 import { useUserStore } from '../stores/user'
 
 const route = useRoute()
@@ -15,11 +18,11 @@ const detail = ref({
   recipe: {},
   recipeStepList: [],
   ingredientList: [],
+  seasoningList: [],
   imageList: [],
 })
 const isFavorite = ref(false)
-
-const recipe = computed(() => detail.value.recipe || {})
+const errorText = ref('')
 
 onMounted(async () => {
   await loadDetail()
@@ -27,17 +30,55 @@ onMounted(async () => {
 
 async function loadDetail() {
   loading.value = true
+  errorText.value = ''
   try {
     const res = await getRecipeDetail(route.params.id)
     detail.value = res.data
+    await mergeIngredientImages()
+    await mergeSeasoningImages()
     if (userStore.userId) {
       const fav = await checkFavorite(userStore.userId, route.params.id)
       isFavorite.value = Boolean(fav.data)
     }
   } catch (error) {
-    showFailToast(error.message || '详情加载失败')
+    errorText.value = error.message || '详情加载失败'
+    showFailToast(errorText.value)
   } finally {
     loading.value = false
+  }
+}
+
+async function mergeSeasoningImages() {
+  const seasoningList = detail.value.seasoningList || []
+  const needsImage = seasoningList.some((item) => item.seasoningId && !item.seasoningImage)
+  if (!needsImage) {
+    return
+  }
+  const res = await pageSeasoning({ current: 1, size: 1000 })
+  const imageMap = new Map((res.data.records || []).map((item) => [item.id, item.seasoningImage]))
+  detail.value = {
+    ...detail.value,
+    seasoningList: seasoningList.map((item) => ({
+      ...item,
+      seasoningImage: item.seasoningImage || imageMap.get(item.seasoningId) || '',
+    })),
+  }
+}
+
+async function mergeIngredientImages() {
+  const ingredientList = detail.value.ingredientList || []
+  const needsImage = ingredientList.some((item) => item.ingredientId && !item.ingredientImage)
+  if (!needsImage) {
+    return
+  }
+  const res = await pageIngredient({ current: 1, size: 1000 })
+  const imageMap = new Map((res.data.records || []).map((item) => [item.id, item.ingredientImage]))
+  detail.value = {
+    ...detail.value,
+    ingredientList: ingredientList.map((item) => ({
+      ...item,
+      ingredientImage: item.ingredientImage || imageMap.get(item.ingredientId) || '',
+    })),
   }
 }
 
@@ -63,200 +104,43 @@ async function toggleFavorite() {
 </script>
 
 <template>
-  <div class="page-wrap">
-    <section class="card-panel page">
-      <van-nav-bar title="菜谱详情" left-arrow @click-left="router.back()">
-        <template #right>
-          <van-icon
-            :name="isFavorite ? 'like' : 'like-o'"
-            :color="isFavorite ? '#ef4444' : '#6b7280'"
-            size="22"
-            @click="toggleFavorite"
-          />
-        </template>
-      </van-nav-bar>
-
+  <div class="app-shell">
+    <main class="page-wrap detail-page">
       <van-loading v-if="loading" size="24px" class="loading">加载中...</van-loading>
-      <div v-else>
-        <img
-          class="cover"
-          :src="recipe.coverImage || 'https://via.placeholder.com/1000x520?text=No+Image'"
-          :alt="recipe.recipeName"
-        />
-        <div class="summary">
-          <h1>{{ recipe.recipeName }}</h1>
-          <p>{{ recipe.recipeDesc || '暂无简介' }}</p>
-          <div class="tags">
-            <van-tag type="warning">{{ recipe.categoryName || '未分类' }}</van-tag>
-            <van-tag plain>{{ recipe.difficulty || '普通' }}</van-tag>
-            <van-tag plain>{{ recipe.cookingTime || '-' }}</van-tag>
-            <van-tag plain>{{ recipe.servingCount || '-' }}</van-tag>
-          </div>
-        </div>
-
-        <div class="section">
-          <h3>食材</h3>
-          <van-empty v-if="detail.ingredientList.length === 0" description="暂无食材" />
-          <div v-else class="ingredient-grid">
-            <div v-for="item in detail.ingredientList" :key="item.id" class="ingredient-item">
-              <div class="name">{{ item.ingredientName }}</div>
-              <div class="amount">{{ item.amount || '-' }} {{ item.unit || '' }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <h3>制作步骤</h3>
-          <van-empty v-if="detail.recipeStepList.length === 0" description="暂无步骤" />
-          <div v-else class="step-list">
-            <article v-for="item in detail.recipeStepList" :key="item.id" class="step-card">
-              <div class="step-index">{{ item.stepNo }}</div>
-              <div class="step-body">
-                <div class="step-title">{{ item.stepTitle || `步骤 ${item.stepNo}` }}</div>
-                <div class="step-desc">{{ item.stepDesc || '暂无说明' }}</div>
-                <img
-                  v-if="item.stepImage"
-                  :src="item.stepImage"
-                  :alt="item.stepTitle || 'step-image'"
-                  class="step-image"
-                />
-              </div>
-            </article>
-          </div>
-        </div>
-
-        <div class="ops">
-          <van-button type="warning" block @click="router.push(`/recipe/${route.params.id}/edit`)">
-            编辑菜谱
-          </van-button>
-        </div>
+      <div v-else-if="errorText" class="error-card">
+        <span>{{ errorText }}</span>
+        <van-button size="small" plain type="warning" @click="loadDetail">重试</van-button>
       </div>
-    </section>
+      <RecipeDetail
+        v-else
+        :detail="detail"
+        :favorite="isFavorite"
+        @back="router.back()"
+        @favorite="toggleFavorite"
+        @edit="router.push(`/recipe/${route.params.id}/edit`)"
+      />
+    </main>
   </div>
 </template>
 
 <style scoped>
-.page {
-  padding-bottom: 20px;
+.detail-page {
+  min-height: 100vh;
 }
 
 .loading {
-  margin-top: 24px;
+  margin-top: 40px;
 }
 
-.cover {
-  width: 100%;
-  max-height: 460px;
-  object-fit: cover;
-}
-
-.summary {
-  padding: 14px;
-}
-
-h1 {
-  margin: 0;
-  font-size: 28px;
-}
-
-.summary p {
-  margin: 8px 0;
-  color: #6b7280;
-}
-
-.tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.section {
-  padding: 0 14px 14px;
-}
-
-.section h3 {
-  margin: 10px 0;
-}
-
-.ingredient-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.ingredient-item {
-  border: 1px solid #f0f0f0;
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.ingredient-item .name {
-  font-weight: 600;
-}
-
-.amount {
-  margin-top: 4px;
-  color: #6b7280;
-}
-
-.step-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.step-card {
-  display: flex;
-  gap: 10px;
-  border: 1px solid #f0f0f0;
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.step-index {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #f59e0b;
-  color: #fff;
+.error-card {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff1f2;
+  color: #be123c;
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-weight: 600;
-}
-
-.step-body {
-  flex: 1;
-}
-
-.step-title {
-  font-weight: 600;
-}
-
-.step-desc {
-  margin-top: 6px;
-  color: #6b7280;
-  white-space: pre-wrap;
-}
-
-.step-image {
-  margin-top: 8px;
-  width: 220px;
-  max-width: 100%;
-  border-radius: 8px;
-}
-
-.ops {
-  padding: 14px;
-}
-
-@media (max-width: 768px) {
-  h1 {
-    font-size: 22px;
-  }
-
-  .ingredient-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  justify-content: space-between;
+  gap: 10px;
 }
 </style>

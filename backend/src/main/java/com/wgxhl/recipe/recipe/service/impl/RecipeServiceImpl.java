@@ -18,6 +18,8 @@ import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
 import com.wgxhl.recipe.record.service.RecipeViewRecordService;
 import com.wgxhl.recipe.relation.dto.RecipeIngredientRelBatchDTO;
 import com.wgxhl.recipe.relation.service.RecipeIngredientRelService;
+import com.wgxhl.recipe.seasoningrelation.dto.RecipeSeasoningRelBatchDTO;
+import com.wgxhl.recipe.seasoningrelation.service.RecipeSeasoningRelService;
 import com.wgxhl.recipe.step.dto.RecipeStepBatchDTO;
 import com.wgxhl.recipe.step.entity.RecipeStep;
 import com.wgxhl.recipe.step.service.RecipeStepService;
@@ -38,6 +40,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private final RecipeStepService recipeStepService;
     private final RecipeImageService recipeImageService;
     private final RecipeIngredientRelService recipeIngredientRelService;
+    private final RecipeSeasoningRelService recipeSeasoningRelService;
     private final UserFavoriteService userFavoriteService;
     private final RecipeViewRecordService recipeViewRecordService;
 
@@ -45,12 +48,14 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                              RecipeStepService recipeStepService,
                              RecipeImageService recipeImageService,
                              RecipeIngredientRelService recipeIngredientRelService,
+                             RecipeSeasoningRelService recipeSeasoningRelService,
                              UserFavoriteService userFavoriteService,
                              RecipeViewRecordService recipeViewRecordService) {
         this.recipeCategoryService = recipeCategoryService;
         this.recipeStepService = recipeStepService;
         this.recipeImageService = recipeImageService;
         this.recipeIngredientRelService = recipeIngredientRelService;
+        this.recipeSeasoningRelService = recipeSeasoningRelService;
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
     }
@@ -221,7 +226,15 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         RecipeImageBatchDTO imageBatchDTO = new RecipeImageBatchDTO();
         imageBatchDTO.setRecipeId(recipeId);
         imageBatchDTO.setImageList(dto.getImageList());
-        return recipeImageService.saveBatchByRecipeId(imageBatchDTO);
+        ApiResponse<Void> imageResult = recipeImageService.saveBatchByRecipeId(imageBatchDTO);
+        if (imageResult.getStatus() != 200) {
+            return imageResult;
+        }
+
+        RecipeSeasoningRelBatchDTO seasoningBatchDTO = new RecipeSeasoningRelBatchDTO();
+        seasoningBatchDTO.setRecipeId(recipeId);
+        seasoningBatchDTO.setRelList(dto.getSeasoningList());
+        return recipeSeasoningRelService.saveBatchByRecipeId(seasoningBatchDTO);
     }
 
     private void clearChildrenByRecipeId(String recipeId) {
@@ -236,6 +249,10 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         RecipeImageBatchDTO imageBatchDTO = new RecipeImageBatchDTO();
         imageBatchDTO.setRecipeId(recipeId);
         recipeImageService.saveBatchByRecipeId(imageBatchDTO);
+
+        RecipeSeasoningRelBatchDTO seasoningBatchDTO = new RecipeSeasoningRelBatchDTO();
+        seasoningBatchDTO.setRecipeId(recipeId);
+        recipeSeasoningRelService.saveBatchByRecipeId(seasoningBatchDTO);
     }
 
     private RecipeDetailVO buildDetailVO(Recipe recipe) {
@@ -243,6 +260,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         vo.setRecipe(recipe);
         vo.setRecipeStepList(recipeStepService.listByRecipeId(recipe.getId()).getData());
         vo.setIngredientList(recipeIngredientRelService.listByRecipeId(recipe.getId()).getData());
+        vo.setSeasoningList(recipeSeasoningRelService.listByRecipeId(recipe.getId()).getData());
         vo.setImageList(recipeImageService.listByRecipeId(recipe.getId()).getData());
         return vo;
     }

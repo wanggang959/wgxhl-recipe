@@ -1,4 +1,4 @@
-package com.wgxhl.recipe.relation.entity;
+package com.wgxhl.recipe.seasoningrelation.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -9,55 +9,28 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("recipe_ingredient_rel")
-public class RecipeIngredientRel {
+@TableName("recipe_seasoning_rel")
+public class RecipeSeasoningRel {
 
     @TableId(value = "id", type = IdType.INPUT)
     private String id;
 
-    /*
-     * 菜谱id
-     */
     private String recipeId;
 
-    /*
-     * 食材id
-     */
-    private String ingredientId;
+    private String seasoningId;
 
-    /*
-     * 食材名称冗余
-     */
-    private String ingredientName;
+    private String seasoningName;
 
-    /*
-     * 食材图片，仅用于详情展示，不写入关系表
-     */
     @TableField(exist = false)
-    private String ingredientImage;
+    private String seasoningImage;
 
-    /*
-     * 用量
-     */
     private String amount;
 
-    /*
-     * 单位
-     */
     private String unit;
 
-    /*
-     * 排序号
-     */
     private Integer sortNo;
 
-    /*
-     * 创建时间
-     */
     private LocalDateTime createTime;
 
-    /*
-     * 更新时间
-     */
     private LocalDateTime updateTime;
 }

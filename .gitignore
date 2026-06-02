@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build
+frontend/dist/
+backend/target/
+backend/scripts/node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env & secrets
+backend/src/main/resources/application-dev.yml
+frontend/.env.local
+frontend/.env.*.local
+.cursor/mcp.json

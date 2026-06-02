@@ -1,0 +1,193 @@
+USE recipe;
+
+create table recipe_category
+(
+    id varchar(36) not null comment '主键id',
+
+    category_name varchar(64) not null comment '分类名称',
+    category_code varchar(64) not null comment '分类编码',
+    sort_no int comment '排序号',
+    category_desc varchar(255) comment '分类描述',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id),
+    unique key uk_recipe_category_code (category_code),
+    unique key uk_recipe_category_name (category_name)
+)
+engine=innodb
+default charset=utf8mb4
+comment='菜谱分类表';
+
+
+create table recipe
+(
+    id varchar(36) not null comment '主键id',
+
+    recipe_name varchar(128) not null comment '菜谱名称',
+    recipe_desc varchar(255) comment '菜谱简介',
+    cover_image varchar(255) comment '封面图片地址',
+    difficulty varchar(32) comment '难度',
+    cooking_time varchar(32) comment '制作耗时',
+    serving_count varchar(32) comment '适合人数',
+    taste varchar(64) comment '口味',
+    status varchar(32) comment '状态',
+
+    category_id varchar(36) comment '分类id',
+    category_name varchar(64) comment '分类名称冗余',
+
+    remark varchar(255) comment '备注',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id),
+    unique key uk_recipe_name (recipe_name)
+)
+engine=innodb
+default charset=utf8mb4
+comment='菜谱信息表';
+
+
+create table recipe_image
+(
+    id varchar(36) not null comment '主键id',
+
+    recipe_id varchar(36) not null comment '菜谱id',
+    image_type varchar(32) not null comment '图片类型：cover-封面，ingredient-食材，step-步骤，finish-成品',
+    image_url varchar(255) not null comment '图片地址',
+    sort_no int comment '排序号',
+    image_desc varchar(255) comment '图片描述',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id)
+)
+engine=innodb
+default charset=utf8mb4
+comment='菜谱图片表';
+
+
+create table recipe_step
+(
+    id varchar(36) not null comment '主键id',
+
+    recipe_id varchar(36) not null comment '菜谱id',
+    step_no int not null comment '步骤序号',
+    step_title varchar(128) comment '步骤标题',
+    step_desc text comment '步骤说明',
+    step_image varchar(255) comment '步骤图片地址',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id),
+    unique key uk_recipe_step_no (recipe_id, step_no)
+)
+engine=innodb
+default charset=utf8mb4
+comment='菜谱制作步骤表';
+
+
+create table ingredient
+(
+    id varchar(36) not null comment '主键id',
+
+    ingredient_name varchar(128) not null comment '食材名称',
+    ingredient_image varchar(255) comment '食材图片地址',
+    ingredient_desc varchar(255) comment '食材描述',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id),
+    unique key uk_ingredient_name (ingredient_name)
+)
+engine=innodb
+default charset=utf8mb4
+comment='食材信息表';
+
+
+create table recipe_ingredient_rel
+(
+    id varchar(36) not null comment '主键id',
+
+    recipe_id varchar(36) not null comment '菜谱id',
+    ingredient_id varchar(36) not null comment '食材id',
+    ingredient_name varchar(128) comment '食材名称冗余',
+    amount varchar(64) comment '用量',
+    unit varchar(32) comment '单位',
+    sort_no int comment '排序号',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id),
+    unique key uk_recipe_ingredient_rel (recipe_id, ingredient_id)
+)
+engine=innodb
+default charset=utf8mb4
+comment='菜谱食材关系表';
+
+
+create table user_favorite
+(
+    id varchar(36) not null comment '主键id',
+
+    user_id varchar(36) not null comment '用户id',
+    recipe_id varchar(36) not null comment '菜谱id',
+    recipe_name varchar(128) comment '菜谱名称冗余',
+    cover_image varchar(255) comment '封面图片地址冗余',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id),
+    unique key uk_user_favorite (user_id, recipe_id)
+)
+engine=innodb
+default charset=utf8mb4
+comment='用户收藏表';
+
+
+create table recipe_view_record
+(
+    id varchar(36) not null comment '主键id',
+
+    user_id varchar(36) comment '用户id',
+    recipe_id varchar(36) not null comment '菜谱id',
+    recipe_name varchar(128) comment '菜谱名称冗余',
+    view_time datetime comment '浏览时间',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id)
+)
+engine=innodb
+default charset=utf8mb4
+comment='菜谱浏览记录表';
+
+
+create table app_user
+(
+    id varchar(36) not null comment '主键id',
+
+    username varchar(64) not null comment '用户名',
+    nickname varchar(64) comment '昵称',
+    password varchar(255) comment '密码',
+    avatar varchar(255) comment '头像地址',
+    user_role varchar(32) comment '用户角色',
+    status varchar(32) comment '状态',
+
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
+
+    primary key (id),
+    unique key uk_app_user_username (username)
+)
+engine=innodb
+default charset=utf8mb4
+comment='用户信息表';

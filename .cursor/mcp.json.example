@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "mysql": {
+      "command": "D:\\software\\nodejs\\npx.cmd",
+      "args": ["-y", "@benborla29/mcp-server-mysql"],
+      "env": {
+        "MYSQL_HOST": "wgxhl.space",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "recipe",
+        "MYSQL_PASS": "123456",
+        "MYSQL_DB": "recipe",
+        "ALLOW_INSERT_OPERATION": "true",
+        "ALLOW_UPDATE_OPERATION": "true",
+        "ALLOW_DELETE_OPERATION": "true",
+        "PATH": "D:\\software\\nodejs"
+      }
+    }
+  }
+}

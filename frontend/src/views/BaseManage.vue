@@ -5,10 +5,13 @@ import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { createCategory, deleteCategory, pageCategory, updateCategory } from '../api/category'
 import { uploadImage } from '../api/file'
 import { createIngredient, deleteIngredient, pageIngredient, updateIngredient } from '../api/ingredient'
+import ImageCropper from '../components/ImageCropper.vue'
+import { transcodeImageToWebp } from '../utils/image'
 
 const router = useRouter()
 const active = ref('category')
 const uploading = ref(false)
+const imageCropperRef = ref(null)
 
 const categoryList = ref([])
 const ingredientList = ref([])
@@ -56,13 +59,19 @@ function getRawFile(fileWrapper) {
 }
 
 async function uploadIngredientImage(fileWrapper) {
-  const file = getRawFile(fileWrapper)
-  if (!file) {
+  const rawFile = getRawFile(fileWrapper)
+  if (!rawFile) {
     showFailToast('未获取到图片文件')
     return
   }
+  const croppedFile = await imageCropperRef.value?.open(rawFile, { aspectRatio: 1 })
+  if (!croppedFile) {
+    return
+  }
+
   uploading.value = true
   try {
+    const file = await transcodeImageToWebp(croppedFile, { minCompressBytes: 0 })
     const res = await uploadImage(file, 'ingredient')
     ingredientForm.ingredientImage = res.data
     showSuccessToast('图片上传成功')
@@ -149,6 +158,7 @@ loadIngredient().catch((e) => showFailToast(e.message || '食材加载失败'))
 
 <template>
   <div class="page-wrap">
+    <ImageCropper ref="imageCropperRef" />
     <section class="card-panel page">
       <van-nav-bar title="基础数据管理" left-arrow @click-left="router.back()" />
       <van-tabs v-model:active="active">

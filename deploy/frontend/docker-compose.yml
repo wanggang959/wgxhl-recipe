@@ -1,0 +1,10 @@
+services:
+  recipe-frontend:
+    build: .
+    image: wgxhl-recipe-frontend:1.0.0
+    container_name: wgxhl-recipe-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

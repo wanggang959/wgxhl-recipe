@@ -25,3 +25,7 @@ backend/src/main/resources/application-dev.yml
 frontend/.env.local
 frontend/.env.*.local
 .cursor/mcp.json
+deploy/backend/.env
+deploy/backend/*.jar
+deploy/frontend/.env
+deploy/frontend/dist/

@@ -1,11 +1,12 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showFailToast, showSuccessToast } from 'vant'
+import { closeToast, showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
 import { uploadImage } from '../api/file'
 import { pageIngredient } from '../api/ingredient'
 import { createRecipe, getRecipeDetail, updateRecipe } from '../api/recipe'
+import ImageCropper from '../components/ImageCropper.vue'
 import { transcodeImageToWebp } from '../utils/image'
 
 const route = useRoute()
@@ -43,6 +44,7 @@ const ingredientUnitOptions = ['克', '千克', '个', '根']
 const isEdit = computed(() => Boolean(route.params.id))
 const uploading = ref(false)
 const cookingMinutes = ref('')
+const imageCropperRef = ref(null)
 
 async function bootstrap() {
   loading.value = true
@@ -117,9 +119,14 @@ function getRawFile(fileWrapper) {
   return fileWrapper?.file || fileWrapper
 }
 
-async function doUpload(fileWrapper, folder) {
+async function doUpload(fileWrapper, folder, cropOptions = {}) {
   const rawFile = getRawFile(fileWrapper)
-  const file = await transcodeImageToWebp(rawFile)
+  const croppedFile = await imageCropperRef.value?.open(rawFile, cropOptions)
+  if (!croppedFile) {
+    return ''
+  }
+
+  const file = await transcodeImageToWebp(croppedFile, { minCompressBytes: 0 })
   if (!file) {
     throw new Error('未获取到上传文件')
   }
@@ -135,7 +142,8 @@ async function doUpload(fileWrapper, folder) {
 
 async function uploadCover(fileWrapper) {
   try {
-    form.recipe.coverImage = await doUpload(fileWrapper, 'recipe/cover')
+    const imageUrl = await doUpload(fileWrapper, 'recipe/cover', { aspectRatio: 4 / 3 })
+    if (imageUrl) form.recipe.coverImage = imageUrl
   } catch (error) {
     showFailToast(error.message || '封面上传失败')
   }
@@ -143,7 +151,8 @@ async function uploadCover(fileWrapper) {
 
 async function uploadStepImage(index, fileWrapper) {
   try {
-    form.recipeStepList[index].stepImage = await doUpload(fileWrapper, 'recipe/step')
+    const imageUrl = await doUpload(fileWrapper, 'recipe/step', { aspectRatio: 4 / 3 })
+    if (imageUrl) form.recipeStepList[index].stepImage = imageUrl
   } catch (error) {
     showFailToast(error.message || '步骤图上传失败')
   }
@@ -151,7 +160,8 @@ async function uploadStepImage(index, fileWrapper) {
 
 async function uploadRecipeImage(index, fileWrapper) {
   try {
-    form.imageList[index].imageUrl = await doUpload(fileWrapper, 'recipe/gallery')
+    const imageUrl = await doUpload(fileWrapper, 'recipe/gallery', { aspectRatio: 4 / 3 })
+    if (imageUrl) form.imageList[index].imageUrl = imageUrl
   } catch (error) {
     showFailToast(error.message || '图片上传失败')
   }
@@ -162,12 +172,21 @@ async function submit() {
     showFailToast('请输入菜谱名称')
     return
   }
+  if (saving.value) {
+    return
+  }
+
   saving.value = true
+  showLoadingToast({
+    message: '正在保存...',
+    forbidClick: true,
+    duration: 0,
+  })
   try {
     const normalizedCookingTime = normalizeCookingTime(cookingMinutes.value)
     if (normalizedCookingTime && Number.parseInt(normalizedCookingTime, 10) <= 0) {
+      closeToast()
       showFailToast('耗时分钟数需大于0')
-      saving.value = false
       return
     }
 
@@ -192,14 +211,17 @@ async function submit() {
     }
     if (isEdit.value) {
       await updateRecipe(payload)
-      showSuccessToast('菜谱更新成功')
-      router.push(`/recipe/${form.recipe.id}`)
     } else {
-      const res = await createRecipe(payload)
-      showSuccessToast('菜谱创建成功')
-      router.push(`/recipe/${res.data.recipe.id}`)
+      await createRecipe(payload)
     }
+    closeToast()
+    sessionStorage.setItem(
+      'recipeSaveMessage',
+      isEdit.value ? '菜谱更新成功' : '菜谱创建成功',
+    )
+    await router.replace('/recipes')
   } catch (error) {
+    closeToast()
     showFailToast(error.message || '保存失败')
   } finally {
     saving.value = false
@@ -224,6 +246,7 @@ bootstrap()
 
 <template>
   <div class="page-wrap">
+    <ImageCropper ref="imageCropperRef" />
     <section class="card-panel page">
       <van-nav-bar :title="isEdit ? '编辑菜谱' : '新增菜谱'" left-arrow @click-left="router.back()" />
 
@@ -401,8 +424,15 @@ bootstrap()
         <van-button plain size="small" type="primary" @click="addImage">+ 添加图片</van-button>
 
         <div class="submit">
-          <van-button type="warning" block :loading="saving" @click="submit">
-            {{ isEdit ? '保存修改' : '创建菜谱' }}
+          <van-button
+            type="warning"
+            block
+            :disabled="uploading"
+            :loading="saving"
+            loading-text="保存中..."
+            @click="submit"
+          >
+            {{ isEdit ? '完成修改' : '完成创建' }}
           </van-button>
         </div>
       </div>

@@ -16,6 +16,7 @@ const loading = ref(false)
 const finished = ref(false)
 const total = ref(0)
 const favoriteMap = ref({})
+const saveMessage = ref('')
 
 const query = reactive({
   current: 1,
@@ -45,6 +46,14 @@ const currentCategoryName = computed(() => {
 })
 
 onMounted(async () => {
+  const message = sessionStorage.getItem('recipeSaveMessage')
+  if (message) {
+    saveMessage.value = message
+    sessionStorage.removeItem('recipeSaveMessage')
+    window.setTimeout(() => {
+      saveMessage.value = ''
+    }, 2400)
+  }
   await Promise.all([loadCategory(), refreshList()])
 })
 
@@ -220,6 +229,11 @@ async function removeRecipe(item) {
         </div>
       </div>
 
+      <div v-if="saveMessage" class="save-banner">
+        <van-icon name="success" />
+        <span>{{ saveMessage }}，已回到首页</span>
+      </div>
+
       <div class="filters">
         <van-field v-model="filter.recipeName" clearable placeholder="搜索菜谱名" />
 
@@ -253,7 +267,6 @@ async function removeRecipe(item) {
       <van-list
         :loading="loading"
         :finished="finished"
-        finished-text="没有更多了"
         @load="loadMore"
       >
         <div class="cards" v-if="hasData">
@@ -397,6 +410,18 @@ async function removeRecipe(item) {
   margin-top: 2px;
   color: #9ca3af;
   font-size: 13px;
+}
+
+.save-banner {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
 }
 
 .filters {

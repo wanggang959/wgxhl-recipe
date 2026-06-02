@@ -136,14 +136,15 @@ function showStatus(message, type = 'success') {
               <van-icon name="contact-o" />
               用户名
             </label>
-            <van-field
-              id="login-username"
-              v-model="form.username"
-              class="login-field"
-              placeholder="请输入用户名"
-              clearable
-              autocomplete="username"
-            />
+            <div class="input-shell">
+              <input
+                id="login-username"
+                v-model="form.username"
+                class="native-input"
+                placeholder="请输入用户名"
+                autocomplete="username"
+              >
+            </div>
           </div>
 
           <div class="field-group">
@@ -151,21 +152,20 @@ function showStatus(message, type = 'success') {
               <van-icon name="lock" />
               密码
             </label>
-            <van-field
-              id="login-password"
-              v-model="form.password"
-              class="login-field"
-              :type="passwordVisible ? 'text' : 'password'"
-              placeholder="请输入密码"
-              autocomplete="current-password"
-              @keyup.enter="submit"
-            >
-              <template #right-icon>
-                <button class="icon-button" type="button" @click="passwordVisible = !passwordVisible">
-                  <van-icon :name="passwordVisible ? 'eye-o' : 'closed-eye'" />
-                </button>
-              </template>
-            </van-field>
+            <div class="input-shell password-shell">
+              <input
+                id="login-password"
+                v-model="form.password"
+                class="native-input"
+                :type="passwordVisible ? 'text' : 'password'"
+                placeholder="请输入密码"
+                autocomplete="current-password"
+                @keyup.enter="submit"
+              >
+              <button class="icon-button" type="button" @click="passwordVisible = !passwordVisible">
+                <van-icon :name="passwordVisible ? 'eye-o' : 'closed-eye'" />
+              </button>
+            </div>
           </div>
 
           <div class="form-options">
@@ -436,24 +436,47 @@ function showStatus(message, type = 'success') {
   font-size: 22px;
 }
 
-::deep(.login-field) {
-  height: 56px;
+.input-shell {
+  height: 52px;
   display: flex;
   align-items: center;
   padding: 0 14px;
-  border: 1px solid #ead9cd;
+  border: 2px solid #dfc4b3;
   border-radius: 999px;
-  background: rgba(255, 253, 249, 0.92);
-  box-shadow: inset 0 2px 8px rgba(117, 58, 16, 0.04);
+  background: #fffaf4;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72),
+    inset 0 2px 9px rgba(117, 58, 16, 0.04),
+    0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
-::deep(.login-field .van-field__control) {
+.input-shell:focus-within {
+  border-color: rgba(255, 107, 24, 0.72);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 0 0 3px rgba(255, 122, 26, 0.09),
+    inset 0 2px 8px rgba(117, 58, 16, 0.03);
+}
+
+.native-input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
   color: #3e2818;
+  background: transparent;
+  font: inherit;
   font-size: 16px;
 }
 
-::deep(.login-field .van-field__control::placeholder) {
+.native-input::placeholder {
   color: #b7aaa1;
+}
+
+.password-shell {
+  gap: 8px;
 }
 
 .icon-button,

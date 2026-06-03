@@ -242,7 +242,7 @@ function getUserName(userId) {
   border: 1px solid var(--app-border);
   box-shadow: 0 12px 26px rgba(154, 52, 18, 0.08);
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 76px;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
 }
@@ -269,15 +269,28 @@ function getUserName(userId) {
 }
 
 .todo-item button {
+  box-sizing: border-box;
+  min-width: 78px;
   height: 36px;
   border: 0;
   border-radius: 999px;
+  padding: 0 12px;
   background: var(--app-primary);
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  font-size: 14px;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.todo-item button :deep(.van-icon) {
+  flex: 0 0 auto;
+  line-height: 1;
 }
 </style>

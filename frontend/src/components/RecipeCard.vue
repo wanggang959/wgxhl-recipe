@@ -104,27 +104,48 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   right: 10px;
   width: 34px;
   height: 34px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(47, 38, 31, 0.34);
-  display: grid;
-  place-items: center;
-  backdrop-filter: blur(10px);
-}
-
-.want-cart {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 30px;
-  height: 30px;
+  box-sizing: border-box;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: rgba(47, 38, 31, 0.34);
   color: #fff;
   display: grid;
   place-items: center;
+  line-height: 1;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  appearance: none;
+  -webkit-appearance: none;
+  z-index: 2;
+}
+
+.want-cart {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 34px;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(47, 38, 31, 0.34);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  appearance: none;
+  -webkit-appearance: none;
+  z-index: 2;
+}
+
+.favorite :deep(.van-icon),
+.want-cart :deep(.van-icon) {
+  display: block;
+  line-height: 1;
 }
 
 .want-cart.active {

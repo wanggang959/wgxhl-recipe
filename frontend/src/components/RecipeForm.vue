@@ -9,6 +9,7 @@ import { createRecipe, getRecipeDetail, updateRecipe } from '../api/recipe'
 import { createSeasoning, pageSeasoning } from '../api/seasoning'
 import { transcodeImageToWebp } from '../utils/image'
 import { toObjectPath } from '../utils/imageUrl'
+import { DEFAULT_RECIPE_VERSION, isValidRecipeVersion, normalizeRecipeVersion } from '../utils/recipeVersion'
 import ImageCropper from './ImageCropper.vue'
 import ImageUploader from './ImageUploader.vue'
 
@@ -32,6 +33,7 @@ const form = reactive({
   recipe: {
     id: '',
     recipeName: '',
+    recipeVersion: DEFAULT_RECIPE_VERSION,
     recipeDesc: '',
     coverImage: '',
     difficulty: '普通',
@@ -81,6 +83,7 @@ async function bootstrap() {
       const detailRes = await getRecipeDetail(route.params.id)
       const detail = detailRes.data
       Object.assign(form.recipe, detail.recipe || {})
+      form.recipe.recipeVersion = normalizeRecipeVersion(form.recipe.recipeVersion)
       cookingMinutes.value = parseCookingMinutes(form.recipe.cookingTime)
       form.recipeStepList = (detail.recipeStepList || []).map((item) => ({ ...item }))
       form.ingredientList = (detail.ingredientList || []).map((item) => ({ ...item }))
@@ -297,6 +300,11 @@ async function submit() {
     showFailToast('请输入菜名')
     return
   }
+  form.recipe.recipeVersion = normalizeRecipeVersion(form.recipe.recipeVersion)
+  if (!isValidRecipeVersion(form.recipe.recipeVersion)) {
+    showFailToast('版本号请填写为 1.0、2.1 这类两位数字格式')
+    return
+  }
   if (saving.value) return
 
   saving.value = true
@@ -383,6 +391,14 @@ bootstrap()
       <section class="form-section">
         <h2>基础信息</h2>
         <van-field v-model="form.recipe.recipeName" class="form-field" label="菜名" placeholder="请输入菜名" required />
+        <van-field
+          v-model="form.recipe.recipeVersion"
+          class="form-field"
+          label="版本"
+          placeholder="默认 1.0，如 2.0"
+          maxlength="5"
+        />
+        <p class="field-hint">同一上传者下，菜名 + 版本 唯一（例如王师傅的「青椒肉丝 1.0」与「青椒肉丝 2.0」可并存）</p>
         <div class="select-grid">
           <label class="form-label">
             <span>分类</span>
@@ -645,6 +661,13 @@ bootstrap()
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.field-hint {
+  margin: -4px 4px 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .row-panel {

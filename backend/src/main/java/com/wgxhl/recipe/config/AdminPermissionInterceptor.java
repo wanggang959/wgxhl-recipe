@@ -70,6 +70,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             writeJson(response, ApiResponse.fail(403, disabledAccountMessage(currentUser)));
             return false;
         }
+        request.setAttribute(AuthRequestAttributes.CURRENT_USER, currentUser);
 
         String userRole = jwtAuthUtil.getUserRole(jwt);
         String path = normalizePath(request.getRequestURI());

@@ -26,6 +26,7 @@ create table recipe
     id varchar(36) not null comment '主键id',
 
     recipe_name varchar(128) not null comment '菜谱名称',
+    recipe_version varchar(8) not null default '1.0' comment '版本号（如1.0）',
     recipe_desc varchar(255) comment '菜谱简介',
     cover_image varchar(255) comment '封面图片地址',
     difficulty varchar(32) comment '难度',
@@ -37,13 +38,16 @@ create table recipe
     category_id varchar(36) comment '分类id',
     category_name varchar(64) comment '分类名称冗余',
 
+    owner_user_id varchar(36) comment '上传者用户id',
+    owner_name varchar(64) comment '上传者显示名',
+
     remark varchar(255) comment '备注',
 
     create_time datetime comment '创建时间',
     update_time datetime comment '更新时间',
 
     primary key (id),
-    unique key uk_recipe_name (recipe_name)
+    unique key uk_recipe_name_version_owner (recipe_name, recipe_version, owner_user_id)
 )
 engine=innodb
 default charset=utf8mb4

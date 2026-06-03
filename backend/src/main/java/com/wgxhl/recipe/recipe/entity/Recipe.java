@@ -20,6 +20,11 @@ public class Recipe {
     private String recipeName;
 
     /*
+     * 版本号（如 1.0）
+     */
+    private String recipeVersion;
+
+    /*
      * 菜谱简介
      */
     private String recipeDesc;
@@ -63,6 +68,16 @@ public class Recipe {
      * 分类名称冗余
      */
     private String categoryName;
+
+    /*
+     * 上传者用户id
+     */
+    private String ownerUserId;
+
+    /*
+     * 上传者显示名（昵称优先）
+     */
+    private String ownerName;
 
     /*
      * 备注

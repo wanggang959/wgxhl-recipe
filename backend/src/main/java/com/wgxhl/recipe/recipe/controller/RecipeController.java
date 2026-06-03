@@ -8,10 +8,14 @@ import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
+import com.wgxhl.recipe.config.AuthRequestAttributes;
+import com.wgxhl.recipe.user.entity.AppUser;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/recipe")
@@ -49,8 +53,9 @@ public class RecipeController {
      * @Author wg
      **/
     @PostMapping("/create")
-    public ApiResponse<RecipeDetailVO> create(@RequestBody RecipeSaveDTO dto) {
-        return recipeService.create(dto);
+    public ApiResponse<RecipeDetailVO> create(@RequestBody RecipeSaveDTO dto, HttpServletRequest request) {
+        AppUser creator = (AppUser) request.getAttribute(AuthRequestAttributes.CURRENT_USER);
+        return recipeService.create(dto, creator);
     }
 
     /***

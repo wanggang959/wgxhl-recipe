@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
 import { useUserStore } from '../stores/user'
 import { getRecipeImage } from '../utils/imageUrl'
+import { formatRecipeVersionLabel } from '../utils/recipeVersion'
 
 const route = useRoute()
 const router = useRouter()
@@ -286,7 +287,7 @@ async function toggleFavoriteSafe(item) {
       <div>
         <p>王刚家的大菜单</p>
         <h1>今晚想吃哪一道？</h1>
-        <span>一页一页慢慢翻，只看菜名、口味和大图。</span>
+        <span>一页一页慢慢翻，只看菜名、口味、作者和版本。</span>
       </div>
       <button type="button" @click="exitShowcaseMode">
         <van-icon name="cross" />
@@ -310,9 +311,11 @@ async function toggleFavoriteSafe(item) {
         @click="openDetail(item)"
       >
         <img :src="getRecipeImage(item.coverImage)" :alt="item.recipeName" />
-        <div class="showcase-dish-info">
-          <span>{{ item.taste || '家常' }}</span>
-          <h2>{{ item.recipeName }}</h2>
+        <h2 class="showcase-dish-title">{{ item.recipeName }}</h2>
+        <div class="showcase-dish-tags">
+          <span class="taste">{{ item.taste || '家常' }}</span>
+          <span v-if="item.ownerName" class="owner">{{ item.ownerName }}</span>
+          <span class="version">{{ formatRecipeVersionLabel(item.recipeVersion) }}</span>
         </div>
       </article>
     </section>
@@ -333,7 +336,7 @@ async function toggleFavoriteSafe(item) {
   <div v-else class="home-page">
     <section v-if="!isTodayMode" class="hero">
       <div>
-        <p>家用食谱</p>
+        <p>欢迎回家</p>
         <h1>王刚家的家常菜谱</h1>
         <span>记录家里的味道，今天想吃什么？</span>
       </div>
@@ -356,6 +359,10 @@ async function toggleFavoriteSafe(item) {
             <span>{{ suggestRecipe.categoryName || '未分类' }}</span>
             <span>{{ suggestRecipe.taste || '家常' }}</span>
             <span>{{ suggestRecipe.cookingTime || '用时未记录' }}</span>
+            <div class="today-pick-tags-meta">
+              <span v-if="suggestRecipe.ownerName" class="owner">{{ suggestRecipe.ownerName }}</span>
+              <span class="version">{{ formatRecipeVersionLabel(suggestRecipe.recipeVersion) }}</span>
+            </div>
           </div>
           <p>{{ suggestRecipe.recipeDesc || '点进去看看做法，今天就吃它。' }}</p>
           <div class="today-pick-actions">
@@ -405,7 +412,9 @@ async function toggleFavoriteSafe(item) {
       <div>
         <span>今日推荐</span>
         <strong>{{ suggestRecipe.recipeName }}</strong>
-        <p>{{ suggestRecipe.taste || '家常' }} · {{ suggestRecipe.cookingTime || '用时未记录' }}</p>
+        <p>
+          <template v-if="suggestRecipe.ownerName">{{ suggestRecipe.ownerName }} · </template>{{ formatRecipeVersionLabel(suggestRecipe.recipeVersion) }} · {{ suggestRecipe.taste || '家常' }} · {{ suggestRecipe.cookingTime || '用时未记录' }}
+        </p>
       </div>
       <van-icon name="arrow" size="18" />
     </section>
@@ -548,32 +557,51 @@ async function toggleFavoriteSafe(item) {
   background: linear-gradient(180deg, transparent, rgba(47, 38, 31, 0.78));
 }
 
-.showcase-dish-info {
+.showcase-dish-title {
   position: absolute;
   left: clamp(14px, 2vw, 24px);
-  right: clamp(14px, 2vw, 24px);
+  right: clamp(72px, 14vw, 160px);
   bottom: clamp(14px, 2vw, 24px);
   z-index: 1;
+  margin: 0;
   color: #fff;
-  text-shadow: 0 2px 14px rgba(47, 38, 31, 0.36);
-}
-
-.showcase-dish-info span {
-  display: inline-flex;
-  padding: 6px 11px;
-  border-radius: 999px;
-  background: rgba(255, 237, 213, 0.92);
-  color: #c2410c;
-  font-size: 13px;
-  font-weight: 900;
-  text-shadow: none;
-}
-
-.showcase-dish-info h2 {
-  margin: 10px 0 0;
   font-size: clamp(24px, 4vw, 46px);
   line-height: 1.08;
   overflow-wrap: anywhere;
+  text-shadow: 0 2px 14px rgba(47, 38, 31, 0.36);
+}
+
+.showcase-dish-tags {
+  position: absolute;
+  right: clamp(10px, 1.6vw, 18px);
+  bottom: clamp(10px, 1.6vw, 18px);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: 58%;
+}
+
+.showcase-dish-tags span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: none;
+}
+
+.showcase-dish-tags .taste,
+.showcase-dish-tags .owner,
+.showcase-dish-tags .version {
+  background: rgba(255, 237, 213, 0.92);
+  color: #c2410c;
 }
 
 .showcase-footer {
@@ -715,16 +743,44 @@ async function toggleFavoriteSafe(item) {
 .today-pick-tags {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 7px;
 }
 
-.today-pick-tags span {
+.today-pick-tags-meta {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.today-pick-tags > span,
+.today-pick-tags-meta span {
+  box-sizing: border-box;
   padding: 5px 9px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--app-primary-soft);
-  color: #c2410c;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1;
+}
+
+.today-pick-tags > span {
+  background: var(--app-primary-soft);
+  color: #c2410c;
+}
+
+.today-pick-tags-meta span.owner {
+  background: #fff4e8;
+  color: #9a3412;
+  border-color: rgba(249, 115, 22, 0.22);
+}
+
+.today-pick-tags-meta span.version {
+  background: #f3f4f6;
+  color: #4b5563;
+  border-color: rgba(107, 114, 128, 0.18);
 }
 
 .today-pick-body p {

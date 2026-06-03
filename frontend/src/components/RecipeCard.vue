@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { getRecipeImage } from '../utils/imageUrl'
+import { formatRecipeVersionLabel, normalizeRecipeVersion } from '../utils/recipeVersion'
 
 const props = defineProps({
   recipe: {
@@ -24,6 +25,8 @@ const taste = computed(() => props.recipe.taste || '家常')
 const category = computed(() => props.recipe.categoryName || '未分类')
 const cookingTime = computed(() => props.recipe.cookingTime || '未记录')
 const difficulty = computed(() => props.recipe.difficulty || '普通')
+const ownerName = computed(() => props.recipe.ownerName || '')
+const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVersion(props.recipe.recipeVersion)))
 </script>
 
 <template>
@@ -39,10 +42,14 @@ const difficulty = computed(() => props.recipe.difficulty || '普通')
         <h3>{{ recipe.recipeName }}</h3>
         <span>{{ cookingTime }}</span>
       </div>
-      <div class="tags">
+      <div class="tags-row">
         <span class="tag primary">{{ category }}</span>
         <span class="tag">{{ taste }}</span>
         <span class="tag">{{ difficulty }}</span>
+        <div class="tags-meta">
+          <span v-if="ownerName" class="tag owner">{{ ownerName }}</span>
+          <span class="tag version">{{ versionLabel }}</span>
+        </div>
       </div>
       <div v-if="showActions" class="actions" @click.stop>
         <van-button size="mini" plain type="warning" @click="emit('edit', recipe)">编辑</van-button>
@@ -116,16 +123,27 @@ h3 {
   line-height: 22px;
 }
 
-.tags {
+.tags-row {
   margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
+.tags-meta {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .tag {
+  box-sizing: border-box;
   max-width: 100%;
   padding: 4px 8px;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: #f8efe6;
   color: #7c5c46;
@@ -136,6 +154,18 @@ h3 {
 .tag.primary {
   background: var(--app-primary-soft);
   color: #c2410c;
+}
+
+.tag.owner {
+  background: #fff4e8;
+  color: #9a3412;
+  border: 1px solid rgba(249, 115, 22, 0.22);
+}
+
+.tag.version {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid rgba(107, 114, 128, 0.18);
 }
 
 .actions {

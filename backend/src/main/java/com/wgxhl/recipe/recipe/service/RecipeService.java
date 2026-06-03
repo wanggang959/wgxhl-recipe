@@ -7,6 +7,7 @@ import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
 import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
+import com.wgxhl.recipe.user.entity.AppUser;
 
 public interface RecipeService extends IService<Recipe> {
 
@@ -14,7 +15,7 @@ public interface RecipeService extends IService<Recipe> {
 
     ApiResponse<RecipeDetailVO> getDetailById(String id);
 
-    ApiResponse<RecipeDetailVO> create(RecipeSaveDTO dto);
+    ApiResponse<RecipeDetailVO> create(RecipeSaveDTO dto, AppUser creator);
 
     ApiResponse<Void> update(RecipeSaveDTO dto);
 

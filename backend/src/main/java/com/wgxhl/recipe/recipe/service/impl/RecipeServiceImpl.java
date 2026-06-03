@@ -14,6 +14,7 @@ import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
 import com.wgxhl.recipe.recipe.service.RecipeService;
+import com.wgxhl.recipe.recipe.util.RecipeVersionUtil;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
 import com.wgxhl.recipe.record.service.RecipeViewRecordService;
 import com.wgxhl.recipe.relation.dto.RecipeIngredientRelBatchDTO;
@@ -23,6 +24,7 @@ import com.wgxhl.recipe.seasoningrelation.service.RecipeSeasoningRelService;
 import com.wgxhl.recipe.step.dto.RecipeStepBatchDTO;
 import com.wgxhl.recipe.step.entity.RecipeStep;
 import com.wgxhl.recipe.step.service.RecipeStepService;
+import com.wgxhl.recipe.user.entity.AppUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -106,11 +108,13 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ApiResponse<RecipeDetailVO> create(RecipeSaveDTO dto) {
+    public ApiResponse<RecipeDetailVO> create(RecipeSaveDTO dto, AppUser creator) {
         if (dto == null || dto.getRecipe() == null) {
             return ApiResponse.fail("菜谱信息不能为空");
         }
         Recipe recipe = dto.getRecipe();
+        applyOwner(recipe, creator);
+        normalizeVersion(recipe);
         ApiResponse<Void> validateResult = validateRecipe(recipe, null, dto.getRecipeStepList());
         if (validateResult != null) {
             return ApiResponse.fail(validateResult.getMessage());
@@ -133,9 +137,13 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (!StringUtils.hasText(recipe.getId())) {
             return ApiResponse.fail("菜谱id不能为空");
         }
-        if (super.getById(recipe.getId()) == null) {
+        Recipe existing = super.getById(recipe.getId());
+        if (existing == null) {
             return ApiResponse.fail("菜谱不存在");
         }
+        recipe.setOwnerUserId(existing.getOwnerUserId());
+        recipe.setOwnerName(existing.getOwnerName());
+        normalizeVersion(recipe);
         ApiResponse<Void> validateResult = validateRecipe(recipe, recipe.getId(), dto.getRecipeStepList());
         if (validateResult != null) {
             return ApiResponse.fail(validateResult.getMessage());
@@ -164,15 +172,44 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         return ApiResponse.success("删除成功", null);
     }
 
+    private void applyOwner(Recipe recipe, AppUser creator) {
+        if (recipe == null || creator == null) {
+            return;
+        }
+        recipe.setOwnerUserId(creator.getId());
+        if (StringUtils.hasText(creator.getNickname())) {
+            recipe.setOwnerName(creator.getNickname().trim());
+        } else if (StringUtils.hasText(creator.getUsername())) {
+            recipe.setOwnerName(creator.getUsername().trim());
+        }
+    }
+
+    private void normalizeVersion(Recipe recipe) {
+        if (recipe == null) {
+            return;
+        }
+        recipe.setRecipeVersion(RecipeVersionUtil.normalize(recipe.getRecipeVersion()));
+    }
+
     private ApiResponse<Void> validateRecipe(Recipe recipe, String excludeId, List<RecipeStep> stepList) {
         if (!StringUtils.hasText(recipe.getRecipeName())) {
             return ApiResponse.fail("菜谱名称不能为空");
         }
+        if (!RecipeVersionUtil.isValid(recipe.getRecipeVersion())) {
+            return ApiResponse.fail("版本号格式不正确，请使用如 1.0、2.1 的两位数字版本");
+        }
+        if (!StringUtils.hasText(recipe.getOwnerUserId())) {
+            return ApiResponse.fail("无法确定上传者，请重新登录后再保存");
+        }
         if (lambdaQuery()
                 .ne(StringUtils.hasText(excludeId), Recipe::getId, excludeId)
                 .eq(Recipe::getRecipeName, recipe.getRecipeName())
+                .eq(Recipe::getRecipeVersion, recipe.getRecipeVersion())
+                .eq(Recipe::getOwnerUserId, recipe.getOwnerUserId())
                 .exists()) {
-            return ApiResponse.fail("菜谱名称已存在");
+            String ownerLabel = StringUtils.hasText(recipe.getOwnerName()) ? recipe.getOwnerName() : "该用户";
+            return ApiResponse.fail(ownerLabel + "做的" + recipe.getRecipeName()
+                    + recipe.getRecipeVersion() + "版本已存在");
         }
         if (StringUtils.hasText(recipe.getCategoryId())) {
             RecipeCategory category = recipeCategoryService.lambdaQuery()

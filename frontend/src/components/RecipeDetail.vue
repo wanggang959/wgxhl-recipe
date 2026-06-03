@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { getImageUrl, getRecipeImage } from '../utils/imageUrl'
+import { formatRecipeVersionLabel, normalizeRecipeVersion } from '../utils/recipeVersion'
 
 const props = defineProps({
   detail: {
@@ -38,6 +39,10 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
         <button type="button" @click="emit('favorite')">
           <van-icon :name="favorite ? 'like' : 'like-o'" :color="favorite ? '#ef4444' : '#ffffff'" size="21" />
         </button>
+      </div>
+      <div class="hero-meta-tags">
+        <span v-if="recipe.ownerName" class="detail-tag owner">{{ recipe.ownerName }}</span>
+        <span class="detail-tag version">{{ formatRecipeVersionLabel(normalizeRecipeVersion(recipe.recipeVersion)) }}</span>
       </div>
     </div>
 
@@ -179,6 +184,18 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
   backdrop-filter: blur(10px);
 }
 
+.hero-meta-tags {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 58%;
+}
+
 .summary {
   position: relative;
   margin-top: -28px;
@@ -208,6 +225,29 @@ h1 {
   color: var(--app-muted);
   font-size: 14px;
   line-height: 1.6;
+}
+
+.detail-tag {
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #f8efe6;
+  color: #7c5c46;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.detail-tag.owner {
+  background: #fff4e8;
+  color: #9a3412;
+  border: 1px solid rgba(249, 115, 22, 0.22);
+}
+
+.detail-tag.version {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid rgba(107, 114, 128, 0.18);
 }
 
 .meta-grid {

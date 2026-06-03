@@ -25,6 +25,21 @@ const routes = [
         component: () => import('../views/FavoriteList.vue'),
       },
       {
+        path: '/want',
+        name: 'WantList',
+        component: () => import('../views/WantList.vue'),
+      },
+      {
+        path: '/todo',
+        name: 'TodoList',
+        component: () => import('../views/TodoList.vue'),
+      },
+      {
+        path: '/todo/summary',
+        name: 'TodoSummary',
+        component: () => import('../views/TodoSummary.vue'),
+      },
+      {
         path: '/profile',
         name: 'Profile',
         component: () => import('../views/ProfileView.vue'),

@@ -8,7 +8,7 @@ import { createIngredient, pageIngredient } from '../api/ingredient'
 import { createRecipe, getRecipeDetail, updateRecipe } from '../api/recipe'
 import { createSeasoning, pageSeasoning } from '../api/seasoning'
 import { transcodeImageToWebp } from '../utils/image'
-import { toObjectPath } from '../utils/imageUrl'
+import { getImageUrl, toObjectPath } from '../utils/imageUrl'
 import { DEFAULT_RECIPE_VERSION, isValidRecipeVersion, normalizeRecipeVersion } from '../utils/recipeVersion'
 import ImageCropper from './ImageCropper.vue'
 import ImageUploader from './ImageUploader.vue'
@@ -27,6 +27,10 @@ const uploadStatus = ref('')
 const showQuickIngredient = ref(false)
 const showQuickSeasoning = ref(false)
 const creatingBaseData = ref(false)
+const basePickerVisible = ref(false)
+const basePickerType = ref('ingredient')
+const basePickerRow = ref(null)
+const basePickerKeyword = ref('')
 let uploadStatusTimer = null
 
 const form = reactive({
@@ -67,6 +71,19 @@ const servingCountOptions = ['1-2人', '2-3人', '3-4人', '4-5人', '5人以上
 const ingredientUnitOptions = ['克', '千克', '个', '根', '棵', '片', '勺', '适量']
 const seasoningUnitOptions = ['克', '毫升', '勺', '小勺', '大勺', '适量', '少许']
 const isEdit = computed(() => Boolean(route.params.id))
+const basePickerTitle = computed(() => (basePickerType.value === 'ingredient' ? '选择食材' : '选择调料'))
+const basePickerPlaceholder = computed(() =>
+  basePickerType.value === 'ingredient' ? '搜索食材名称或描述' : '搜索调料名称或描述',
+)
+const basePickerOptions = computed(() => {
+  const keyword = normalizeKeyword(basePickerKeyword.value)
+  const list = basePickerType.value === 'ingredient' ? ingredients.value : seasonings.value
+  if (!keyword) return list
+  return list.filter((item) => {
+    const text = normalizeKeyword(`${getBaseName(item)} ${getBaseDesc(item)}`)
+    return text.includes(keyword)
+  })
+})
 
 async function bootstrap() {
   loading.value = true
@@ -295,6 +312,75 @@ async function createQuickSeasoning() {
   }
 }
 
+function normalizeKeyword(text) {
+  return String(text || '').trim().toLowerCase()
+}
+
+function getBaseName(item, type = basePickerType.value) {
+  return type === 'ingredient' ? item?.ingredientName || '' : item?.seasoningName || ''
+}
+
+function getBaseImage(item, type = basePickerType.value) {
+  return type === 'ingredient' ? item?.ingredientImage || '' : item?.seasoningImage || ''
+}
+
+function getBaseDesc(item, type = basePickerType.value) {
+  return type === 'ingredient' ? item?.ingredientDesc || '' : item?.seasoningDesc || ''
+}
+
+function findIngredient(id) {
+  return ingredients.value.find((item) => item.id === id)
+}
+
+function findSeasoning(id) {
+  return seasonings.value.find((item) => item.id === id)
+}
+
+function getSelectedIngredientName(row) {
+  return getBaseName(findIngredient(row.ingredientId), 'ingredient') || row.ingredientName || ''
+}
+
+function getSelectedIngredientImage(row) {
+  return getBaseImage(findIngredient(row.ingredientId), 'ingredient') || row.ingredientImage || ''
+}
+
+function getSelectedSeasoningName(row) {
+  return getBaseName(findSeasoning(row.seasoningId), 'seasoning') || row.seasoningName || ''
+}
+
+function getSelectedSeasoningImage(row) {
+  return getBaseImage(findSeasoning(row.seasoningId), 'seasoning') || row.seasoningImage || ''
+}
+
+function openBasePicker(type, row) {
+  basePickerType.value = type
+  basePickerRow.value = row
+  basePickerKeyword.value = ''
+  basePickerVisible.value = true
+}
+
+function selectBaseOption(option) {
+  if (!basePickerRow.value) return
+  if (basePickerType.value === 'ingredient') {
+    basePickerRow.value.ingredientId = option.id
+    basePickerRow.value.ingredientName = option.ingredientName
+    basePickerRow.value.ingredientImage = option.ingredientImage
+  } else {
+    basePickerRow.value.seasoningId = option.id
+    basePickerRow.value.seasoningName = option.seasoningName
+    basePickerRow.value.seasoningImage = option.seasoningImage
+  }
+  basePickerVisible.value = false
+}
+
+function isSelectedBaseOption(option) {
+  if (!basePickerRow.value) return false
+  const selectedId = basePickerType.value === 'ingredient'
+    ? basePickerRow.value.ingredientId
+    : basePickerRow.value.seasoningId
+  return selectedId === option.id
+}
+
 async function submit() {
   if (!form.recipe.recipeName) {
     showFailToast('请输入菜名')
@@ -482,12 +568,20 @@ bootstrap()
           </div>
           <label class="form-label">
             <span>食材</span>
-            <select v-model="item.ingredientId" class="select-input">
-              <option value="">请选择食材</option>
-              <option v-for="ing in ingredients" :key="ing.id" :value="ing.id">
-                {{ ing.ingredientName }}
-              </option>
-            </select>
+            <button type="button" class="base-select-trigger" @click="openBasePicker('ingredient', item)">
+              <img
+                v-if="getSelectedIngredientImage(item)"
+                :src="getImageUrl(getSelectedIngredientImage(item))"
+                :alt="getSelectedIngredientName(item)"
+              />
+              <span v-else class="base-select-placeholder">
+                <van-icon name="photo-o" />
+              </span>
+              <strong :class="{ empty: !getSelectedIngredientName(item) }">
+                {{ getSelectedIngredientName(item) || '请选择食材' }}
+              </strong>
+              <van-icon name="arrow" />
+            </button>
           </label>
           <div class="select-grid">
             <label class="form-label">
@@ -543,12 +637,20 @@ bootstrap()
           </div>
           <label class="form-label">
             <span>调料</span>
-            <select v-model="item.seasoningId" class="select-input">
-              <option value="">请选择调料</option>
-              <option v-for="seasoning in seasonings" :key="seasoning.id" :value="seasoning.id">
-                {{ seasoning.seasoningName }}
-              </option>
-            </select>
+            <button type="button" class="base-select-trigger" @click="openBasePicker('seasoning', item)">
+              <img
+                v-if="getSelectedSeasoningImage(item)"
+                :src="getImageUrl(getSelectedSeasoningImage(item))"
+                :alt="getSelectedSeasoningName(item)"
+              />
+              <span v-else class="base-select-placeholder">
+                <van-icon name="photo-o" />
+              </span>
+              <strong :class="{ empty: !getSelectedSeasoningName(item) }">
+                {{ getSelectedSeasoningName(item) || '请选择调料' }}
+              </strong>
+              <van-icon name="arrow" />
+            </button>
           </label>
           <div class="select-grid">
             <label class="form-label">
@@ -614,6 +716,44 @@ bootstrap()
         </van-button>
       </div>
     </form>
+
+    <van-popup v-model:show="basePickerVisible" position="bottom" round>
+      <div class="base-picker">
+        <div class="base-picker-head">
+          <h3>{{ basePickerTitle }}</h3>
+          <button type="button" @click="basePickerVisible = false">
+            <van-icon name="cross" />
+          </button>
+        </div>
+        <label class="base-picker-search">
+          <van-icon name="search" />
+          <input v-model="basePickerKeyword" :placeholder="basePickerPlaceholder" />
+        </label>
+        <div class="base-option-list">
+          <button
+            v-for="option in basePickerOptions"
+            :key="option.id"
+            type="button"
+            class="base-option"
+            :class="{ active: isSelectedBaseOption(option) }"
+            @click="selectBaseOption(option)"
+          >
+            <img v-if="getBaseImage(option)" :src="getImageUrl(getBaseImage(option))" :alt="getBaseName(option)" />
+            <span v-else class="base-option-placeholder">
+              <van-icon name="photo-o" />
+            </span>
+            <span class="base-option-main">
+              <strong>{{ getBaseName(option) }}</strong>
+              <em v-if="getBaseDesc(option)">{{ getBaseDesc(option) }}</em>
+            </span>
+            <van-icon v-if="isSelectedBaseOption(option)" name="success" />
+          </button>
+          <div v-if="basePickerOptions.length === 0" class="base-option-empty">
+            没有匹配的{{ basePickerType === 'ingredient' ? '食材' : '调料' }}
+          </div>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -748,6 +888,179 @@ h2 {
   background: #fffaf2;
   color: var(--app-text);
   outline: 0;
+}
+
+.base-select-trigger {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 6px 9px;
+  background: #fffaf2;
+  color: var(--app-text);
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+}
+
+.base-select-trigger img,
+.base-select-placeholder,
+.base-option img,
+.base-option-placeholder {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.base-select-trigger img,
+.base-option img {
+  object-fit: cover;
+}
+
+.base-select-placeholder,
+.base-option-placeholder {
+  background: #fff1df;
+  color: var(--app-primary);
+  display: grid;
+  place-items: center;
+}
+
+.base-select-trigger strong {
+  min-width: 0;
+  color: var(--app-text);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.base-select-trigger strong.empty {
+  color: var(--app-muted);
+  font-weight: 500;
+}
+
+.base-picker {
+  max-height: min(76vh, 620px);
+  padding: 14px 14px max(16px, env(safe-area-inset-bottom));
+  background: #fffaf2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.base-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.base-picker-head h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 18px;
+}
+
+.base-picker-head button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff1df;
+  color: #9b7d66;
+  display: grid;
+  place-items: center;
+}
+
+.base-picker-search {
+  height: 42px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-primary);
+}
+
+.base-picker-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--app-text);
+}
+
+.base-option-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.base-option {
+  width: 100%;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  padding: 8px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.base-option img,
+.base-option-placeholder {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+.base-option.active {
+  border-color: var(--app-primary);
+  background: #fff7e8;
+}
+
+.base-option-main {
+  min-width: 0;
+}
+
+.base-option-main strong,
+.base-option-main em {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.base-option-main strong {
+  color: var(--app-text);
+  font-size: 15px;
+}
+
+.base-option-main em {
+  margin-top: 3px;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.base-option > .van-icon {
+  color: var(--app-primary);
+}
+
+.base-option-empty {
+  padding: 28px 0;
+  color: var(--app-muted);
+  text-align: center;
+  font-size: 14px;
 }
 
 :deep(.form-field) {

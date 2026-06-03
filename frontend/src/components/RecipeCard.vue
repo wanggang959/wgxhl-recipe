@@ -12,13 +12,21 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  wanted: {
+    type: Boolean,
+    default: false,
+  },
+  showWantButton: {
+    type: Boolean,
+    default: true,
+  },
   showActions: {
     type: Boolean,
     default: false,
   },
 })
 
-const emit = defineEmits(['open', 'favorite', 'edit', 'delete'])
+const emit = defineEmits(['open', 'favorite', 'want', 'edit', 'delete'])
 
 const cover = computed(() => getRecipeImage(props.recipe.coverImage))
 const taste = computed(() => props.recipe.taste || '家常')
@@ -35,6 +43,15 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
       <img class="cover" :src="cover" :alt="recipe.recipeName" loading="lazy" />
       <button class="favorite" type="button" @click.stop="emit('favorite', recipe)">
         <van-icon :name="favorite ? 'like' : 'like-o'" :color="favorite ? '#ef4444' : '#ffffff'" size="20" />
+      </button>
+      <button
+        v-if="showWantButton"
+        class="want-cart"
+        :class="{ active: wanted }"
+        type="button"
+        @click.stop="emit('want', recipe)"
+      >
+        <van-icon name="cart-o" size="18" />
       </button>
     </div>
     <div class="body">
@@ -93,6 +110,26 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   display: grid;
   place-items: center;
   backdrop-filter: blur(10px);
+}
+
+.want-cart {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(47, 38, 31, 0.34);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(10px);
+}
+
+.want-cart.active {
+  background: rgba(255, 247, 237, 0.92);
+  color: #ea580c;
 }
 
 .body {

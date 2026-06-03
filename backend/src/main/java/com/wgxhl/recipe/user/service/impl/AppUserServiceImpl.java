@@ -14,6 +14,7 @@ import com.wgxhl.recipe.user.vo.UserPreviewVO;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.AppUserService;
 import com.wgxhl.recipe.user.util.DefaultAvatars;
+import com.wgxhl.recipe.want.service.UserWantedRecipeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -39,13 +40,16 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
 
     private final UserFavoriteService userFavoriteService;
     private final RecipeViewRecordService recipeViewRecordService;
+    private final UserWantedRecipeService userWantedRecipeService;
     private final JwtAuthUtil jwtAuthUtil;
 
     public AppUserServiceImpl(UserFavoriteService userFavoriteService,
                               RecipeViewRecordService recipeViewRecordService,
+                              UserWantedRecipeService userWantedRecipeService,
                               JwtAuthUtil jwtAuthUtil) {
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
+        this.userWantedRecipeService = userWantedRecipeService;
         this.jwtAuthUtil = jwtAuthUtil;
     }
 
@@ -282,6 +286,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         userFavoriteService.deleteByUserId(id);
         recipeViewRecordService.deleteByUserId(id);
+        userWantedRecipeService.deleteByUserId(id);
         removeById(id);
         return ApiResponse.success("删除成功", null);
     }

@@ -5,6 +5,7 @@ import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
 import { pageRecipe } from '../api/recipe'
+import { checkWantedRecipe, createWantedRecipe } from '../api/want'
 import CategoryTabs from '../components/CategoryTabs.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
@@ -23,10 +24,16 @@ const finished = ref(false)
 const total = ref(0)
 const favoriteMap = ref({})
 const favoritePendingMap = ref({})
+const wantedMap = ref({})
+const wantedPendingMap = ref({})
 const saveMessage = ref('')
 const recommendMessage = ref('')
 const suggestRecipe = ref(null)
 const errorText = ref('')
+const wantActionVisible = ref(false)
+const wantDateVisible = ref(false)
+const wantTargetRecipe = ref(null)
+const customWantDate = ref('')
 let recommendMessageTimer = null
 
 const query = reactive({
@@ -54,6 +61,7 @@ const showcaseRecipes = computed(() => {
   const start = showcasePage.value * showcasePageSize
   return list.value.slice(start, start + showcasePageSize)
 })
+const minWantDate = computed(() => formatDate(new Date()))
 
 onMounted(async () => {
   const message = sessionStorage.getItem('recipeSaveMessage')
@@ -108,7 +116,7 @@ async function loadMore() {
     if (list.value.length >= total.value || records.length === 0) {
       finished.value = true
     }
-    await syncFavoriteState(records)
+    await Promise.all([syncFavoriteState(records), syncWantedState(records)])
     if (!suggestRecipe.value && list.value.length > 0) {
       chooseRandomRecipe()
     }
@@ -125,6 +133,16 @@ async function syncFavoriteState(records) {
   const tasks = records.map((item) =>
     checkFavorite(userStore.userId, item.id).then((res) => {
       favoriteMap.value[item.id] = Boolean(res.data)
+    }),
+  )
+  await Promise.allSettled(tasks)
+}
+
+async function syncWantedState(records) {
+  if (!userStore.userId || records.length === 0) return
+  const tasks = records.map((item) =>
+    checkWantedRecipe(userStore.userId, item.id).then((res) => {
+      wantedMap.value[item.id] = Boolean(res.data)
     }),
   )
   await Promise.allSettled(tasks)
@@ -279,6 +297,72 @@ async function toggleFavoriteSafe(item) {
     favoritePendingMap.value[item.id] = false
   }
 }
+
+function formatDate(date) {
+  const target = new Date(date)
+  const year = target.getFullYear()
+  const month = String(target.getMonth() + 1).padStart(2, '0')
+  const day = String(target.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDays(days) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return formatDate(date)
+}
+
+function openWantAction(item) {
+  if (!userStore.userId) {
+    closeToast()
+    showFailToast('请先登录后再添加想吃')
+    return
+  }
+  wantTargetRecipe.value = item
+  wantActionVisible.value = true
+}
+
+function openWantDatePicker() {
+  customWantDate.value = minWantDate.value
+  wantActionVisible.value = false
+  wantDateVisible.value = true
+}
+
+function closeWantPanels() {
+  wantActionVisible.value = false
+  wantDateVisible.value = false
+  wantTargetRecipe.value = null
+}
+
+async function addWantedByDate(plannedDate) {
+  const recipe = wantTargetRecipe.value
+  if (!recipe || wantedPendingMap.value[recipe.id]) return
+  wantedPendingMap.value[recipe.id] = true
+  try {
+    const res = await createWantedRecipe({
+      userId: userStore.userId,
+      recipeId: recipe.id,
+      plannedDate,
+    })
+    wantedMap.value[recipe.id] = true
+    closeToast()
+    showSuccessToast({ message: res.message || '已添加到想吃', duration: 1400 })
+    closeWantPanels()
+  } catch (error) {
+    closeToast()
+    showFailToast({ message: error.message || '添加想吃失败', duration: 1800 })
+  } finally {
+    wantedPendingMap.value[recipe.id] = false
+  }
+}
+
+function submitCustomWantDate() {
+  if (!customWantDate.value) {
+    showFailToast('请选择想吃日期')
+    return
+  }
+  addWantedByDate(customWantDate.value)
+}
 </script>
 
 <template>
@@ -311,6 +395,14 @@ async function toggleFavoriteSafe(item) {
         @click="openDetail(item)"
       >
         <img :src="getRecipeImage(item.coverImage)" :alt="item.recipeName" />
+        <div class="showcase-actions" @click.stop>
+          <button class="showcase-action" type="button" :class="{ active: favoriteMap[item.id] }" @click="toggleFavoriteSafe(item)">
+            <van-icon :name="favoriteMap[item.id] ? 'like' : 'like-o'" />
+          </button>
+          <button class="showcase-action" type="button" :class="{ active: wantedMap[item.id] }" @click="openWantAction(item)">
+            <van-icon name="cart-o" />
+          </button>
+        </div>
         <h2 class="showcase-dish-title">{{ item.recipeName }}</h2>
         <div class="showcase-dish-tags">
           <span class="taste">{{ item.taste || '家常' }}</span>
@@ -374,6 +466,10 @@ async function toggleFavoriteSafe(item) {
               <van-icon name="description-o" />
               查看做法
             </button>
+            <button type="button" class="want-action" @click="openWantAction(suggestRecipe)">
+              <van-icon name="cart-o" />
+              {{ wantedMap[suggestRecipe.id] ? '已想吃' : '想吃' }}
+            </button>
           </div>
           <button type="button" class="showcase-entry" @click="enterShowcaseMode">
             <van-icon name="photo-o" />
@@ -391,7 +487,7 @@ async function toggleFavoriteSafe(item) {
 
     <form v-if="!isTodayMode" class="search-card" @submit.prevent="applySearch">
       <van-icon name="search" size="18" />
-      <input v-model="filter.recipeName" placeholder="搜索菜名、食材、口味" />
+      <input v-model="filter.recipeName" placeholder="搜索菜名、作者用户名" />
       <button type="submit">搜索</button>
     </form>
 
@@ -416,7 +512,15 @@ async function toggleFavoriteSafe(item) {
           <template v-if="suggestRecipe.ownerName">{{ suggestRecipe.ownerName }} · </template>{{ formatRecipeVersionLabel(suggestRecipe.recipeVersion) }} · {{ suggestRecipe.taste || '家常' }} · {{ suggestRecipe.cookingTime || '用时未记录' }}
         </p>
       </div>
-      <van-icon name="arrow" size="18" />
+      <div class="today-card-actions" @click.stop>
+        <button type="button" :class="{ active: favoriteMap[suggestRecipe.id] }" @click="toggleFavoriteSafe(suggestRecipe)">
+          <van-icon :name="favoriteMap[suggestRecipe.id] ? 'like' : 'like-o'" />
+        </button>
+        <button type="button" :class="{ active: wantedMap[suggestRecipe.id] }" @click="openWantAction(suggestRecipe)">
+          <van-icon name="cart-o" />
+        </button>
+        <van-icon name="arrow" size="18" />
+      </div>
     </section>
 
     <div class="list-head">
@@ -436,13 +540,42 @@ async function toggleFavoriteSafe(item) {
           :key="item.id"
           :recipe="item"
           :favorite="Boolean(favoriteMap[item.id])"
+          :wanted="Boolean(wantedMap[item.id])"
           @open="openDetail"
           @favorite="toggleFavoriteSafe"
+          @want="openWantAction"
         />
       </div>
       <EmptyState v-else-if="!loading" :show-button="userStore.isAdmin" @action="router.push('/recipe/create')" />
     </van-list>
   </div>
+
+  <van-popup v-model:show="wantActionVisible" position="bottom" round>
+    <div class="want-sheet">
+      <h3>{{ wantTargetRecipe?.recipeName || '这道菜' }}</h3>
+      <button type="button" class="want-sheet-primary" @click="openWantDatePicker">
+        <van-icon name="cart-o" />
+        想吃
+      </button>
+      <button type="button" @click="closeWantPanels">取消</button>
+    </div>
+  </van-popup>
+
+  <van-popup v-model:show="wantDateVisible" position="bottom" round>
+    <div class="want-sheet">
+      <h3>选择想吃日期</h3>
+      <div class="want-date-actions">
+        <button type="button" @click="addWantedByDate(addDays(0))">今日</button>
+        <button type="button" @click="addWantedByDate(addDays(1))">明日</button>
+      </div>
+      <label class="want-custom-date">
+        <span>自选日期</span>
+        <input v-model="customWantDate" type="date" :min="minWantDate" />
+      </label>
+      <button type="button" class="want-sheet-primary" @click="submitCustomWantDate">添加到想吃</button>
+      <button type="button" @click="closeWantPanels">取消</button>
+    </div>
+  </van-popup>
 </template>
 
 <style scoped>
@@ -548,6 +681,32 @@ async function toggleFavoriteSafe(item) {
 
 .showcase-dish:active img {
   transform: scale(1.02);
+}
+
+.showcase-actions {
+  position: absolute;
+  right: clamp(12px, 1.8vw, 22px);
+  top: clamp(12px, 1.8vw, 22px);
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+}
+
+.showcase-action {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(47, 38, 31, 0.38);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(10px);
+}
+
+.showcase-action.active {
+  color: #fb923c;
+  background: rgba(255, 247, 237, 0.92);
 }
 
 .showcase-dish::after {
@@ -793,7 +952,7 @@ async function toggleFavoriteSafe(item) {
 .today-pick-actions {
   margin-top: 13px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -814,6 +973,12 @@ async function toggleFavoriteSafe(item) {
   border-color: var(--app-primary);
   background: var(--app-primary);
   color: #fff;
+}
+
+.today-pick-actions button.want-action {
+  border-color: #fed7aa;
+  background: #fff7e8;
+  color: #c2410c;
 }
 
 .showcase-entry {
@@ -897,7 +1062,7 @@ async function toggleFavoriteSafe(item) {
   border: 1px solid var(--app-border);
   box-shadow: 0 12px 26px rgba(154, 52, 18, 0.08);
   display: grid;
-  grid-template-columns: 72px 1fr 20px;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
 }
@@ -928,6 +1093,30 @@ async function toggleFavoriteSafe(item) {
   font-size: 12px;
 }
 
+.today-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #9b7d66;
+}
+
+.today-card-actions button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--app-border);
+  border-radius: 50%;
+  background: #fffaf2;
+  color: #9b7d66;
+  display: grid;
+  place-items: center;
+}
+
+.today-card-actions button.active {
+  color: #f97316;
+  background: #fff7e8;
+  border-color: #fed7aa;
+}
+
 .list-head {
   display: flex;
   align-items: end;
@@ -950,6 +1139,67 @@ async function toggleFavoriteSafe(item) {
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
+}
+
+.want-sheet {
+  padding: 18px 14px max(18px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fffaf2;
+}
+
+.want-sheet h3 {
+  margin: 0 0 4px;
+  color: var(--app-text);
+  font-size: 17px;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.want-sheet button {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #fff;
+  color: #7c5c46;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.want-sheet button.want-sheet-primary,
+.want-date-actions button {
+  background: var(--app-primary);
+  color: #fff;
+  border-color: var(--app-primary);
+}
+
+.want-date-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.want-custom-date {
+  display: grid;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.want-custom-date input {
+  height: 42px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 0 11px;
+  background: #fff;
+  color: var(--app-text);
+  outline: 0;
 }
 
 @media (min-width: 760px) {

@@ -11,15 +11,18 @@ const active = computed(() => {
   if (route.path.startsWith('/recipes') && route.query.pick === 'today') return 'today'
   if (route.path.startsWith('/manage/base')) return '/manage/base'
   if (route.path.startsWith('/favorites')) return '/favorites'
+  if (route.path.startsWith('/want')) return '/want'
+  if (route.path.startsWith('/todo')) return '/todo'
   if (route.path.startsWith('/profile')) return '/profile'
   return '/recipes'
 })
 
 const items = computed(() => [
   { key: '/recipes', path: '/recipes', label: '首页', icon: 'wap-home-o' },
-  ...(userStore.isAdmin ? [{ key: '/manage/base', path: '/manage/base', label: '分类', icon: 'apps-o' }] : []),
   { key: 'today', path: '/recipes?pick=today', label: '今天吃什么', icon: 'fire-o' },
   { key: '/favorites', path: '/favorites', label: '收藏', icon: 'star-o' },
+  { key: '/want', path: '/want', label: '想吃', icon: 'cart-o' },
+  { key: '/todo', path: '/todo', label: '待办', icon: 'todo-list-o' },
   { key: '/profile', path: '/profile', label: '我的', icon: 'contact-o' },
 ])
 

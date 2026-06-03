@@ -1,5 +1,6 @@
 package com.wgxhl.recipe.recipe.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -25,14 +26,18 @@ import com.wgxhl.recipe.step.dto.RecipeStepBatchDTO;
 import com.wgxhl.recipe.step.entity.RecipeStep;
 import com.wgxhl.recipe.step.service.RecipeStepService;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.user.mapper.AppUserMapper;
+import com.wgxhl.recipe.want.service.UserWantedRecipeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
@@ -45,6 +50,8 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private final RecipeSeasoningRelService recipeSeasoningRelService;
     private final UserFavoriteService userFavoriteService;
     private final RecipeViewRecordService recipeViewRecordService;
+    private final UserWantedRecipeService userWantedRecipeService;
+    private final AppUserMapper appUserMapper;
 
     public RecipeServiceImpl(RecipeCategoryService recipeCategoryService,
                              RecipeStepService recipeStepService,
@@ -52,7 +59,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                              RecipeIngredientRelService recipeIngredientRelService,
                              RecipeSeasoningRelService recipeSeasoningRelService,
                              UserFavoriteService userFavoriteService,
-                             RecipeViewRecordService recipeViewRecordService) {
+                             RecipeViewRecordService recipeViewRecordService,
+                             UserWantedRecipeService userWantedRecipeService,
+                             AppUserMapper appUserMapper) {
         this.recipeCategoryService = recipeCategoryService;
         this.recipeStepService = recipeStepService;
         this.recipeImageService = recipeImageService;
@@ -60,6 +69,8 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         this.recipeSeasoningRelService = recipeSeasoningRelService;
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
+        this.userWantedRecipeService = userWantedRecipeService;
+        this.appUserMapper = appUserMapper;
     }
 
     @Override
@@ -82,8 +93,17 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     @Override
     public ApiResponse<Page<Recipe>> page(RecipePageDTO dto) {
         Page<Recipe> page = new Page<>(dto.getCurrent(), dto.getSize());
+        String keyword = StringUtils.hasText(dto.getRecipeName()) ? dto.getRecipeName().trim() : "";
+        List<String> ownerUserIds = findOwnerUserIds(keyword);
         Page<Recipe> result = lambdaQuery()
-                .like(StringUtils.hasText(dto.getRecipeName()), Recipe::getRecipeName, dto.getRecipeName())
+                .and(StringUtils.hasText(keyword), wrapper -> {
+                    wrapper.like(Recipe::getRecipeName, keyword)
+                            .or()
+                            .like(Recipe::getOwnerName, keyword);
+                    if (!ownerUserIds.isEmpty()) {
+                        wrapper.or().in(Recipe::getOwnerUserId, ownerUserIds);
+                    }
+                })
                 .eq(StringUtils.hasText(dto.getCategoryId()), Recipe::getCategoryId, dto.getCategoryId())
                 .like(StringUtils.hasText(dto.getCategoryName()), Recipe::getCategoryName, dto.getCategoryName())
                 .eq(StringUtils.hasText(dto.getDifficulty()), Recipe::getDifficulty, dto.getDifficulty())
@@ -92,6 +112,20 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                 .orderByDesc(Recipe::getCreateTime)
                 .page(page);
         return ApiResponse.success(result);
+    }
+
+    private List<String> findOwnerUserIds(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return Collections.emptyList();
+        }
+        return appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
+                        .like(AppUser::getUsername, keyword)
+                        .or()
+                        .like(AppUser::getNickname, keyword))
+                .stream()
+                .map(AppUser::getId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -168,6 +202,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         clearChildrenByRecipeId(id);
         userFavoriteService.deleteByRecipeId(id);
         recipeViewRecordService.deleteByRecipeId(id);
+        userWantedRecipeService.deleteByRecipeId(id);
         removeById(id);
         return ApiResponse.success("删除成功", null);
     }

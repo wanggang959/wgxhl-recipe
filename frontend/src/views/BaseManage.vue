@@ -275,7 +275,7 @@ if (userStore.isAdmin) {
       <div v-if="!userStore.isAdmin" class="permission-card">
         <van-icon name="warning-o" size="24" />
         <strong>需要管理员权限</strong>
-        <p>分类、食材、调料管理只能由管理员「王师傅」操作。</p>
+        <p>分类、食材、调料管理只能由管理员操作。</p>
         <van-button round type="warning" size="small" @click="router.push('/profile')">去登录</van-button>
       </div>
       <template v-else>

@@ -93,7 +93,7 @@ function showStatus(message, type = 'success') {
     <section class="login-hero" aria-label="王师傅家常菜谱">
       <div class="brand-lockup">
         <div class="chef-mark" aria-hidden="true">
-          <img src="/login-chef.png" alt="" />
+          <img src="/login-chef.webp" alt="" />
         </div>
         <div class="brand-main">王师傅家</div>
         <div class="brand-sub">
@@ -121,7 +121,7 @@ function showStatus(message, type = 'success') {
             <span class="steam steam-1"></span>
             <span class="steam steam-2"></span>
             <span class="pot-mark">
-              <img class="pot-icon" src="/login-pot.png" alt="" />
+              <img class="pot-icon" src="/login-pot.webp" alt="" />
             </span>
             <span class="steam steam-3"></span>
           </div>
@@ -187,7 +187,7 @@ function showStatus(message, type = 'success') {
             <button type="button" @click="guestLogin">游客登录</button>
           </div>
 
-          <img class="family-illustration" src="/login-family.png" alt="" />
+          <img class="family-illustration" src="/login-family.webp" alt="" />
         </section>
 
         <footer class="footer-note">
@@ -209,7 +209,7 @@ function showStatus(message, type = 'success') {
   color: #3e2818;
   font-family: "LXGW WenKai", "STKaiti", "KaiTi", "Microsoft YaHei", "PingFang SC", sans-serif;
   background:
-    url('/login-bg.png') top center / 100% auto no-repeat,
+    url('/login-bg.webp') top center / 100% auto no-repeat,
     linear-gradient(180deg, #fff8ec 0%, #fffaf3 48%, #fff6e9 100%);
   box-shadow: 0 0 0 1px rgba(245, 223, 199, 0.55);
 }

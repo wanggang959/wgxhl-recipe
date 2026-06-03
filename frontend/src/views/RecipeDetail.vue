@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showFailToast, showSuccessToast } from 'vant'
+import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
 import { pageIngredient } from '../api/ingredient'
 import { getRecipeDetail } from '../api/recipe'
@@ -22,6 +22,7 @@ const detail = ref({
   imageList: [],
 })
 const isFavorite = ref(false)
+const favoritePending = ref(false)
 const errorText = ref('')
 
 onMounted(async () => {
@@ -101,6 +102,34 @@ async function toggleFavorite() {
     showFailToast(error.message || '收藏操作失败')
   }
 }
+
+async function toggleFavoriteSafe() {
+  if (!userStore.userId) {
+    closeToast()
+    showFailToast({ message: '请先登录后再收藏', duration: 1800 })
+    return
+  }
+  if (favoritePending.value) return
+  favoritePending.value = true
+  try {
+    if (isFavorite.value) {
+      await deleteFavoriteByRecipeId(userStore.userId, route.params.id)
+      isFavorite.value = false
+      closeToast()
+      showSuccessToast({ message: '已取消收藏', duration: 1400 })
+    } else {
+      await createFavorite({ userId: userStore.userId, recipeId: route.params.id })
+      isFavorite.value = true
+      closeToast()
+      showSuccessToast({ message: '收藏成功', duration: 1400 })
+    }
+  } catch (error) {
+    closeToast()
+    showFailToast({ message: error.message || '收藏操作失败', duration: 1800 })
+  } finally {
+    favoritePending.value = false
+  }
+}
 </script>
 
 <template>
@@ -117,7 +146,7 @@ async function toggleFavorite() {
         :favorite="isFavorite"
         :can-edit="userStore.isAdmin"
         @back="router.back()"
-        @favorite="toggleFavorite"
+        @favorite="toggleFavoriteSafe"
         @edit="router.push(`/recipe/${route.params.id}/edit`)"
       />
     </main>

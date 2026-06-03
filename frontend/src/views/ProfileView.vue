@@ -22,7 +22,15 @@ const userForm = reactive({
   userRole: 'user',
 })
 
+const BUILTIN_ADMIN_ID = 'admin-wangshifu'
+const BUILTIN_ADMIN_USERNAME = '王师傅'
+
 const isEditingUser = computed(() => Boolean(userForm.id))
+const editingBuiltinAdmin = ref(false)
+
+function isBuiltinAdminUser(item) {
+  return item?.id === BUILTIN_ADMIN_ID || item?.username === BUILTIN_ADMIN_USERNAME
+}
 
 async function loadUsers() {
   if (!userStore.isAdmin) {
@@ -50,6 +58,7 @@ function resetUserForm() {
   userForm.nickname = ''
   userForm.password = ''
   userForm.userRole = 'user'
+  editingBuiltinAdmin.value = false
   showMemberForm.value = false
 }
 
@@ -59,6 +68,7 @@ function beginAddUser() {
   userForm.nickname = ''
   userForm.password = ''
   userForm.userRole = 'user'
+  editingBuiltinAdmin.value = false
   showMemberForm.value = true
 }
 
@@ -68,6 +78,7 @@ function editUser(item) {
   userForm.nickname = item.nickname || ''
   userForm.password = ''
   userForm.userRole = item.userRole || 'user'
+  editingBuiltinAdmin.value = isBuiltinAdminUser(item)
   showMemberForm.value = true
 }
 
@@ -192,7 +203,14 @@ if (userStore.isAdmin) {
           <van-button type="warning" round size="small" @click="beginAddUser">添加成员</van-button>
         </div>
         <div v-else>
-          <van-field v-model="userForm.username" class="form-field" label="用户名" placeholder="用户名唯一" />
+          <van-field
+            v-model="userForm.username"
+            class="form-field"
+            label="用户名"
+            placeholder="用户名唯一"
+            :disabled="editingBuiltinAdmin"
+          />
+          <p v-if="editingBuiltinAdmin" class="builtin-hint">内置管理员用户名固定为「王师傅」，如需改名请只修改昵称。</p>
           <van-field v-model="userForm.nickname" class="form-field" label="昵称" placeholder="显示名称" />
           <van-field
             v-model="userForm.password"
@@ -203,9 +221,9 @@ if (userStore.isAdmin) {
           />
           <label class="role-field">
             <span>权限</span>
-            <select v-model="userForm.userRole">
+            <select v-model="userForm.userRole" :disabled="editingBuiltinAdmin">
               <option value="user">普通用户（查看、收藏）</option>
-              <option value="admin">管理员（完全控制，仅王师傅）</option>
+              <option value="admin">管理员（完全控制）</option>
             </select>
           </label>
           <div class="form-actions">
@@ -217,7 +235,7 @@ if (userStore.isAdmin) {
         </div>
       </div>
       <div v-else-if="userStore.isLogin" class="permission-note">
-        普通用户可以查看菜谱和收藏菜谱，家庭成员管理由管理员「王师傅」操作。
+        普通用户可以查看菜谱和收藏菜谱，家庭成员管理由管理员操作。
       </div>
       <div v-else class="permission-note">
         登录后可查看自己的权限，管理员可管理家庭成员。
@@ -235,7 +253,13 @@ if (userStore.isAdmin) {
           <template #right-icon>
             <div class="member-actions">
               <van-button size="mini" plain type="warning" @click="editUser(u)">编辑</van-button>
-              <van-button size="mini" plain type="danger" @click="removeUser(u)">删除</van-button>
+              <van-button
+                v-if="!isBuiltinAdminUser(u)"
+                size="mini"
+                plain
+                type="danger"
+                @click="removeUser(u)"
+              >删除</van-button>
             </div>
           </template>
         </van-cell>
@@ -396,5 +420,12 @@ h2 {
   color: #7c5c46;
   line-height: 1.6;
   font-size: 14px;
+}
+
+.builtin-hint {
+  margin: -4px 0 10px;
+  color: #9a6b4f;
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>

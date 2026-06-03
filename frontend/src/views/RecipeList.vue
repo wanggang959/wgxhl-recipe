@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showFailToast, showSuccessToast } from 'vant'
+import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
 import { pageRecipe } from '../api/recipe'
@@ -21,6 +21,7 @@ const loading = ref(false)
 const finished = ref(false)
 const total = ref(0)
 const favoriteMap = ref({})
+const favoritePendingMap = ref({})
 const saveMessage = ref('')
 const recommendMessage = ref('')
 const suggestRecipe = ref(null)
@@ -226,6 +227,34 @@ async function toggleFavorite(item) {
     showFailToast(error.message || '收藏操作失败')
   }
 }
+
+async function toggleFavoriteSafe(item) {
+  if (!userStore.userId) {
+    closeToast()
+    showFailToast('请先登录后再收藏')
+    return
+  }
+  if (favoritePendingMap.value[item.id]) return
+  favoritePendingMap.value[item.id] = true
+  try {
+    if (favoriteMap.value[item.id]) {
+      await deleteFavoriteByRecipeId(userStore.userId, item.id)
+      favoriteMap.value[item.id] = false
+      closeToast()
+      showSuccessToast({ message: '已取消收藏', duration: 1400 })
+    } else {
+      await createFavorite({ userId: userStore.userId, recipeId: item.id })
+      favoriteMap.value[item.id] = true
+      closeToast()
+      showSuccessToast({ message: '收藏成功', duration: 1400 })
+    }
+  } catch (error) {
+    closeToast()
+    showFailToast({ message: error.message || '收藏操作失败', duration: 1800 })
+  } finally {
+    favoritePendingMap.value[item.id] = false
+  }
+}
 </script>
 
 <template>
@@ -376,7 +405,7 @@ async function toggleFavorite(item) {
           :recipe="item"
           :favorite="Boolean(favoriteMap[item.id])"
           @open="openDetail"
-          @favorite="toggleFavorite"
+          @favorite="toggleFavoriteSafe"
         />
       </div>
       <EmptyState v-else-if="!loading" :show-button="userStore.isAdmin" @action="router.push('/recipe/create')" />

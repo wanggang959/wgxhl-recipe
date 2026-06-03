@@ -101,9 +101,6 @@ body {
   border-radius: 999px !important;
   background: rgba(47, 38, 31, 0.92) !important;
   color: #fff !important;
-  display: inline-flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
   gap: 6px !important;
   box-shadow: 0 12px 28px rgba(47, 38, 31, 0.18);
 }
@@ -112,6 +109,8 @@ body {
 .van-toast--fail,
 .van-toast--text {
   background: rgba(47, 38, 31, 0.92) !important;
+  flex-direction: row !important;
+  align-items: center !important;
 }
 
 .van-toast__icon {

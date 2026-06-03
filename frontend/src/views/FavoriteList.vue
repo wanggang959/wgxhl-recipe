@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showFailToast, showSuccessToast } from 'vant'
+import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { deleteFavorite, pageFavorite } from '../api/favorite'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
@@ -49,6 +49,18 @@ async function remove(item) {
     showFailToast(error.message || '操作失败')
   }
 }
+
+async function removeSafe(item) {
+  try {
+    await deleteFavorite(item.favoriteId)
+    closeToast()
+    showSuccessToast({ message: '已取消收藏', duration: 1400 })
+    await loadFavorite()
+  } catch (error) {
+    closeToast()
+    showFailToast({ message: error.message || '操作失败', duration: 1800 })
+  }
+}
 </script>
 
 <template>
@@ -81,7 +93,7 @@ async function remove(item) {
         :recipe="item"
         favorite
         @open="router.push(`/recipe/${item.id}`)"
-        @favorite="remove"
+        @favorite="removeSafe"
       />
     </div>
   </section>

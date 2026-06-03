@@ -24,6 +24,7 @@ import java.util.Objects;
 public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         implements AppUserService {
 
+    private static final String ADMIN_ID = "admin-wangshifu";
     private static final String ADMIN_USERNAME = "王师傅";
     private static final String ADMIN_PASSWORD = "123456";
     private static final String ROLE_ADMIN = "admin";
@@ -44,11 +45,15 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
 
     @PostConstruct
     public void ensureAdminAccount() {
-        AppUser admin = lambdaQuery()
-                .eq(AppUser::getUsername, ADMIN_USERNAME)
-                .one();
+        AppUser admin = super.getById(ADMIN_ID);
+        if (admin == null) {
+            admin = lambdaQuery()
+                    .eq(AppUser::getUsername, ADMIN_USERNAME)
+                    .one();
+        }
         if (admin == null) {
             admin = new AppUser();
+            admin.setId(ADMIN_ID);
             admin.setUsername(ADMIN_USERNAME);
             admin.setNickname(ADMIN_USERNAME);
             admin.setPassword(ADMIN_PASSWORD);
@@ -58,6 +63,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             return;
         }
         boolean changed = false;
+        if (!ADMIN_USERNAME.equals(admin.getUsername())) {
+            admin.setUsername(ADMIN_USERNAME);
+            changed = true;
+        }
         if (!Objects.equals(admin.getPassword(), ADMIN_PASSWORD)) {
             admin.setPassword(ADMIN_PASSWORD);
             changed = true;
@@ -145,14 +154,22 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(entity.getId())) {
             return ApiResponse.fail("用户id不能为空");
         }
-        if (super.getById(entity.getId()) == null) {
+        AppUser existing = super.getById(entity.getId());
+        if (existing == null) {
             return ApiResponse.fail("用户不存在");
         }
-        if (ADMIN_USERNAME.equals(entity.getUsername())) {
+        if (isBuiltinAdmin(existing)) {
+            if (!ADMIN_USERNAME.equals(entity.getUsername())) {
+                return ApiResponse.fail("内置管理员「王师傅」的用户名不能修改，请只改昵称");
+            }
+            entity.setUsername(ADMIN_USERNAME);
             entity.setUserRole(ROLE_ADMIN);
             entity.setStatus(STATUS_NORMAL);
-        } else if (ROLE_ADMIN.equals(entity.getUserRole())) {
-            return ApiResponse.fail("只有内置账号王师傅可以设置为管理员");
+        } else {
+            if (ADMIN_USERNAME.equals(entity.getUsername())) {
+                return ApiResponse.fail("用户名「王师傅」为系统保留");
+            }
+            applyRole(entity);
         }
         if (StringUtils.hasText(entity.getUsername())
                 && lambdaQuery()
@@ -175,7 +192,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (user == null) {
             return ApiResponse.fail("用户不存在");
         }
-        if (ADMIN_USERNAME.equals(user.getUsername())) {
+        if (isBuiltinAdmin(user)) {
             return ApiResponse.fail("内置管理员不能删除");
         }
         userFavoriteService.deleteByUserId(id);
@@ -217,10 +234,28 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             user.setStatus(STATUS_NORMAL);
             return;
         }
-        user.setUserRole(ROLE_USER);
+        applyRole(user);
         if (!StringUtils.hasText(user.getStatus())) {
             user.setStatus(STATUS_NORMAL);
         }
+    }
+
+    private void applyRole(AppUser user) {
+        if (ROLE_ADMIN.equals(user.getUserRole())) {
+            user.setUserRole(ROLE_ADMIN);
+        } else {
+            user.setUserRole(ROLE_USER);
+        }
+    }
+
+    private boolean isBuiltinAdmin(AppUser user) {
+        if (user == null) {
+            return false;
+        }
+        if (ADMIN_ID.equals(user.getId())) {
+            return true;
+        }
+        return ADMIN_USERNAME.equals(user.getUsername());
     }
 
     private void maskPassword(AppUser user) {

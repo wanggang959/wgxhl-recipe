@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "convert:public-webp": "node scripts/convert-public-to-webp.mjs"
   },
   "dependencies": {
     "axios": "^1.16.1",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.4",
+    "sharp": "^0.34.5",
     "unplugin-vue-components": "^32.1.0",
     "vite": "^5.4.10"
   }

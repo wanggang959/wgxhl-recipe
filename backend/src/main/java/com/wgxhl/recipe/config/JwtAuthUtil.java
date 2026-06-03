@@ -67,4 +67,12 @@ public class JwtAuthUtil {
         Object value = jwt.getPayload(CLAIM_USER_ROLE);
         return value == null ? null : String.valueOf(value);
     }
+
+    public String getUserId(JWT jwt) {
+        if (jwt == null) {
+            return null;
+        }
+        Object value = jwt.getPayload(CLAIM_USER_ID);
+        return value == null ? null : String.valueOf(value);
+    }
 }

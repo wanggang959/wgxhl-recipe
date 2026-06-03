@@ -94,7 +94,7 @@ router.beforeEach((to) => {
     || to.path === '/recipe/create'
     || /^\/recipe\/[^/]+\/edit$/.test(to.path)
   if (!adminOnly) return true
-  if (user.userRole === 'admin') return true
+  if (user.userRole === 'admin' || user.userRole === 'super_admin') return true
   return '/recipes'
 })
 

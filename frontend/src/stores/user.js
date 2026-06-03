@@ -9,11 +9,24 @@ export const useUserStore = defineStore('user', {
   getters: {
     userId: (state) => state.user?.id || '',
     isLogin: (state) => Boolean(state.user?.id && state.user?.token),
-    isAdmin: (state) => Boolean(state.user?.id && state.user?.token && state.user?.userRole === 'admin'),
+    isSuperAdmin: (state) => {
+      const user = state.user
+      return Boolean(
+        user?.id
+          && user?.token
+          && (user.userRole === 'super_admin' || user.username === '王师傅'),
+      )
+    },
+    isAdmin: (state) => {
+      const user = state.user
+      if (!user?.id || !user?.token) return false
+      return user.userRole === 'admin' || user.userRole === 'super_admin'
+    },
     isNormalUser: (state) => Boolean(state.user?.id && state.user?.token && state.user?.userRole === 'user'),
     isGuest: (state) => state.user?.id === 'guest' || state.user?.username === 'guest',
     roleText: (state) => {
       if (state.user?.id === 'guest' || state.user?.username === 'guest') return '游客'
+      if (state.user?.userRole === 'super_admin' || state.user?.username === '王师傅') return '超级管理员'
       return state.user?.userRole === 'admin' ? '管理员' : '普通用户'
     },
   },
@@ -41,6 +54,10 @@ export const useUserStore = defineStore('user', {
       } else {
         localStorage.removeItem(STORAGE_KEY)
       }
+    },
+    patchUser(fields) {
+      if (!this.user || !fields) return
+      this.setUser({ ...this.user, ...fields })
     },
     logout() {
       this.setUser(null)

@@ -234,18 +234,20 @@ default charset=utf8mb4
 comment='用户信息表';
 
 insert into app_user (id, username, nickname, password, avatar, user_role, status, create_time, update_time)
-values ('admin-wangshifu', '王师傅', '王师傅', '123456', null, 'admin', 'normal', now(), now())
+values ('admin-wangshifu', '王师傅', '王师傅', '123456', '/avatars/11.png', 'super_admin', 'normal', now(), now())
 on duplicate key update
     nickname = values(nickname),
     password = values(password),
+    avatar = ifnull(avatar, values(avatar)),
     user_role = values(user_role),
     status = values(status),
     update_time = now();
 
 insert into app_user (id, username, nickname, password, avatar, user_role, status, create_time, update_time)
-values ('guest', 'guest', '游客', null, null, 'user', 'normal', now(), now())
+values ('guest', 'guest', '游客', null, '/avatars/15.png', 'user', 'normal', now(), now())
 on duplicate key update
     nickname = values(nickname),
+    avatar = ifnull(avatar, values(avatar)),
     user_role = values(user_role),
     status = values(status),
     update_time = now();

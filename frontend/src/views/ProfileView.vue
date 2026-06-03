@@ -1,9 +1,11 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog } from 'vant'
-import { createUser, deleteUser, pageUser, updateUser } from '../api/user'
+import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
+import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
+import { pickDefaultAvatar, userAvatarSrc } from '../utils/avatar'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -12,6 +14,7 @@ const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
 const showMemberForm = ref(false)
+const memberPanelBodyRef = ref(null)
 let actionStatusTimer = null
 
 const userForm = reactive({
@@ -20,6 +23,7 @@ const userForm = reactive({
   nickname: '',
   password: '',
   userRole: 'user',
+  avatar: '',
 })
 
 const BUILTIN_ADMIN_ID = 'admin-wangshifu'
@@ -38,6 +42,19 @@ function isGuestUser(item) {
   return item?.id === GUEST_ID || item?.username === 'guest'
 }
 
+function syncStoreFromUsersList() {
+  if (!userStore.user) return
+  const fromList = users.value.find((item) => item.id === userStore.userId)
+  if (!fromList) return
+  userStore.setUser({
+    ...userStore.user,
+    nickname: fromList.nickname,
+    username: fromList.username,
+    userRole: fromList.userRole,
+    avatar: fromList.avatar,
+  })
+}
+
 async function loadUsers() {
   if (!userStore.isAdmin) {
     users.value = []
@@ -46,6 +63,7 @@ async function loadUsers() {
   try {
     const res = await pageUser({ current: 1, size: 50 })
     users.value = res.data.records || []
+    syncStoreFromUsersList()
   } catch (error) {
     users.value = []
   }
@@ -64,8 +82,15 @@ function resetUserForm() {
   userForm.nickname = ''
   userForm.password = ''
   userForm.userRole = 'user'
+  userForm.avatar = ''
   editingBuiltinAdmin.value = false
   showMemberForm.value = false
+}
+
+function scrollMemberPanelToTop() {
+  nextTick(() => {
+    memberPanelBodyRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  })
 }
 
 function beginAddUser() {
@@ -74,8 +99,10 @@ function beginAddUser() {
   userForm.nickname = ''
   userForm.password = ''
   userForm.userRole = 'user'
+  userForm.avatar = DEFAULT_AVATARS[0]
   editingBuiltinAdmin.value = false
   showMemberForm.value = true
+  scrollMemberPanelToTop()
 }
 
 function editUser(item) {
@@ -84,8 +111,25 @@ function editUser(item) {
   userForm.nickname = item.nickname || ''
   userForm.password = ''
   userForm.userRole = item.userRole || 'user'
+  userForm.avatar = item.avatar || pickDefaultAvatar(item.id)
   editingBuiltinAdmin.value = isBuiltinAdminUser(item)
   showMemberForm.value = true
+  scrollMemberPanelToTop()
+}
+
+function selectAvatar(path) {
+  userForm.avatar = path
+}
+
+function syncCurrentUserAfterSave(payload) {
+  if (!userStore.user || payload.id !== userStore.userId) return
+  userStore.setUser({
+    ...userStore.user,
+    nickname: payload.nickname,
+    username: payload.username,
+    userRole: payload.userRole,
+    avatar: payload.avatar,
+  })
 }
 
 async function saveUser() {
@@ -104,11 +148,14 @@ async function saveUser() {
 
   savingUser.value = true
   try {
+    const editingUser = users.value.find((item) => item.id === userForm.id)
+    const avatar = userForm.avatar || pickDefaultAvatar(userForm.username.trim() || userForm.id)
     const payload = {
       ...userForm,
       username: userForm.username.trim(),
       nickname: userForm.nickname.trim() || userForm.username.trim(),
-      status: 'normal',
+      avatar,
+      status: isEditingUser.value ? (editingUser?.status || 'normal') : 'normal',
     }
     if (!payload.password) {
       delete payload.password
@@ -120,6 +167,7 @@ async function saveUser() {
       await createUser(payload)
       showActionStatus('成员已新增')
     }
+    syncCurrentUserAfterSave(payload)
     resetUserForm()
     await loadUsers()
   } catch (error) {
@@ -148,7 +196,40 @@ async function removeUser(item) {
 }
 
 function roleText(role) {
+  if (role === 'super_admin') return '超级管理员'
   return role === 'admin' ? '管理员' : '普通用户'
+}
+
+function statusText(status) {
+  return status === 'disabled' ? '已禁用' : '正常'
+}
+
+function canManageStatus(item) {
+  return userStore.isSuperAdmin && !isBuiltinAdminUser(item)
+}
+
+async function toggleUserStatus(item) {
+  if (!userStore.isSuperAdmin) {
+    showActionStatus('仅超级管理员王师傅可以禁用或启用账户', 'error')
+    return
+  }
+  const disabled = item.status === 'disabled'
+  try {
+    await showConfirmDialog({
+      title: disabled ? '恢复登录' : '禁止登录',
+      message: disabled
+        ? `确认恢复「${item.nickname || item.username}」的登录权限吗？`
+        : `确认禁止「${item.nickname || item.username}」登录吗？禁用后该账号将无法登录${isGuestUser(item) ? '（含游客入口）' : ''}。`,
+    })
+    await setUserStatus({
+      id: item.id,
+      status: disabled ? 'normal' : 'disabled',
+    })
+    showActionStatus(disabled ? '已恢复登录权限' : '已禁止该用户登录')
+    await loadUsers()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  }
 }
 
 function showActionStatus(message, type = 'success') {
@@ -161,16 +242,61 @@ function showActionStatus(message, type = 'success') {
   }, 2200)
 }
 
+function roleIcon(role, item) {
+  if (isBuiltinAdminUser(item) || role === 'super_admin') return 'award-o'
+  if (role === 'admin') return 'manager-o'
+  return 'friends-o'
+}
+
+function avatarTone(item) {
+  if (isGuestUser(item)) return 'guest'
+  if (isBuiltinAdminUser(item) || item.userRole === 'super_admin') return 'super'
+  if (item.userRole === 'admin') return 'admin'
+  return 'user'
+}
+
+function canEditUser(item) {
+  return userStore.isAdmin && !isGuestUser(item)
+}
+
+function canDeleteUser(item) {
+  return userStore.isAdmin && !isBuiltinAdminUser(item) && !isGuestUser(item)
+}
+
+const sortedUsers = computed(() => {
+  const rank = (item) => {
+    if (isGuestUser(item)) return 0
+    if (item.userRole === 'super_admin' || isBuiltinAdminUser(item)) return 3
+    if (item.userRole === 'admin') return 2
+    return 1
+  }
+  return [...users.value].sort((a, b) => rank(a) - rank(b))
+})
+
+/** 顶部「我的」与成员列表共用：优先用服务端列表里的当前用户 */
+const currentProfileUser = computed(() => {
+  if (!userStore.user) return null
+  const fromList = users.value.find((item) => item.id === userStore.userId)
+  return fromList ? { ...userStore.user, ...fromList } : userStore.user
+})
+
 if (userStore.isAdmin) {
   loadUsers()
 }
 </script>
 
 <template>
-  <section class="profile-page">
+  <section class="profile-page" :class="{ 'profile-page--fill': userStore.isAdmin }">
+    <div class="profile-page-top">
     <div class="profile-card">
       <div class="avatar">
-        <van-icon name="contact-o" size="32" />
+        <img
+          v-if="userStore.isLogin"
+          :src="userAvatarSrc(currentProfileUser)"
+          alt=""
+          class="avatar-img"
+        />
+        <van-icon v-else name="contact-o" size="32" />
       </div>
       <div>
         <p>我的</p>
@@ -201,14 +327,27 @@ if (userStore.isAdmin) {
       <van-cell title="权限" :value="userStore.roleText" />
       <van-button plain round type="danger" block @click="logout">退出登录</van-button>
     </section>
+    </div>
 
-    <section class="form-card">
-      <h2>家庭成员</h2>
-      <div v-if="userStore.isAdmin" class="member-form">
-        <div v-if="!showMemberForm" class="member-toolbar">
-          <van-button type="warning" round size="small" @click="beginAddUser">添加成员</van-button>
+    <section v-if="userStore.isAdmin" class="member-panel">
+      <header class="member-panel-head">
+        <div class="member-panel-title">
+          <div class="title-icon">
+            <van-icon name="friends-o" size="22" />
+          </div>
+          <div>
+            <h2>家庭成员</h2>
+            <p>管理家人账号，设置不同的权限</p>
+          </div>
         </div>
-        <div v-else>
+        <button v-if="!showMemberForm" type="button" class="add-member-btn" @click="beginAddUser">
+          <van-icon name="plus" size="14" />
+          添加成员
+        </button>
+      </header>
+
+      <div ref="memberPanelBodyRef" class="member-panel-body">
+        <div v-if="showMemberForm" class="member-form-card">
           <van-field
             v-model="userForm.username"
             class="form-field"
@@ -232,6 +371,21 @@ if (userStore.isAdmin) {
               <option value="admin">管理员（完全控制）</option>
             </select>
           </label>
+          <div class="avatar-field">
+            <span>头像</span>
+            <div class="avatar-picker">
+              <button
+                v-for="path in DEFAULT_AVATARS"
+                :key="path"
+                type="button"
+                class="avatar-option"
+                :class="{ active: userForm.avatar === path }"
+                @click="selectAvatar(path)"
+              >
+                <img :src="path" alt="" />
+              </button>
+            </div>
+          </div>
           <div class="form-actions">
             <van-button type="warning" round size="small" :loading="savingUser" @click="saveUser">
               {{ isEditingUser ? '保存成员' : '新增成员' }}
@@ -239,43 +393,115 @@ if (userStore.isAdmin) {
             <van-button round size="small" @click="resetUserForm">取消</van-button>
           </div>
         </div>
+
+        <template v-if="!showMemberForm">
+          <van-empty v-if="users.length === 0" description="暂无用户数据" />
+          <div v-else class="member-list">
+          <article
+            v-for="u in sortedUsers"
+            :key="u.id"
+            class="member-card"
+            :class="{ 'is-disabled': u.status === 'disabled' }"
+          >
+            <div class="member-card-body">
+              <div class="member-avatar" :class="`tone-${avatarTone(u)}`">
+                <img :src="userAvatarSrc(u)" alt="" class="member-avatar-img" />
+              </div>
+              <div class="member-main">
+                <div class="member-top">
+                  <div class="member-names">
+                    <h3>{{ u.nickname || u.username }}</h3>
+                    <p>用户名：{{ u.username }}</p>
+                  </div>
+                  <span class="role-badge" :class="`role-${u.userRole || 'user'}`">
+                    <van-icon :name="roleIcon(u.userRole, u)" size="12" />
+                    {{ roleText(u.userRole) }}
+                  </span>
+                </div>
+                <div class="member-bottom">
+                  <span class="member-status" :class="{ danger: u.status === 'disabled' }">
+                    状态：{{ statusText(u.status) }}
+                  </span>
+                  <div v-if="isGuestUser(u)" class="member-actions member-actions--guest">
+                    <button
+                      v-if="canManageStatus(u)"
+                      type="button"
+                      class="action-chip"
+                      @click="toggleUserStatus(u)"
+                    >
+                      <van-icon :name="u.status === 'disabled' ? 'passed' : 'lock'" size="16" />
+                      <span>{{ u.status === 'disabled' ? '启用' : '禁用' }}</span>
+                    </button>
+                    <button v-else type="button" class="action-chevron" aria-label="查看">
+                      <van-icon name="arrow" size="18" />
+                    </button>
+                  </div>
+                  <div v-else-if="isBuiltinAdminUser(u)" class="member-actions">
+                    <button type="button" class="edit-pill" @click="editUser(u)">
+                      <van-icon name="edit" size="14" />
+                      编辑
+                    </button>
+                  </div>
+                  <div v-else class="member-actions member-actions--icons">
+                    <button v-if="canEditUser(u)" type="button" class="action-item" @click="editUser(u)">
+                      <span class="action-icon edit"><van-icon name="edit" size="18" /></span>
+                      <span>编辑</span>
+                    </button>
+                    <button
+                      v-if="canManageStatus(u)"
+                      type="button"
+                      class="action-item"
+                      @click="toggleUserStatus(u)"
+                    >
+                      <span class="action-icon lock"><van-icon :name="u.status === 'disabled' ? 'passed' : 'lock'" size="18" /></span>
+                      <span>{{ u.status === 'disabled' ? '启用' : '禁用' }}</span>
+                    </button>
+                    <button v-if="canDeleteUser(u)" type="button" class="action-item" @click="removeUser(u)">
+                      <span class="action-icon delete"><van-icon name="delete-o" size="18" /></span>
+                      <span>删除</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+          </div>
+        </template>
+
+        <footer class="member-footer">
+          <van-icon name="shield-o" size="16" />
+          <span>家人账号用于记录菜谱、收藏和饮食偏好，数据仅在家人间共享</span>
+        </footer>
       </div>
-      <div v-else-if="userStore.isLogin" class="permission-note">
-        普通用户可以查看菜谱和收藏菜谱，家庭成员管理由管理员操作。
+    </section>
+
+    <section v-else class="form-card">
+      <h2>家庭成员</h2>
+      <div v-if="userStore.isLogin" class="permission-note">
+        普通用户可以查看菜谱和收藏菜谱；管理员可管理成员，仅超级管理员王师傅可禁用账户。
       </div>
       <div v-else class="permission-note">
         登录后可查看自己的权限，管理员可管理家庭成员。
       </div>
-
-      <van-empty v-if="userStore.isAdmin && users.length === 0" description="暂无用户数据" />
-      <van-cell-group v-else-if="userStore.isAdmin">
-        <van-cell
-          v-for="u in users"
-          :key="u.id"
-          :title="u.nickname || u.username"
-          :label="u.username"
-          :value="roleText(u.userRole)"
-        >
-          <template #right-icon>
-            <div class="member-actions">
-              <van-button size="mini" plain type="warning" @click="editUser(u)">编辑</van-button>
-              <van-button
-                v-if="!isBuiltinAdminUser(u) && !isGuestUser(u)"
-                size="mini"
-                plain
-                type="danger"
-                @click="removeUser(u)"
-              >删除</van-button>
-            </div>
-          </template>
-        </van-cell>
-      </van-cell-group>
     </section>
   </section>
 </template>
 
 <style scoped>
 .profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-page--fill {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.profile-page-top {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -305,6 +531,13 @@ if (userStore.isAdmin) {
   color: var(--app-primary);
   display: grid;
   place-items: center;
+  overflow: hidden;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-card p,
@@ -405,18 +638,377 @@ h2 {
   color: var(--app-text);
 }
 
-.form-actions,
-.member-actions {
+.form-actions {
   display: flex;
   gap: 8px;
+  margin-bottom: 8px;
 }
 
-.member-toolbar {
+.member-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 16px 16px;
+  border-radius: 24px;
+  background: #fffdf8;
+  border: 1px solid #f3e5d8;
+  box-shadow: 0 12px 28px rgba(154, 52, 18, 0.08);
+  overflow: hidden;
+}
+
+.member-panel-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.member-panel-title {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.title-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fff4e8, #ffe8d2);
+  color: var(--app-primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.member-panel-title h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--app-text);
+}
+
+.member-panel-title p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #9a8b7f;
+  line-height: 1.5;
+}
+
+.add-member-btn {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fb923c, #f97316);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.28);
+}
+
+.member-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
+  padding-bottom: 8px;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.member-panel-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.member-panel-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.35);
+}
+
+.member-form-card {
+  margin-bottom: 14px;
+  padding: 14px;
+  padding-bottom: 18px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid var(--app-border);
+}
+
+.member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.member-card {
+  padding: 14px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #f1e4d8;
+  box-shadow: 0 8px 20px rgba(154, 52, 18, 0.05);
+}
+
+.member-card.is-disabled {
+  background: #fafafa;
+  border-color: #ececec;
+}
+
+.member-card-body {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.member-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.member-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-field {
   margin-bottom: 10px;
 }
 
-.form-actions {
+.avatar-field > span {
+  display: block;
   margin-bottom: 8px;
+  color: var(--app-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.avatar-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.avatar-option {
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: #fff7ed;
+  overflow: hidden;
+  aspect-ratio: 1;
+}
+
+.avatar-option.active {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
+}
+
+.avatar-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.member-avatar.tone-guest {
+  background: linear-gradient(145deg, #fdba74, #f97316);
+}
+
+.member-avatar.tone-user {
+  background: linear-gradient(145deg, #fcd34d, #f59e0b);
+  color: #7c4a03;
+}
+
+.member-avatar.tone-admin {
+  background: linear-gradient(145deg, #86efac, #22c55e);
+  color: #14532d;
+}
+
+.member-avatar.tone-super {
+  background: linear-gradient(145deg, #fdba74, #ea580c);
+}
+
+.member-main {
+  min-width: 0;
+}
+
+.member-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.member-names h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--app-text);
+}
+
+.member-names p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #9a8b7f;
+}
+
+.role-badge {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #fff4e8;
+  color: #ea580c;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.role-badge.role-admin,
+.role-badge.role-super_admin {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.member-bottom {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.member-status {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.member-status.danger {
+  color: #dc2626;
+}
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.member-actions--icons {
+  gap: 14px;
+}
+
+.action-item {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.action-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.action-icon.edit {
+  background: #fff4e8;
+  color: #ea580c;
+}
+
+.action-icon.lock {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.action-icon.delete {
+  background: #fff1f2;
+  color: #dc2626;
+}
+
+.edit-pill {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff4e8;
+  color: #ea580c;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-chip {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-chevron {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #f9fafb;
+  color: #9ca3af;
+  display: grid;
+  place-items: center;
+}
+
+.member-footer {
+  flex-shrink: 0;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #fff4e8;
+  color: #9a6b4f;
+  font-size: 12px;
+  line-height: 1.6;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.member-card.is-disabled .member-names h3 {
+  color: #9ca3af;
 }
 
 .permission-note {

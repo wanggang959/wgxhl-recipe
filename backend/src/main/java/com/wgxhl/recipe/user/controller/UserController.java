@@ -5,7 +5,10 @@ import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.common.dto.IdDTO;
 import com.wgxhl.recipe.user.dto.UserLoginDTO;
 import com.wgxhl.recipe.user.dto.UserPageDTO;
+import com.wgxhl.recipe.user.dto.UserStatusDTO;
+import com.wgxhl.recipe.user.dto.UserUsernameDTO;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.user.vo.UserPreviewVO;
 import com.wgxhl.recipe.user.service.AppUserService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -88,5 +91,21 @@ public class UserController {
     @PostMapping("/guestLogin")
     public ApiResponse<AppUser> guestLogin() {
         return appUserService.guestLogin();
+    }
+
+    /***
+     * @Description 登录页按用户名预览头像（无需登录）
+     **/
+    @PostMapping("/preview")
+    public ApiResponse<UserPreviewVO> preview(@RequestBody UserUsernameDTO dto) {
+        return appUserService.previewByUsername(dto == null ? null : dto.getUsername());
+    }
+
+    /***
+     * @Description 设置用户状态（启用/禁用）
+     **/
+    @PostMapping("/setStatus")
+    public ApiResponse<Void> setStatus(@RequestBody UserStatusDTO dto) {
+        return appUserService.setStatus(dto.getId(), dto.getStatus());
     }
 }

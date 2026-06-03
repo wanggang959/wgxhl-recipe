@@ -6,6 +6,7 @@ import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.user.dto.UserLoginDTO;
 import com.wgxhl.recipe.user.dto.UserPageDTO;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.user.vo.UserPreviewVO;
 
 public interface AppUserService extends IService<AppUser> {
 
@@ -22,4 +23,8 @@ public interface AppUserService extends IService<AppUser> {
     ApiResponse<AppUser> login(UserLoginDTO dto);
 
     ApiResponse<AppUser> guestLogin();
+
+    ApiResponse<UserPreviewVO> previewByUsername(String username);
+
+    ApiResponse<Void> setStatus(String id, String status);
 }

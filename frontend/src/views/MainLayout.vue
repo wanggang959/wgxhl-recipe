@@ -30,7 +30,10 @@ const isTodayMode = computed(() => route.query.pick === 'today')
       </van-button>
     </header>
 
-    <main class="page-wrap content" :class="{ 'showcase-content': isShowcase }">
+    <main
+      class="page-wrap content"
+      :class="{ 'showcase-content': isShowcase, 'profile-shell': route.path === '/profile' && userStore.isAdmin }"
+    >
       <router-view />
     </main>
 
@@ -87,5 +90,14 @@ const isTodayMode = computed(() => route.query.pick === 'today')
 .showcase-content {
   width: min(100%, 1180px);
   padding: 0;
+}
+
+.profile-shell {
+  height: calc(100dvh - 52px - 72px);
+  max-height: calc(100dvh - 52px - 72px);
+  overflow: hidden;
+  padding-bottom: 10px;
+  display: flex;
+  flex-direction: column;
 }
 </style>

@@ -1,8 +1,9 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { guestLogin as guestLoginApi, login } from '../api/user'
+import { guestLogin as guestLoginApi, login, previewUserByUsername } from '../api/user'
 import { useUserStore } from '../stores/user'
+import { userAvatarSrc } from '../utils/avatar'
 
 const REMEMBER_USERNAME_KEY = 'wgxhl_recipe_login_username'
 
@@ -20,11 +21,53 @@ const form = reactive({
   password: '',
 })
 
+const previewUser = ref(null)
+let previewTimer = null
+let previewRequestId = 0
+
+const previewAvatarSrc = computed(() => {
+  if (!previewUser.value) return ''
+  return userAvatarSrc(previewUser.value)
+})
+
+async function fetchUsernamePreview(username) {
+  const name = username.trim()
+  if (!name) {
+    previewUser.value = null
+    return
+  }
+  const requestId = ++previewRequestId
+  try {
+    const res = await previewUserByUsername({ username: name })
+    if (requestId !== previewRequestId) return
+    previewUser.value = res.data || null
+  } catch {
+    if (requestId !== previewRequestId) return
+    previewUser.value = null
+  }
+}
+
+watch(
+  () => form.username,
+  (value) => {
+    window.clearTimeout(previewTimer)
+    const name = value.trim()
+    if (!name) {
+      previewUser.value = null
+      return
+    }
+    previewTimer = window.setTimeout(() => {
+      fetchUsernamePreview(name)
+    }, 320)
+  },
+)
+
 onMounted(() => {
   const rememberedUsername = localStorage.getItem(REMEMBER_USERNAME_KEY)
   if (rememberedUsername) {
     form.username = rememberedUsername
     rememberMe.value = true
+    fetchUsernamePreview(rememberedUsername)
   }
 })
 
@@ -52,7 +95,7 @@ async function submit() {
       router.replace(getRedirectTarget())
     }, 260)
   } catch (error) {
-    showStatus(error.message || '登录失败', 'error')
+    showStatus(error.message || '您的帐号已被禁用，请联系王师傅处理', 'error')
   } finally {
     loading.value = false
   }
@@ -68,7 +111,7 @@ async function guestLogin() {
       router.replace(getRedirectTarget())
     }, 200)
   } catch (error) {
-    showStatus(error.message || '游客登录失败', 'error')
+    showStatus(error.message || '当前系统已禁止游客登录，请联系管理员处理', 'error')
   } finally {
     loading.value = false
   }
@@ -140,14 +183,18 @@ function showStatus(message, type = 'success') {
               <van-icon name="contact-o" />
               用户名
             </label>
-            <div class="input-shell">
+            <div class="input-shell username-shell" :class="{ 'has-avatar': previewAvatarSrc }">
               <input
                 id="login-username"
                 v-model="form.username"
                 class="native-input"
+                :class="{ 'with-avatar': previewAvatarSrc }"
                 placeholder="请输入用户名"
                 autocomplete="username"
               >
+              <div v-if="previewAvatarSrc" class="username-avatar" aria-hidden="true">
+                <img :src="previewAvatarSrc" alt="" />
+              </div>
             </div>
           </div>
 
@@ -477,6 +524,51 @@ function showStatus(message, type = 'success') {
 
 .native-input::placeholder {
   color: #b7aaa1;
+}
+
+.username-shell.has-avatar {
+  padding-right: 56px;
+}
+
+.username-shell .native-input.with-avatar {
+  padding-right: 6px;
+}
+
+.username-avatar {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 0;
+  box-shadow: 0 2px 10px rgba(154, 52, 18, 0.14);
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  animation: avatar-pop 0.22s ease;
+}
+
+.username-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+@keyframes avatar-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+.username-shell {
+  position: relative;
 }
 
 .password-shell {

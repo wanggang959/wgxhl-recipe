@@ -17,8 +17,29 @@
 wgxhl-recipe/
 ├── frontend/          # 前端项目
 ├── backend/           # 后端项目
+├── deploy/            # 部署目录（Docker / 1Panel）
+│   ├── backend/       # 后端 jar + Dockerfile + compose
+│   └── frontend/      # 前端 dist + nginx + compose
+├── scripts/           # 工具脚本（含 pack-deploy）
 └── README.md
 ```
+
+## 打包到 deploy 目录
+
+一键打包前后端并复制到 `deploy`（与 Dockerfile 路径一致）：
+
+```bash
+node scripts/pack-deploy.mjs
+```
+
+产物位置：
+
+| 类型 | 路径 |
+|------|------|
+| 后端 JAR | `deploy/backend/recipe-backend-1.0.0-SNAPSHOT.jar` |
+| 前端静态文件 | `deploy/frontend/dist/` |
+
+随后在 1Panel 中分别使用 `deploy/backend`、`deploy/frontend` 目录进行编排部署即可。
 
 ## 环境要求
 

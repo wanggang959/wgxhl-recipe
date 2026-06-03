@@ -65,14 +65,14 @@ onMounted(async () => {
   }
   await Promise.all([loadCategory(), refreshList()])
   if (route.query.pick === 'today') {
-    chooseRandomRecipe(true)
+    chooseRandomRecipe({ showMessage: true })
   }
 })
 
 watch(
   () => [route.query.pick, route.query.mode, route.query.t],
   ([pick, mode]) => {
-    if (pick === 'today') chooseRandomRecipe(true)
+    if (pick === 'today') chooseRandomRecipe({ showMessage: true })
     if (mode === 'showcase') showcasePage.value = 0
   },
 )
@@ -109,7 +109,7 @@ async function loadMore() {
     }
     await syncFavoriteState(records)
     if (!suggestRecipe.value && list.value.length > 0) {
-      chooseRandomRecipe(false)
+      chooseRandomRecipe()
     }
   } catch (error) {
     errorText.value = error.message || '菜谱加载失败'
@@ -140,15 +140,38 @@ function pickCategory(categoryId = '') {
   applySearch()
 }
 
-function chooseRandomRecipe(open = false) {
+function chooseRandomRecipe(options = {}) {
+  const showMessage = Boolean(options.showMessage)
+  const forceDifferent = Boolean(options.forceDifferent)
+
   if (list.value.length === 0) {
     suggestRecipe.value = null
     return
   }
-  const randomIndex = Math.floor(Math.random() * list.value.length)
-  suggestRecipe.value = list.value[randomIndex]
-  if (open && suggestRecipe.value) {
+
+  let pool = list.value
+  if (forceDifferent && suggestRecipe.value && list.value.length > 1) {
+    pool = list.value.filter((item) => item.id !== suggestRecipe.value.id)
+  }
+
+  const randomIndex = Math.floor(Math.random() * pool.length)
+  const nextRecipe = pool[randomIndex]
+  const unchanged = forceDifferent && suggestRecipe.value?.id === nextRecipe?.id
+
+  suggestRecipe.value = nextRecipe
+
+  if (showMessage && suggestRecipe.value) {
     showRecommendMessage(`今天推荐：${suggestRecipe.value.recipeName}`)
+    return
+  }
+
+  if (forceDifferent && list.value.length <= 1) {
+    showRecommendMessage('目前只有一道菜，先去添加更多吧')
+    return
+  }
+
+  if (unchanged) {
+    showRecommendMessage('暂时没有别的菜了，往下翻翻自己挑')
   }
 }
 
@@ -314,7 +337,7 @@ async function toggleFavoriteSafe(item) {
         <h1>王刚家的家常菜谱</h1>
         <span>记录家里的味道，今天想吃什么？</span>
       </div>
-      <button type="button" class="today-button" @click="chooseRandomRecipe(true)">
+      <button type="button" class="today-button" @click="chooseRandomRecipe({ showMessage: true })">
         <van-icon name="fire-o" size="18" />
         今天吃什么
       </button>
@@ -336,7 +359,7 @@ async function toggleFavoriteSafe(item) {
           </div>
           <p>{{ suggestRecipe.recipeDesc || '点进去看看做法，今天就吃它。' }}</p>
           <div class="today-pick-actions">
-            <button type="button" @click="chooseRandomRecipe(true)">
+            <button type="button" @click="chooseRandomRecipe({ forceDifferent: true })">
               <van-icon name="replay" />
               换一道
             </button>

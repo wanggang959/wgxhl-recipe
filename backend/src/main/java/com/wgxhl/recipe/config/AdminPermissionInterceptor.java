@@ -74,7 +74,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             return true;
         }
         if (path.startsWith("/user/")) {
-            return path.equals("/user/login");
+            return path.equals("/user/login") || path.equals("/user/guestLogin");
         }
         return path.endsWith("/page")
                 || path.endsWith("/getById")

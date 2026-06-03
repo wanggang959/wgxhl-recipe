@@ -40,25 +40,24 @@ public class JwtAuthUtil {
         if (token == null || token.trim().isEmpty()) {
             return null;
         }
-        boolean valid = JWTUtil.verify(token, secret.getBytes(StandardCharsets.UTF_8));
-        if (!valid) {
-            return null;
-        }
-        JWT jwt = JWT.of(token);
-        Object expireAt = jwt.getPayload(CLAIM_EXPIRE_AT);
-        if (expireAt == null) {
-            return null;
-        }
-        long expireAtMs;
         try {
-            expireAtMs = Long.parseLong(String.valueOf(expireAt));
+            boolean valid = JWTUtil.verify(token, secret.getBytes(StandardCharsets.UTF_8));
+            if (!valid) {
+                return null;
+            }
+            JWT jwt = JWT.of(token);
+            Object expireAt = jwt.getPayload(CLAIM_EXPIRE_AT);
+            if (expireAt == null) {
+                return null;
+            }
+            long expireAtMs = Long.parseLong(String.valueOf(expireAt));
+            if (System.currentTimeMillis() >= expireAtMs) {
+                return null;
+            }
+            return jwt;
         } catch (Exception ex) {
             return null;
         }
-        if (System.currentTimeMillis() >= expireAtMs) {
-            return null;
-        }
-        return jwt;
     }
 
     public String getUserRole(JWT jwt) {

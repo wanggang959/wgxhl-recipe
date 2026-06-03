@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { login } from '../api/user'
+import { guestLogin as guestLoginApi, login } from '../api/user'
 import { useUserStore } from '../stores/user'
 
 const REMEMBER_USERNAME_KEY = 'wgxhl_recipe_login_username'
@@ -58,16 +58,20 @@ async function submit() {
   }
 }
 
-function guestLogin() {
-  userStore.setUser({
-    id: 'guest',
-    username: 'guest',
-    nickname: '游客',
-    userRole: 'user',
-    status: 'normal',
-    token: 'guest-token',
-  })
-  router.replace(getRedirectTarget())
+async function guestLogin() {
+  loading.value = true
+  try {
+    const res = await guestLoginApi()
+    userStore.setUser(res.data)
+    showStatus('欢迎随便逛逛～')
+    setTimeout(() => {
+      router.replace(getRedirectTarget())
+    }, 200)
+  } catch (error) {
+    showStatus(error.message || '游客登录失败', 'error')
+  } finally {
+    loading.value = false
+  }
 }
 
 function saveRememberedUsername() {

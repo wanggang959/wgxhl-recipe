@@ -25,6 +25,8 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         implements AppUserService {
 
     private static final String ADMIN_ID = "admin-wangshifu";
+    private static final String GUEST_ID = "guest";
+    private static final String GUEST_USERNAME = "guest";
     private static final String ADMIN_USERNAME = "王师傅";
     private static final String ADMIN_PASSWORD = "123456";
     private static final String ROLE_ADMIN = "admin";
@@ -44,7 +46,12 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     }
 
     @PostConstruct
-    public void ensureAdminAccount() {
+    public void ensureBuiltinAccounts() {
+        ensureAdminAccount();
+        ensureGuestAccount();
+    }
+
+    private void ensureAdminAccount() {
         AppUser admin = super.getById(ADMIN_ID);
         if (admin == null) {
             admin = lambdaQuery()
@@ -85,6 +92,46 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         if (changed) {
             updateById(admin);
+        }
+    }
+
+    private void ensureGuestAccount() {
+        AppUser guest = super.getById(GUEST_ID);
+        if (guest == null) {
+            guest = lambdaQuery()
+                    .eq(AppUser::getUsername, GUEST_USERNAME)
+                    .one();
+        }
+        if (guest == null) {
+            guest = new AppUser();
+            guest.setId(GUEST_ID);
+            guest.setUsername(GUEST_USERNAME);
+            guest.setNickname("游客");
+            guest.setPassword(null);
+            guest.setUserRole(ROLE_USER);
+            guest.setStatus(STATUS_NORMAL);
+            save(guest);
+            return;
+        }
+        boolean changed = false;
+        if (!GUEST_USERNAME.equals(guest.getUsername())) {
+            guest.setUsername(GUEST_USERNAME);
+            changed = true;
+        }
+        if (!ROLE_USER.equals(guest.getUserRole())) {
+            guest.setUserRole(ROLE_USER);
+            changed = true;
+        }
+        if (!STATUS_NORMAL.equals(guest.getStatus())) {
+            guest.setStatus(STATUS_NORMAL);
+            changed = true;
+        }
+        if (!StringUtils.hasText(guest.getNickname())) {
+            guest.setNickname("游客");
+            changed = true;
+        }
+        if (changed) {
+            updateById(guest);
         }
     }
 
@@ -165,6 +212,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             entity.setUsername(ADMIN_USERNAME);
             entity.setUserRole(ROLE_ADMIN);
             entity.setStatus(STATUS_NORMAL);
+        } else if (isGuestUser(existing)) {
+            entity.setUsername(GUEST_USERNAME);
+            entity.setUserRole(ROLE_USER);
+            entity.setStatus(STATUS_NORMAL);
         } else {
             if (ADMIN_USERNAME.equals(entity.getUsername())) {
                 return ApiResponse.fail("用户名「王师傅」为系统保留");
@@ -195,6 +246,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (isBuiltinAdmin(user)) {
             return ApiResponse.fail("内置管理员不能删除");
         }
+        if (isGuestUser(user)) {
+            return ApiResponse.fail("游客账号不能删除");
+        }
         userFavoriteService.deleteByUserId(id);
         recipeViewRecordService.deleteByUserId(id);
         removeById(id);
@@ -220,6 +274,25 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         return ApiResponse.success(user);
     }
 
+    @Override
+    public ApiResponse<AppUser> guestLogin() {
+        AppUser guest = super.getById(GUEST_ID);
+        if (guest == null) {
+            guest = lambdaQuery()
+                    .eq(AppUser::getUsername, GUEST_USERNAME)
+                    .one();
+        }
+        if (guest == null) {
+            return ApiResponse.fail("游客账号未初始化");
+        }
+        if (!STATUS_NORMAL.equals(guest.getStatus())) {
+            return ApiResponse.fail("游客账号不可用");
+        }
+        guest.setToken(jwtAuthUtil.createToken(guest));
+        maskPassword(guest);
+        return ApiResponse.success(guest);
+    }
+
     private void normalizeUser(AppUser user) {
         if (user == null) {
             return;
@@ -231,6 +304,11 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (ADMIN_USERNAME.equals(user.getUsername())) {
             user.setPassword(ADMIN_PASSWORD);
             user.setUserRole(ROLE_ADMIN);
+            user.setStatus(STATUS_NORMAL);
+            return;
+        }
+        if (GUEST_USERNAME.equals(user.getUsername()) || GUEST_ID.equals(user.getId())) {
+            user.setUserRole(ROLE_USER);
             user.setStatus(STATUS_NORMAL);
             return;
         }
@@ -256,6 +334,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             return true;
         }
         return ADMIN_USERNAME.equals(user.getUsername());
+    }
+
+    private boolean isGuestUser(AppUser user) {
+        return user != null && (GUEST_ID.equals(user.getId()) || GUEST_USERNAME.equals(user.getUsername()));
     }
 
     private void maskPassword(AppUser user) {

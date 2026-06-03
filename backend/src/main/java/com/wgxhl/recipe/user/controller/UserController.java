@@ -81,4 +81,12 @@ public class UserController {
     public ApiResponse<AppUser> login(@RequestBody UserLoginDTO dto) {
         return appUserService.login(dto);
     }
+
+    /***
+     * @Description 游客登录
+     **/
+    @PostMapping("/guestLogin")
+    public ApiResponse<AppUser> guestLogin() {
+        return appUserService.guestLogin();
+    }
 }

@@ -4,6 +4,10 @@ export function login(payload) {
   return post('/user/login', payload)
 }
 
+export function guestLogin() {
+  return post('/user/guestLogin')
+}
+
 export function pageUser(params) {
   return post('/user/page', params)
 }

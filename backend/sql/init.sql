@@ -241,3 +241,11 @@ on duplicate key update
     user_role = values(user_role),
     status = values(status),
     update_time = now();
+
+insert into app_user (id, username, nickname, password, avatar, user_role, status, create_time, update_time)
+values ('guest', 'guest', '游客', null, null, 'user', 'normal', now(), now())
+on duplicate key update
+    nickname = values(nickname),
+    user_role = values(user_role),
+    status = values(status),
+    update_time = now();

@@ -28,8 +28,14 @@ const BUILTIN_ADMIN_USERNAME = '王师傅'
 const isEditingUser = computed(() => Boolean(userForm.id))
 const editingBuiltinAdmin = ref(false)
 
+const GUEST_ID = 'guest'
+
 function isBuiltinAdminUser(item) {
   return item?.id === BUILTIN_ADMIN_ID || item?.username === BUILTIN_ADMIN_USERNAME
+}
+
+function isGuestUser(item) {
+  return item?.id === GUEST_ID || item?.username === 'guest'
 }
 
 async function loadUsers() {
@@ -254,7 +260,7 @@ if (userStore.isAdmin) {
             <div class="member-actions">
               <van-button size="mini" plain type="warning" @click="editUser(u)">编辑</van-button>
               <van-button
-                v-if="!isBuiltinAdminUser(u)"
+                v-if="!isBuiltinAdminUser(u) && !isGuestUser(u)"
                 size="mini"
                 plain
                 type="danger"

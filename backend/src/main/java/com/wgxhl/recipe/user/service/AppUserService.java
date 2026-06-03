@@ -20,4 +20,6 @@ public interface AppUserService extends IService<AppUser> {
     ApiResponse<Void> delete(String id);
 
     ApiResponse<AppUser> login(UserLoginDTO dto);
+
+    ApiResponse<AppUser> guestLogin();
 }

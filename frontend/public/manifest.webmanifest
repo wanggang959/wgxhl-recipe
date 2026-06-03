@@ -1,6 +1,6 @@
 {
-  "name": "王刚家的家常菜谱",
-  "short_name": "家常菜谱",
+  "name": "家用食谱",
+  "short_name": "家用食谱",
   "description": "记录家里的味道，像点菜一样浏览自己的家常菜谱。",
   "start_url": "/",
   "display": "standalone",

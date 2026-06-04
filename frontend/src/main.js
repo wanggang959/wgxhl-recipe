@@ -8,6 +8,7 @@ import { useUserStore } from './stores/user'
 
 applyIosSafeAreaFallback()
 syncThemeColor()
+setupShareMetadata()
 setupMobileZoomLock()
 
 const app = createApp(App)
@@ -56,6 +57,40 @@ function syncThemeColor() {
   if (meta) {
     meta.setAttribute('content', themeColor)
   }
+}
+
+function setupShareMetadata() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+  const imageUrl = new URL('/wechat-share.png', window.location.origin).href
+  const pageUrl = window.location.href
+  const imageMetaSelectors = [
+    'meta[property="og:image"]',
+    'meta[property="og:image:secure_url"]',
+    'meta[itemprop="image"]',
+    'meta[name="twitter:image"]',
+    'meta[name="thumbnail"]',
+  ]
+
+  imageMetaSelectors.forEach((selector) => {
+    const meta = document.querySelector(selector)
+    if (meta) {
+      meta.setAttribute('content', imageUrl)
+    }
+  })
+
+  const imageLink = document.querySelector('link[rel="image_src"]')
+  if (imageLink) {
+    imageLink.setAttribute('href', imageUrl)
+  }
+
+  let urlMeta = document.querySelector('meta[property="og:url"]')
+  if (!urlMeta) {
+    urlMeta = document.createElement('meta')
+    urlMeta.setAttribute('property', 'og:url')
+    document.head.appendChild(urlMeta)
+  }
+  urlMeta.setAttribute('content', pageUrl)
 }
 
 function setupMobileZoomLock() {

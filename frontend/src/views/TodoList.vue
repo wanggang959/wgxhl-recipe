@@ -46,6 +46,7 @@ async function loadTodo() {
       pageWantedRecipe({
         current: 1,
         size: 200,
+        plannedDateStart: formatDate(new Date()),
       }),
       loadFamilyMembers(),
     ])

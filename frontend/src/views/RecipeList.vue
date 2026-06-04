@@ -7,6 +7,7 @@ import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/
 import { pageRecipe } from '../api/recipe'
 import { checkWantedRecipe, createWantedRecipe } from '../api/want'
 import CategoryTabs from '../components/CategoryTabs.vue'
+import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
 import { useUserStore } from '../stores/user'
@@ -397,10 +398,10 @@ function submitCustomWantDate() {
         <img :src="getRecipeImage(item.coverImage)" :alt="item.recipeName" />
         <div class="showcase-actions" @click.stop>
           <button class="showcase-action" type="button" :class="{ active: favoriteMap[item.id] }" @click="toggleFavoriteSafe(item)">
-            <van-icon :name="favoriteMap[item.id] ? 'like' : 'like-o'" />
+            <ActionIcon name="heart" :filled="Boolean(favoriteMap[item.id])" :size="20" />
           </button>
           <button class="showcase-action" type="button" :class="{ active: wantedMap[item.id] }" @click="openWantAction(item)">
-            <van-icon name="cart-o" />
+            <ActionIcon name="cart" :size="19" />
           </button>
         </div>
         <h2 class="showcase-dish-title">{{ item.recipeName }}</h2>
@@ -467,7 +468,7 @@ function submitCustomWantDate() {
               查看做法
             </button>
             <button type="button" class="want-action" @click="openWantAction(suggestRecipe)">
-              <van-icon name="cart-o" />
+              <ActionIcon name="cart" :size="17" />
               {{ wantedMap[suggestRecipe.id] ? '已想吃' : '想吃' }}
             </button>
           </div>
@@ -514,10 +515,10 @@ function submitCustomWantDate() {
       </div>
       <div class="today-card-actions" @click.stop>
         <button type="button" :class="{ active: favoriteMap[suggestRecipe.id] }" @click="toggleFavoriteSafe(suggestRecipe)">
-          <van-icon :name="favoriteMap[suggestRecipe.id] ? 'like' : 'like-o'" />
+          <ActionIcon name="heart" :filled="Boolean(favoriteMap[suggestRecipe.id])" :size="16" />
         </button>
         <button type="button" :class="{ active: wantedMap[suggestRecipe.id] }" @click="openWantAction(suggestRecipe)">
-          <van-icon name="cart-o" />
+          <ActionIcon name="cart" :size="16" />
         </button>
         <van-icon name="arrow" size="18" />
       </div>
@@ -554,7 +555,7 @@ function submitCustomWantDate() {
     <div class="want-sheet">
       <h3>{{ wantTargetRecipe?.recipeName || '这道菜' }}</h3>
       <button type="button" class="want-sheet-primary" @click="openWantDatePicker">
-        <van-icon name="cart-o" />
+        <ActionIcon name="cart" :size="17" />
         想吃
       </button>
       <button type="button" @click="closeWantPanels">取消</button>
@@ -699,9 +700,19 @@ function submitCustomWantDate() {
   border-radius: 50%;
   background: rgba(47, 38, 31, 0.38);
   color: #fff;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  overflow: hidden;
   backdrop-filter: blur(10px);
+}
+
+.showcase-action :deep(.action-svg-icon),
+.today-card-actions button :deep(.action-svg-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .showcase-action.active {
@@ -952,12 +963,14 @@ function submitCustomWantDate() {
 .today-pick-actions {
   margin-top: 13px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(0, 0.98fr) minmax(0, 1.08fr) minmax(0, 0.94fr);
+  gap: 8px;
 }
 
 .today-pick-actions button {
+  min-width: 0;
   height: 40px;
+  padding: 0 8px;
   border: 1px solid var(--app-border);
   border-radius: 999px;
   background: #fffaf2;
@@ -966,7 +979,11 @@ function submitCustomWantDate() {
   align-items: center;
   justify-content: center;
   gap: 5px;
+  font-size: 14px;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .today-pick-actions button.primary {
@@ -1055,14 +1072,15 @@ function submitCustomWantDate() {
 }
 
 .today-card {
+  position: relative;
   min-height: 86px;
-  padding: 10px;
+  padding: 10px 104px 10px 10px;
   border-radius: 18px;
   background: #fff;
   border: 1px solid var(--app-border);
   box-shadow: 0 12px 26px rgba(154, 52, 18, 0.08);
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
+  grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
 }
@@ -1094,8 +1112,14 @@ function submitCustomWantDate() {
 }
 
 .today-card-actions {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 84px;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 7px;
   color: #9b7d66;
 }
@@ -1107,8 +1131,11 @@ function submitCustomWantDate() {
   border-radius: 50%;
   background: #fffaf2;
   color: #9b7d66;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  overflow: hidden;
 }
 
 .today-card-actions button.active {

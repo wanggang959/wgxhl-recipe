@@ -24,4 +24,9 @@ public class WantedRecipePageDTO extends PageDTO {
      * 想吃日期
      */
     private LocalDate plannedDate;
+
+    /*
+     * 想吃日期下限（含，用于筛选该日及之后）
+     */
+    private LocalDate plannedDateStart;
 }

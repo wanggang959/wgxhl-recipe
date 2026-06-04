@@ -16,15 +16,29 @@
   --app-primary-soft: #ffedd5;
   --app-danger: #ef4444;
   --app-shadow: 0 12px 32px rgba(154, 52, 18, 0.1);
+  --app-shell-width: 430px;
+  --ios-safe-area-top-fallback: 0px;
+  --ios-safe-area-bottom-fallback: 0px;
+  --safe-area-top: max(env(safe-area-inset-top, 0px), var(--ios-safe-area-top-fallback));
+  --safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--ios-safe-area-bottom-fallback));
+  --app-top-bar-height: calc(56px + var(--safe-area-top));
+  --app-bottom-nav-height: calc(64px + var(--safe-area-bottom));
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: var(--app-bg);
+}
+
 body {
   margin: 0;
   min-width: 320px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 18% 0%, rgba(254, 215, 170, 0.42), transparent 28%),
     linear-gradient(180deg, #fff7ed 0%, #fffaf2 45%, #fff7ed 100%);
@@ -32,12 +46,13 @@ body {
 
 #app {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .page-wrap {
-  width: min(100%, 430px);
+  width: min(100%, var(--app-shell-width));
   margin: 0 auto;
-  padding: 12px 12px 92px;
+  padding: 12px 12px calc(92px + var(--safe-area-bottom));
 }
 
 .card-panel {
@@ -52,11 +67,26 @@ body {
 }
 
 .app-shell {
-  width: min(100%, 430px);
+  width: min(100%, var(--app-shell-width));
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
   background: rgba(255, 250, 242, 0.9);
   box-shadow: 0 0 0 1px rgba(245, 223, 199, 0.5);
+}
+
+button .van-icon,
+button .van-badge__wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+button .van-icon::before {
+  display: block;
+  line-height: 1;
 }
 
 .section-title {

@@ -8,5 +8,8 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class SeasoningPageDTO extends PageDTO {
 
+    /*
+     * 调料名称
+     */
     private String seasoningName;
 }

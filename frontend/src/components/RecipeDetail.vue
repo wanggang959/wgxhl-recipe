@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import ActionIcon from './ActionIcon.vue'
 import { getImageUrl, getRecipeImage } from '../utils/imageUrl'
 import { formatRecipeVersionLabel, normalizeRecipeVersion } from '../utils/recipeVersion'
 
@@ -36,8 +37,8 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
         <button type="button" @click="emit('back')">
           <van-icon name="arrow-left" size="20" />
         </button>
-        <button type="button" @click="emit('favorite')">
-          <van-icon :name="favorite ? 'like' : 'like-o'" :color="favorite ? '#ef4444' : '#ffffff'" size="21" />
+        <button class="favorite-action" :class="{ active: favorite }" type="button" @click="emit('favorite')">
+          <ActionIcon name="heart" :filled="favorite" :size="21" />
         </button>
       </div>
       <div class="hero-meta-tags">
@@ -165,7 +166,7 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
 
 .hero-actions {
   position: absolute;
-  top: 12px;
+  top: calc(12px + var(--safe-area-top));
   left: 12px;
   right: 12px;
   display: flex;
@@ -179,9 +180,22 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
   border-radius: 50%;
   background: rgba(47, 38, 31, 0.38);
   color: #fff;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  overflow: hidden;
   backdrop-filter: blur(10px);
+}
+
+.favorite-action.active {
+  color: #ef4444;
+}
+
+.hero-actions button :deep(.action-svg-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero-meta-tags {

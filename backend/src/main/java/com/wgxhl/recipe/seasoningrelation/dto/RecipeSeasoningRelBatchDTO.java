@@ -8,7 +8,13 @@ import java.util.List;
 @Data
 public class RecipeSeasoningRelBatchDTO {
 
+    /*
+     * 菜谱id
+     */
     private String recipeId;
 
+    /*
+     * 调料关系列表
+     */
     private List<RecipeSeasoningRel> relList;
 }

@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ActionIcon from './ActionIcon.vue'
 import { useUserStore } from '../stores/user'
 
 const route = useRoute()
@@ -51,7 +52,8 @@ function go(item) {
       type="button"
       @click="go(item)"
     >
-      <van-icon :name="item.icon" size="21" />
+      <ActionIcon v-if="item.icon === 'cart-o'" name="cart" :size="21" />
+      <van-icon v-else :name="item.icon" size="21" />
       <span>{{ item.label }}</span>
     </button>
   </nav>
@@ -63,9 +65,10 @@ function go(item) {
   left: 50%;
   bottom: 0;
   z-index: 50;
-  width: min(100%, 430px);
+  width: min(100%, var(--app-shell-width));
+  min-height: var(--app-bottom-nav-height);
   transform: translateX(-50%);
-  padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+  padding: 8px 8px calc(8px + var(--safe-area-bottom));
   background: rgba(255, 250, 242, 0.96);
   border-top: 1px solid var(--app-border);
   display: grid;
@@ -82,6 +85,7 @@ function go(item) {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   padding: 5px 2px;
   font-size: 11px;

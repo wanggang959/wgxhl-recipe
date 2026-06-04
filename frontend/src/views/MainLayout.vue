@@ -46,9 +46,10 @@ const isTodayMode = computed(() => route.query.pick === 'today')
   position: sticky;
   top: 0;
   z-index: 30;
-  width: min(100%, 430px);
+  width: min(100%, var(--app-shell-width));
   margin: 0 auto;
-  padding: 10px 12px;
+  min-height: var(--app-top-bar-height);
+  padding: calc(10px + var(--safe-area-top)) 12px 10px;
   background: rgba(255, 250, 242, 0.9);
   display: flex;
   align-items: center;
@@ -93,8 +94,8 @@ const isTodayMode = computed(() => route.query.pick === 'today')
 }
 
 .profile-shell {
-  height: calc(100dvh - 52px - 72px);
-  max-height: calc(100dvh - 52px - 72px);
+  height: calc(100dvh - var(--app-top-bar-height) - var(--app-bottom-nav-height));
+  max-height: calc(100dvh - var(--app-top-bar-height) - var(--app-bottom-nav-height));
   overflow: hidden;
   padding-bottom: 10px;
   display: flex;

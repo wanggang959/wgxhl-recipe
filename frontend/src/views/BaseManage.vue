@@ -8,6 +8,7 @@ import { createIngredient, deleteIngredient, pageIngredient, updateIngredient } 
 import { createSeasoning, deleteSeasoning, pageSeasoning, updateSeasoning } from '../api/seasoning'
 import BottomNav from '../components/BottomNav.vue'
 import ImageCropper from '../components/ImageCropper.vue'
+import ImageUploader from '../components/ImageUploader.vue'
 import { useUserStore } from '../stores/user'
 import { transcodeImageToWebp } from '../utils/image'
 import { getImageUrl, toObjectPath } from '../utils/imageUrl'
@@ -16,10 +17,9 @@ const router = useRouter()
 const userStore = useUserStore()
 const active = ref('category')
 const uploading = ref(false)
+const uploadingTarget = ref('')
 const imageCropperRef = ref(null)
-const uploadStatus = ref('')
 const actionStatus = ref('')
-let uploadStatusTimer = null
 let actionStatusTimer = null
 
 const categoryList = ref([])
@@ -42,6 +42,23 @@ const ingredientForm = reactive({
 })
 
 const seasoningForm = reactive({
+  id: '',
+  seasoningName: '',
+  seasoningImage: '',
+  seasoningDesc: '',
+})
+
+const editingIngredientId = ref('')
+const editingSeasoningId = ref('')
+
+const editingIngredientForm = reactive({
+  id: '',
+  ingredientName: '',
+  ingredientImage: '',
+  ingredientDesc: '',
+})
+
+const editingSeasoningForm = reactive({
   id: '',
   seasoningName: '',
   seasoningImage: '',
@@ -75,11 +92,37 @@ function editCategory(item) {
 }
 
 function editIngredient(item) {
-  Object.assign(ingredientForm, item)
+  if (editingIngredientId.value === item.id) {
+    cancelEditIngredient()
+    return
+  }
+  editingIngredientId.value = item.id
+  Object.assign(editingIngredientForm, item)
 }
 
 function editSeasoning(item) {
-  Object.assign(seasoningForm, item)
+  if (editingSeasoningId.value === item.id) {
+    cancelEditSeasoning()
+    return
+  }
+  editingSeasoningId.value = item.id
+  Object.assign(editingSeasoningForm, item)
+}
+
+function cancelEditIngredient() {
+  editingIngredientId.value = ''
+  editingIngredientForm.id = ''
+  editingIngredientForm.ingredientName = ''
+  editingIngredientForm.ingredientImage = ''
+  editingIngredientForm.ingredientDesc = ''
+}
+
+function cancelEditSeasoning() {
+  editingSeasoningId.value = ''
+  editingSeasoningForm.id = ''
+  editingSeasoningForm.seasoningName = ''
+  editingSeasoningForm.seasoningImage = ''
+  editingSeasoningForm.seasoningDesc = ''
 }
 
 function getRawFile(fileWrapper) {
@@ -98,16 +141,39 @@ async function uploadIngredientImage(fileWrapper) {
   }
 
   uploading.value = true
-  uploadStatus.value = '图片上传中...'
+  uploadingTarget.value = 'ingredient'
   try {
     const file = await transcodeImageToWebp(croppedFile, { minCompressBytes: 0 })
     const res = await uploadImage(file, 'ingredient')
     ingredientForm.ingredientImage = toObjectPath(res.data)
-    showUploadStatus('图片上传成功')
   } catch (error) {
     showFailToast(error.message || '图片上传失败')
   } finally {
     uploading.value = false
+    uploadingTarget.value = ''
+  }
+}
+
+async function uploadEditingIngredientImage(fileWrapper) {
+  const rawFile = getRawFile(fileWrapper)
+  if (!rawFile) {
+    showFailToast('未获取到图片文件')
+    return
+  }
+  const croppedFile = await imageCropperRef.value?.open(rawFile, { aspectRatio: 1 })
+  if (!croppedFile) return
+
+  uploading.value = true
+  uploadingTarget.value = `ingredient-edit-${editingIngredientId.value}`
+  try {
+    const file = await transcodeImageToWebp(croppedFile, { minCompressBytes: 0 })
+    const res = await uploadImage(file, 'ingredient')
+    editingIngredientForm.ingredientImage = toObjectPath(res.data)
+  } catch (error) {
+    showFailToast(error.message || '图片上传失败')
+  } finally {
+    uploading.value = false
+    uploadingTarget.value = ''
   }
 }
 
@@ -123,27 +189,40 @@ async function uploadSeasoningImage(fileWrapper) {
   }
 
   uploading.value = true
-  uploadStatus.value = '图片上传中...'
+  uploadingTarget.value = 'seasoning'
   try {
     const file = await transcodeImageToWebp(croppedFile, { minCompressBytes: 0 })
     const res = await uploadImage(file, 'seasoning')
     seasoningForm.seasoningImage = toObjectPath(res.data)
-    showUploadStatus('图片上传成功')
   } catch (error) {
     showFailToast(error.message || '图片上传失败')
   } finally {
     uploading.value = false
+    uploadingTarget.value = ''
   }
 }
 
-function showUploadStatus(message) {
-  uploadStatus.value = message
-  window.clearTimeout(uploadStatusTimer)
-  uploadStatusTimer = window.setTimeout(() => {
-    if (!uploading.value) {
-      uploadStatus.value = ''
-    }
-  }, 2200)
+async function uploadEditingSeasoningImage(fileWrapper) {
+  const rawFile = getRawFile(fileWrapper)
+  if (!rawFile) {
+    showFailToast('未获取到图片文件')
+    return
+  }
+  const croppedFile = await imageCropperRef.value?.open(rawFile, { aspectRatio: 1 })
+  if (!croppedFile) return
+
+  uploading.value = true
+  uploadingTarget.value = `seasoning-edit-${editingSeasoningId.value}`
+  try {
+    const file = await transcodeImageToWebp(croppedFile, { minCompressBytes: 0 })
+    const res = await uploadImage(file, 'seasoning')
+    editingSeasoningForm.seasoningImage = toObjectPath(res.data)
+  } catch (error) {
+    showFailToast(error.message || '图片上传失败')
+  } finally {
+    uploading.value = false
+    uploadingTarget.value = ''
+  }
 }
 
 function showActionStatus(message) {
@@ -187,14 +266,20 @@ async function saveCategory() {
 
 async function saveIngredient() {
   try {
-    if (ingredientForm.id) {
-      await updateIngredient({ ...ingredientForm })
-      showActionStatus('食材已更新')
-    } else {
-      await createIngredient({ ...ingredientForm })
-      showActionStatus('食材已新增')
-    }
+    await createIngredient({ ...ingredientForm, id: '' })
+    showActionStatus('食材已新增')
     resetIngredientForm()
+    await loadIngredient()
+  } catch (error) {
+    showFailToast(error.message || '食材保存失败')
+  }
+}
+
+async function saveEditingIngredient() {
+  try {
+    await updateIngredient({ ...editingIngredientForm })
+    showActionStatus('食材已更新')
+    cancelEditIngredient()
     await loadIngredient()
   } catch (error) {
     showFailToast(error.message || '食材保存失败')
@@ -203,14 +288,20 @@ async function saveIngredient() {
 
 async function saveSeasoning() {
   try {
-    if (seasoningForm.id) {
-      await updateSeasoning({ ...seasoningForm })
-      showActionStatus('调料已更新')
-    } else {
-      await createSeasoning({ ...seasoningForm })
-      showActionStatus('调料已新增')
-    }
+    await createSeasoning({ ...seasoningForm, id: '' })
+    showActionStatus('调料已新增')
     resetSeasoningForm()
+    await loadSeasoning()
+  } catch (error) {
+    showFailToast(error.message || '调料保存失败')
+  }
+}
+
+async function saveEditingSeasoning() {
+  try {
+    await updateSeasoning({ ...editingSeasoningForm })
+    showActionStatus('调料已更新')
+    cancelEditSeasoning()
     await loadSeasoning()
   } catch (error) {
     showFailToast(error.message || '调料保存失败')
@@ -279,11 +370,6 @@ if (userStore.isAdmin) {
         <van-button round type="warning" size="small" @click="router.push('/profile')">去登录</van-button>
       </div>
       <template v-else>
-      <div v-if="uploadStatus" class="upload-status" :class="{ success: !uploading }">
-        <van-loading v-if="uploading" size="16" color="#f59e0b" />
-        <van-icon v-else name="success" />
-        <span>{{ uploadStatus }}</span>
-      </div>
       <div v-if="actionStatus" class="action-status">
         <van-icon name="success" />
         <span>{{ actionStatus }}</span>
@@ -319,28 +405,17 @@ if (userStore.isAdmin) {
         <van-tab title="食材管理" name="ingredient">
           <div class="form-panel">
             <van-field v-model="ingredientForm.ingredientName" label="食材名" placeholder="如：番茄" />
-            <div class="upload-line">
-              <div class="upload-label">食材图片</div>
-              <div class="upload-area">
-                <van-image
-                  v-if="ingredientForm.ingredientImage"
-                  width="90"
-                  height="90"
-                  fit="cover"
-                  radius="8"
-                  :src="getImageUrl(ingredientForm.ingredientImage)"
-                />
-                <van-uploader
-                  :after-read="uploadIngredientImage"
-                  accept="image/*"
-                  :disabled="uploading"
-                  :max-count="1"
-                />
-              </div>
-            </div>
+            <ImageUploader
+              v-model="ingredientForm.ingredientImage"
+              label="食材图片"
+              :disabled="uploading"
+              :loading="uploadingTarget === 'ingredient'"
+              :size="90"
+              @upload="uploadIngredientImage"
+            />
             <van-field v-model="ingredientForm.ingredientDesc" label="描述" type="textarea" rows="2" />
             <div class="form-actions">
-              <van-button type="warning" size="small" @click="saveIngredient">保存</van-button>
+              <van-button type="warning" size="small" @click="saveIngredient">新增</van-button>
               <van-button size="small" @click="resetIngredientForm">清空</van-button>
             </div>
           </div>
@@ -363,34 +438,39 @@ if (userStore.isAdmin) {
                 <van-button size="mini" plain type="primary" @click="editIngredient(item)">编辑</van-button>
                 <van-button size="mini" plain type="danger" @click="removeIngredient(item)">删除</van-button>
               </div>
+              <div v-if="editingIngredientId === item.id" class="inline-edit-panel">
+                <van-field v-model="editingIngredientForm.ingredientName" label="食材名" placeholder="如：番茄" />
+                <ImageUploader
+                  v-model="editingIngredientForm.ingredientImage"
+                  label="食材图片"
+                  :disabled="uploading"
+                  :loading="uploadingTarget === `ingredient-edit-${item.id}`"
+                  :size="84"
+                  @upload="uploadEditingIngredientImage"
+                />
+                <van-field v-model="editingIngredientForm.ingredientDesc" label="描述" type="textarea" rows="2" />
+                <div class="inline-edit-actions">
+                  <van-button size="small" @click="cancelEditIngredient">取消</van-button>
+                  <van-button type="warning" size="small" @click="saveEditingIngredient">保存修改</van-button>
+                </div>
+              </div>
             </article>
           </div>
         </van-tab>
         <van-tab title="调料管理" name="seasoning">
           <div class="form-panel">
             <van-field v-model="seasoningForm.seasoningName" label="调料名" placeholder="如：生抽" />
-            <div class="upload-line">
-              <div class="upload-label">调料图片</div>
-              <div class="upload-area">
-                <van-image
-                  v-if="seasoningForm.seasoningImage"
-                  width="90"
-                  height="90"
-                  fit="cover"
-                  radius="8"
-                  :src="getImageUrl(seasoningForm.seasoningImage)"
-                />
-                <van-uploader
-                  :after-read="uploadSeasoningImage"
-                  accept="image/*"
-                  :disabled="uploading"
-                  :max-count="1"
-                />
-              </div>
-            </div>
+            <ImageUploader
+              v-model="seasoningForm.seasoningImage"
+              label="调料图片"
+              :disabled="uploading"
+              :loading="uploadingTarget === 'seasoning'"
+              :size="90"
+              @upload="uploadSeasoningImage"
+            />
             <van-field v-model="seasoningForm.seasoningDesc" label="描述" type="textarea" rows="2" />
             <div class="form-actions">
-              <van-button type="warning" size="small" @click="saveSeasoning">保存</van-button>
+              <van-button type="warning" size="small" @click="saveSeasoning">新增</van-button>
               <van-button size="small" @click="resetSeasoningForm">清空</van-button>
             </div>
           </div>
@@ -412,6 +492,22 @@ if (userStore.isAdmin) {
               <div class="cell-actions">
                 <van-button size="mini" plain type="primary" @click="editSeasoning(item)">编辑</van-button>
                 <van-button size="mini" plain type="danger" @click="removeSeasoning(item)">删除</van-button>
+              </div>
+              <div v-if="editingSeasoningId === item.id" class="inline-edit-panel">
+                <van-field v-model="editingSeasoningForm.seasoningName" label="调料名" placeholder="如：生抽" />
+                <ImageUploader
+                  v-model="editingSeasoningForm.seasoningImage"
+                  label="调料图片"
+                  :disabled="uploading"
+                  :loading="uploadingTarget === `seasoning-edit-${item.id}`"
+                  :size="84"
+                  @upload="uploadEditingSeasoningImage"
+                />
+                <van-field v-model="editingSeasoningForm.seasoningDesc" label="描述" type="textarea" rows="2" />
+                <div class="inline-edit-actions">
+                  <van-button size="small" @click="cancelEditSeasoning">取消</van-button>
+                  <van-button type="warning" size="small" @click="saveEditingSeasoning">保存修改</van-button>
+                </div>
               </div>
             </article>
           </div>
@@ -521,6 +617,22 @@ if (userStore.isAdmin) {
   gap: 10px;
 }
 
+.inline-edit-panel {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding: 10px;
+  border-top: 1px dashed #fed7aa;
+  border-radius: 0 0 12px 12px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.inline-edit-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .ingredient-image {
   width: 56px;
   height: 56px;
@@ -552,22 +664,6 @@ if (userStore.isAdmin) {
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
-}
-
-.upload-line {
-  margin: 8px 0 12px;
-}
-
-.upload-label {
-  font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 6px;
-}
-
-.upload-area {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 @media (max-width: 380px) {

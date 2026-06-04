@@ -53,6 +53,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
                 .eq(StringUtils.hasText(dto.getUserId()), UserWantedRecipe::getUserId, dto.getUserId())
                 .like(StringUtils.hasText(dto.getRecipeName()), UserWantedRecipe::getRecipeName, dto.getRecipeName())
                 .eq(dto.getPlannedDate() != null, UserWantedRecipe::getPlannedDate, dto.getPlannedDate())
+                .ge(dto.getPlannedDateStart() != null, UserWantedRecipe::getPlannedDate, dto.getPlannedDateStart())
                 .orderByAsc(UserWantedRecipe::getPlannedDate)
                 .orderByDesc(UserWantedRecipe::getUpdateTime)
                 .page(page);

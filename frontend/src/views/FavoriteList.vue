@@ -5,6 +5,7 @@ import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { deleteFavorite, pageFavorite } from '../api/favorite'
 import { getRecipeDetail } from '../api/recipe'
 import { checkWantedRecipe, createWantedRecipe } from '../api/want'
+import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
 import { useUserStore } from '../stores/user'
@@ -207,7 +208,7 @@ function submitCustomWantDate() {
       <div class="want-sheet">
         <h3>{{ wantTargetRecipe?.recipeName || '这道菜' }}</h3>
         <button type="button" class="want-sheet-primary" @click="openWantDatePicker">
-          <van-icon name="cart-o" />
+          <ActionIcon name="cart" :size="17" />
           想吃
         </button>
         <button type="button" @click="closeWantPanels">取消</button>

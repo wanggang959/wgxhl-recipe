@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import ActionIcon from './ActionIcon.vue'
 import { getRecipeImage } from '../utils/imageUrl'
 import { formatRecipeVersionLabel, normalizeRecipeVersion } from '../utils/recipeVersion'
 
@@ -41,8 +42,8 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   <article class="recipe-card" @click="emit('open', recipe)">
     <div class="cover-wrap">
       <img class="cover" :src="cover" :alt="recipe.recipeName" loading="lazy" />
-      <button class="favorite" type="button" @click.stop="emit('favorite', recipe)">
-        <van-icon :name="favorite ? 'like' : 'like-o'" :color="favorite ? '#ef4444' : '#ffffff'" size="20" />
+      <button class="favorite" :class="{ active: favorite }" type="button" @click.stop="emit('favorite', recipe)">
+        <ActionIcon name="heart" :filled="favorite" :size="20" />
       </button>
       <button
         v-if="showWantButton"
@@ -51,7 +52,7 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
         type="button"
         @click.stop="emit('want', recipe)"
       >
-        <van-icon name="cart-o" size="18" />
+        <ActionIcon name="cart" :size="18" />
       </button>
     </div>
     <div class="body">
@@ -110,14 +111,20 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   border-radius: 50%;
   background: rgba(47, 38, 31, 0.34);
   color: #fff;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+  overflow: hidden;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   appearance: none;
   -webkit-appearance: none;
   z-index: 2;
+}
+
+.favorite.active {
+  color: #ef4444;
 }
 
 .want-cart {
@@ -132,9 +139,11 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   border-radius: 50%;
   background: rgba(47, 38, 31, 0.34);
   color: #fff;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+  overflow: hidden;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   appearance: none;
@@ -142,10 +151,11 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   z-index: 2;
 }
 
-.favorite :deep(.van-icon),
-.want-cart :deep(.van-icon) {
-  display: block;
-  line-height: 1;
+.favorite :deep(.action-svg-icon),
+.want-cart :deep(.action-svg-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .want-cart.active {

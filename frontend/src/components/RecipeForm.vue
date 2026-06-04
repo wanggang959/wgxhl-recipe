@@ -21,9 +21,9 @@ const categories = ref([])
 const ingredients = ref([])
 const seasonings = ref([])
 const uploading = ref(false)
+const uploadingTarget = ref('')
 const cookingMinutes = ref('')
 const imageCropperRef = ref(null)
-const uploadStatus = ref('')
 const showQuickIngredient = ref(false)
 const showQuickSeasoning = ref(false)
 const creatingBaseData = ref(false)
@@ -31,7 +31,7 @@ const basePickerVisible = ref(false)
 const basePickerType = ref('ingredient')
 const basePickerRow = ref(null)
 const basePickerKeyword = ref('')
-let uploadStatusTimer = null
+let stepUid = 0
 
 const form = reactive({
   recipe: {
@@ -102,7 +102,7 @@ async function bootstrap() {
       Object.assign(form.recipe, detail.recipe || {})
       form.recipe.recipeVersion = normalizeRecipeVersion(form.recipe.recipeVersion)
       cookingMinutes.value = parseCookingMinutes(form.recipe.cookingTime)
-      form.recipeStepList = (detail.recipeStepList || []).map((item) => ({ ...item }))
+      form.recipeStepList = (detail.recipeStepList || []).map((item) => ({ ...item, _uid: nextStepUid() }))
       form.ingredientList = (detail.ingredientList || []).map((item) => ({ ...item }))
       form.seasoningList = (detail.seasoningList || []).map((item) => ({ ...item }))
       form.imageList = (detail.imageList || []).map((item) => ({ ...item }))
@@ -121,6 +121,7 @@ async function bootstrap() {
 
 function addStep() {
   form.recipeStepList.push({
+    _uid: nextStepUid(),
     stepNo: form.recipeStepList.length + 1,
     stepTitle: '',
     stepDesc: '',
@@ -128,8 +129,25 @@ function addStep() {
   })
 }
 
+function nextStepUid() {
+  stepUid += 1
+  return `step-${Date.now()}-${stepUid}`
+}
+
 function removeStep(index) {
   form.recipeStepList.splice(index, 1)
+  normalizeStepNo()
+}
+
+function moveStep(index, direction) {
+  const targetIndex = index + direction
+  if (targetIndex < 0 || targetIndex >= form.recipeStepList.length) return
+  const [target] = form.recipeStepList.splice(index, 1)
+  form.recipeStepList.splice(targetIndex, 0, target)
+  normalizeStepNo()
+}
+
+function normalizeStepNo() {
   form.recipeStepList.forEach((item, idx) => {
     item.stepNo = idx + 1
   })
@@ -165,7 +183,7 @@ function getRawFile(fileWrapper) {
   return fileWrapper?.file || fileWrapper
 }
 
-async function doUpload(fileWrapper, folder, cropOptions = {}) {
+async function doUpload(fileWrapper, folder, cropOptions = {}, uploadKey = '') {
   const rawFile = getRawFile(fileWrapper)
   const croppedFile = await imageCropperRef.value?.open(rawFile, cropOptions)
   if (!croppedFile) return ''
@@ -178,29 +196,19 @@ async function doUpload(fileWrapper, folder, cropOptions = {}) {
   if (!file) throw new Error('未获取到上传文件')
 
   uploading.value = true
-  uploadStatus.value = '图片上传中...'
+  uploadingTarget.value = uploadKey
   try {
     const res = await uploadImage(file, folder)
-    showUploadStatus('图片上传成功')
     return toObjectPath(res.data)
   } finally {
     uploading.value = false
+    uploadingTarget.value = ''
   }
-}
-
-function showUploadStatus(message) {
-  uploadStatus.value = message
-  window.clearTimeout(uploadStatusTimer)
-  uploadStatusTimer = window.setTimeout(() => {
-    if (!uploading.value) {
-      uploadStatus.value = ''
-    }
-  }, 2200)
 }
 
 async function uploadCover(fileWrapper) {
   try {
-    const imageUrl = await doUpload(fileWrapper, 'recipe/cover', { aspectRatio: 4 / 3 })
+    const imageUrl = await doUpload(fileWrapper, 'recipe/cover', { aspectRatio: 4 / 3 }, 'cover')
     if (imageUrl) form.recipe.coverImage = imageUrl
   } catch (error) {
     showFailToast(error.message || '封面上传失败')
@@ -209,7 +217,7 @@ async function uploadCover(fileWrapper) {
 
 async function uploadStepImage(index, fileWrapper) {
   try {
-    const imageUrl = await doUpload(fileWrapper, 'recipe/step', { aspectRatio: 4 / 3 })
+    const imageUrl = await doUpload(fileWrapper, 'recipe/step', { aspectRatio: 4 / 3 }, `step-${index}`)
     if (imageUrl) form.recipeStepList[index].stepImage = imageUrl
   } catch (error) {
     showFailToast(error.message || '步骤图上传失败')
@@ -218,7 +226,7 @@ async function uploadStepImage(index, fileWrapper) {
 
 async function uploadQuickIngredientImage(fileWrapper) {
   try {
-    const imageUrl = await doUpload(fileWrapper, 'ingredient', { aspectRatio: 1 })
+    const imageUrl = await doUpload(fileWrapper, 'ingredient', { aspectRatio: 1 }, 'quick-ingredient')
     if (imageUrl) quickIngredientForm.ingredientImage = imageUrl
   } catch (error) {
     showFailToast(error.message || '食材图片上传失败')
@@ -227,7 +235,7 @@ async function uploadQuickIngredientImage(fileWrapper) {
 
 async function uploadQuickSeasoningImage(fileWrapper) {
   try {
-    const imageUrl = await doUpload(fileWrapper, 'seasoning', { aspectRatio: 1 })
+    const imageUrl = await doUpload(fileWrapper, 'seasoning', { aspectRatio: 1 }, 'quick-seasoning')
     if (imageUrl) quickSeasoningForm.seasoningImage = imageUrl
   } catch (error) {
     showFailToast(error.message || '调料图片上传失败')
@@ -406,10 +414,13 @@ async function submit() {
         ...form.recipe,
         cookingTime: normalizedCookingTime,
       },
-      recipeStepList: form.recipeStepList.map((item, idx) => ({
-        ...item,
-        stepNo: Number(item.stepNo || idx + 1),
-      })),
+      recipeStepList: form.recipeStepList.map((item, idx) => {
+        const { _uid, ...step } = item
+        return {
+          ...step,
+          stepNo: idx + 1,
+        }
+      }),
       ingredientList: form.ingredientList.map((item, idx) => ({
         ...item,
         sortNo: Number(item.sortNo || idx + 1),
@@ -468,12 +479,6 @@ bootstrap()
 
     <van-loading v-if="loading" size="24px" class="loading">加载中...</van-loading>
     <form v-else class="recipe-form" @submit.prevent="submit">
-      <div v-if="uploadStatus" class="upload-status" :class="{ success: !uploading }">
-        <van-loading v-if="uploading" size="16" color="#f59e0b" />
-        <van-icon v-else name="success" />
-        <span>{{ uploadStatus }}</span>
-      </div>
-
       <section class="form-section">
         <h2>基础信息</h2>
         <van-field v-model="form.recipe.recipeName" class="form-field" label="菜名" placeholder="请输入菜名" required />
@@ -527,6 +532,7 @@ bootstrap()
           v-model="form.recipe.coverImage"
           label="成品图"
           :disabled="uploading"
+          :loading="uploadingTarget === 'cover'"
           @upload="uploadCover"
         />
       </section>
@@ -534,29 +540,6 @@ bootstrap()
       <section class="form-section">
         <div class="section-head">
           <h2>食材列表</h2>
-          <div class="head-actions">
-            <van-button round plain size="small" type="warning" icon="plus" @click="addIngredientRel">
-              添加
-            </van-button>
-            <van-button round plain size="small" icon="plus" @click="showQuickIngredient = !showQuickIngredient">
-              新建
-            </van-button>
-          </div>
-        </div>
-        <div v-if="showQuickIngredient" class="quick-create">
-          <van-field v-model="quickIngredientForm.ingredientName" class="form-field" label="食材名" placeholder="如：青椒" />
-          <ImageUploader
-            v-model="quickIngredientForm.ingredientImage"
-            label="食材图片"
-            :disabled="uploading"
-            :size="76"
-            @upload="uploadQuickIngredientImage"
-          />
-          <van-field v-model="quickIngredientForm.ingredientDesc" class="form-field" label="描述" type="textarea" rows="2" />
-          <div class="quick-actions">
-            <van-button size="small" :disabled="creatingBaseData" @click="showQuickIngredient = false">取消</van-button>
-            <van-button size="small" type="warning" :loading="creatingBaseData" @click="createQuickIngredient">保存并选中</van-button>
-          </div>
         </div>
         <article v-for="(item, index) in form.ingredientList" :key="`ing-${index}`" class="row-panel">
           <div class="row-title">
@@ -598,34 +581,37 @@ bootstrap()
             </label>
           </div>
         </article>
+        <div class="list-tail-actions">
+          <button class="tail-action primary" type="button" @click="addIngredientRel">
+            <van-icon name="plus" />
+            添加食材
+          </button>
+          <button class="tail-action" type="button" @click="showQuickIngredient = !showQuickIngredient">
+            <van-icon name="plus" />
+            新建食材
+          </button>
+        </div>
+        <div v-if="showQuickIngredient" class="quick-create">
+          <van-field v-model="quickIngredientForm.ingredientName" class="form-field" label="食材名" placeholder="如：青椒" />
+          <ImageUploader
+            v-model="quickIngredientForm.ingredientImage"
+            label="食材图片"
+            :disabled="uploading"
+            :loading="uploadingTarget === 'quick-ingredient'"
+            :size="76"
+            @upload="uploadQuickIngredientImage"
+          />
+          <van-field v-model="quickIngredientForm.ingredientDesc" class="form-field" label="描述" type="textarea" rows="2" />
+          <div class="quick-actions">
+            <van-button size="small" :disabled="creatingBaseData" @click="showQuickIngredient = false">取消</van-button>
+            <van-button size="small" type="warning" :loading="creatingBaseData" @click="createQuickIngredient">保存并选中</van-button>
+          </div>
+        </div>
       </section>
 
       <section class="form-section">
         <div class="section-head">
           <h2>调料列表</h2>
-          <div class="head-actions">
-            <van-button round plain size="small" type="warning" icon="plus" @click="addSeasoningRel">
-              添加
-            </van-button>
-            <van-button round plain size="small" icon="plus" @click="showQuickSeasoning = !showQuickSeasoning">
-              新建
-            </van-button>
-          </div>
-        </div>
-        <div v-if="showQuickSeasoning" class="quick-create">
-          <van-field v-model="quickSeasoningForm.seasoningName" class="form-field" label="调料名" placeholder="如：生抽" />
-          <ImageUploader
-            v-model="quickSeasoningForm.seasoningImage"
-            label="调料图片"
-            :disabled="uploading"
-            :size="76"
-            @upload="uploadQuickSeasoningImage"
-          />
-          <van-field v-model="quickSeasoningForm.seasoningDesc" class="form-field" label="描述" type="textarea" rows="2" />
-          <div class="quick-actions">
-            <van-button size="small" :disabled="creatingBaseData" @click="showQuickSeasoning = false">取消</van-button>
-            <van-button size="small" type="warning" :loading="creatingBaseData" @click="createQuickSeasoning">保存并选中</van-button>
-          </div>
         </div>
         <article v-for="(item, index) in form.seasoningList" :key="`seasoning-${index}`" class="row-panel">
           <div class="row-title">
@@ -667,25 +653,57 @@ bootstrap()
             </label>
           </div>
         </article>
+        <div class="list-tail-actions">
+          <button class="tail-action primary" type="button" @click="addSeasoningRel">
+            <van-icon name="plus" />
+            添加调料
+          </button>
+          <button class="tail-action" type="button" @click="showQuickSeasoning = !showQuickSeasoning">
+            <van-icon name="plus" />
+            新建调料
+          </button>
+        </div>
+        <div v-if="showQuickSeasoning" class="quick-create">
+          <van-field v-model="quickSeasoningForm.seasoningName" class="form-field" label="调料名" placeholder="如：生抽" />
+          <ImageUploader
+            v-model="quickSeasoningForm.seasoningImage"
+            label="调料图片"
+            :disabled="uploading"
+            :loading="uploadingTarget === 'quick-seasoning'"
+            :size="76"
+            @upload="uploadQuickSeasoningImage"
+          />
+          <van-field v-model="quickSeasoningForm.seasoningDesc" class="form-field" label="描述" type="textarea" rows="2" />
+          <div class="quick-actions">
+            <van-button size="small" :disabled="creatingBaseData" @click="showQuickSeasoning = false">取消</van-button>
+            <van-button size="small" type="warning" :loading="creatingBaseData" @click="createQuickSeasoning">保存并选中</van-button>
+          </div>
+        </div>
       </section>
 
       <section class="form-section">
         <div class="section-head">
           <h2>制作步骤</h2>
-          <van-button round plain size="small" type="warning" icon="plus" @click="addStep">
-            添加
-          </van-button>
         </div>
-        <article v-for="(item, index) in form.recipeStepList" :key="`step-${index}`" class="row-panel step-panel">
+        <article v-for="(item, index) in form.recipeStepList" :key="item._uid || `step-${index}`" class="row-panel step-panel">
           <div class="step-head">
             <span>{{ index + 1 }}</span>
             <input v-model="item.stepTitle" class="step-title-input" placeholder="步骤标题" />
+            <div class="step-move-actions">
+              <button type="button" :disabled="uploading || index === 0" @click="moveStep(index, -1)">
+                <van-icon name="arrow-up" />
+              </button>
+              <button type="button" :disabled="uploading || index === form.recipeStepList.length - 1" @click="moveStep(index, 1)">
+                <van-icon name="arrow-down" />
+              </button>
+            </div>
           </div>
           <van-field v-model="item.stepDesc" class="form-field" type="textarea" rows="3" placeholder="写下这一步怎么做" />
           <ImageUploader
             v-model="item.stepImage"
             label="步骤图"
             :disabled="uploading"
+            :loading="uploadingTarget === `step-${index}`"
             :size="86"
             @upload="(file) => uploadStepImage(index, file)"
           />
@@ -694,6 +712,12 @@ bootstrap()
             删除步骤
           </button>
         </article>
+        <div class="list-tail-actions single">
+          <button class="tail-action primary" type="button" @click="addStep">
+            <van-icon name="plus" />
+            添加步骤
+          </button>
+        </div>
       </section>
 
       <section class="form-section">
@@ -772,22 +796,6 @@ bootstrap()
   gap: 12px;
 }
 
-.upload-status {
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: #fff7e8;
-  color: #b45309;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.upload-status.success {
-  background: #ecfdf3;
-  color: #15803d;
-}
-
 .form-section,
 .row-panel {
   padding: 14px;
@@ -842,15 +850,10 @@ h2 {
   gap: 10px;
 }
 
-.head-actions,
 .quick-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.head-actions {
-  flex: 0 0 auto;
 }
 
 .quick-create {
@@ -863,6 +866,42 @@ h2 {
 .quick-actions {
   justify-content: flex-end;
   margin-top: 8px;
+}
+
+.list-tail-actions {
+  margin-top: -2px;
+  padding: 10px;
+  border: 1px dashed #fed7aa;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 247, 232, 0.48), rgba(255, 250, 242, 0.88));
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.list-tail-actions.single {
+  grid-template-columns: 1fr;
+}
+
+.tail-action {
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #7c5c46;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tail-action.primary {
+  border-color: rgba(249, 115, 22, 0.42);
+  background: #fff7e8;
+  color: #c2410c;
 }
 
 .select-grid {
@@ -1089,7 +1128,7 @@ h2 {
 
 .step-head {
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
 }
@@ -1114,6 +1153,28 @@ h2 {
   color: var(--app-text);
   outline: 0;
   font-weight: 700;
+}
+
+.step-move-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.step-move-actions button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--app-border);
+  border-radius: 50%;
+  background: #fffaf2;
+  color: #9b7d66;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-move-actions button:disabled {
+  opacity: 0.38;
 }
 
 .submit-spacer {

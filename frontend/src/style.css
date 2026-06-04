@@ -31,6 +31,9 @@
 
 html {
   background: var(--app-bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: pan-x pan-y;
 }
 
 body {
@@ -39,6 +42,7 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
+  touch-action: pan-x pan-y;
   background:
     radial-gradient(circle at 18% 0%, rgba(254, 215, 170, 0.42), transparent 28%),
     linear-gradient(180deg, #fff7ed 0%, #fffaf2 45%, #fff7ed 100%);
@@ -87,6 +91,16 @@ button .van-badge__wrapper {
 button .van-icon::before {
   display: block;
   line-height: 1;
+}
+
+input,
+textarea,
+select,
+.van-field__control,
+.van-search__field,
+.van-cell input,
+.van-cell textarea {
+  font-size: 16px !important;
 }
 
 .section-title {

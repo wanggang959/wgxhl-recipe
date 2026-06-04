@@ -8,6 +8,7 @@ import { useUserStore } from './stores/user'
 
 applyIosSafeAreaFallback()
 syncThemeColor()
+setupMobileZoomLock()
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -55,4 +56,24 @@ function syncThemeColor() {
   if (meta) {
     meta.setAttribute('content', themeColor)
   }
+}
+
+function setupMobileZoomLock() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+  const isTouchDevice = window.navigator.maxTouchPoints > 0
+  if (!isTouchDevice) return
+
+  const preventGesture = (event) => {
+    event.preventDefault()
+  }
+
+  document.addEventListener('gesturestart', preventGesture, { passive: false })
+  document.addEventListener('gesturechange', preventGesture, { passive: false })
+  document.addEventListener('gestureend', preventGesture, { passive: false })
+  document.addEventListener('touchmove', (event) => {
+    if (event.touches.length > 1) {
+      event.preventDefault()
+    }
+  }, { passive: false })
 }

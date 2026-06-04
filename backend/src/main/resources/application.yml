@@ -25,3 +25,10 @@ auth:
   jwt:
     secret: ${JWT_SECRET:wgxhl-recipe-secret-key}
     expire-hours: ${JWT_EXPIRE_HOURS:168}
+
+push:
+  vapid:
+    public-key: ${PUSH_VAPID_PUBLIC_KEY:}
+    private-key: ${PUSH_VAPID_PRIVATE_KEY:}
+    subject: ${PUSH_VAPID_SUBJECT:mailto:admin@wgxhl.space}
+  ttl-seconds: ${PUSH_TTL_SECONDS:604800}

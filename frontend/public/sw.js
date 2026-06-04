@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2'
+const CACHE_VERSION = 'v5'
 const IMAGE_CACHE = `wgxhl-image-cache-${CACHE_VERSION}`
 const META_CACHE = `wgxhl-image-meta-${CACHE_VERSION}`
 const CACHE_PREFIX = 'wgxhl-image-cache-'
@@ -33,6 +33,91 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(cacheFirstImage(request, event))
 })
+
+self.addEventListener('push', (event) => {
+  const payload = readPushPayload(event)
+  const title = payload.title || '王师傅私房菜'
+  const notifyUrl = payload.url || payload.data?.url || '/#/todo'
+  const options = {
+    body: payload.body || '有人更新了待办，点击前往备菜',
+    icon: payload.icon || '/pwa-icon-192.png',
+    badge: payload.badge || '/pwa-icon-192.png',
+    tag: payload.tag || 'wgxhl-recipe',
+    data: {
+      ...(payload.data || {}),
+      url: notifyUrl,
+    },
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const targetUrl = getNotificationUrl(event.notification)
+  event.waitUntil(openOrFocusClient(targetUrl))
+})
+
+function readPushPayload(event) {
+  if (!event.data) return {}
+  try {
+    return event.data.json()
+  } catch (error) {
+    return { body: event.data.text() }
+  }
+}
+
+function getNotificationUrl(notification) {
+  const data = notification.data || {}
+  const target = data.url || '/#/todo'
+  return new URL(target, self.location.origin).href
+}
+
+function resolveRoutePath(targetUrl) {
+  try {
+    const parsed = new URL(targetUrl, self.location.origin)
+    if (parsed.hash) {
+      const hashPath = parsed.hash.replace(/^#/, '')
+      return hashPath.startsWith('/') ? hashPath : `/${hashPath}`
+    }
+    if (parsed.pathname && parsed.pathname !== '/') {
+      return parsed.pathname
+    }
+  } catch (error) {
+    // ignore invalid url
+  }
+  return '/todo'
+}
+
+function toAbsoluteAppUrl(targetUrl) {
+  const routePath = resolveRoutePath(targetUrl)
+  return new URL(`/?push=${Date.now()}#${routePath}`, self.location.origin).href
+}
+
+async function openOrFocusClient(targetUrl) {
+  const routePath = resolveRoutePath(targetUrl)
+  const absoluteUrl = toAbsoluteAppUrl(targetUrl)
+  const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+
+  for (const client of clientList) {
+    const clientOrigin = new URL(client.url).origin
+    if (clientOrigin !== self.location.origin) continue
+
+    // iOS PWA 从通知恢复时可能保留异常 viewport，直接重载到目标页最稳定。
+    client.postMessage({ type: 'reload-to', url: absoluteUrl, route: routePath })
+
+    if ('focus' in client) {
+      await client.focus()
+      client.postMessage({ type: 'reload-to', url: absoluteUrl, route: routePath })
+      return undefined
+    }
+  }
+
+  if (self.clients.openWindow) {
+    return self.clients.openWindow(absoluteUrl)
+  }
+  return undefined
+}
 
 function isImageRequest(request, url) {
   if (request.destination === 'image') return true

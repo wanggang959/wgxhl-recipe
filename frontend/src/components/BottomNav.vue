@@ -65,10 +65,10 @@ function go(item) {
   left: 50%;
   bottom: 0;
   z-index: 50;
-  width: min(100%, var(--app-shell-width));
-  min-height: var(--app-bottom-nav-height);
+  width: min(100vw, var(--app-shell-width));
+  height: var(--app-bottom-nav-height);
   transform: translateX(-50%);
-  padding: 8px 8px calc(8px + var(--safe-area-bottom));
+  padding: 8px 8px calc(8px + var(--app-nav-safe-bottom));
   background: rgba(255, 250, 242, 0.96);
   border-top: 1px solid var(--app-border);
   display: grid;

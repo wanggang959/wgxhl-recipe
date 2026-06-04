@@ -27,3 +27,11 @@ export function deleteWantedRecipeByRecipeId(userId, recipeId) {
 export function checkWantedRecipe(userId, recipeId) {
   return post('/want/check', { userId, recipeId })
 }
+
+export function getWantNotifyPreview() {
+  return post('/want/notifyPreview')
+}
+
+export function notifyWantPrepare(payload) {
+  return post('/want/notify', payload)
+}

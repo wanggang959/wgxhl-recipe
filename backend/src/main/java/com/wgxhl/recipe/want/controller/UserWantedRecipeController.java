@@ -3,15 +3,20 @@ package com.wgxhl.recipe.want.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.common.dto.IdDTO;
+import com.wgxhl.recipe.config.AuthRequestAttributes;
+import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.want.dto.WantNotifyDTO;
 import com.wgxhl.recipe.want.dto.WantedRecipePageDTO;
 import com.wgxhl.recipe.want.dto.WantedRecipeUserRecipeDTO;
 import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import com.wgxhl.recipe.want.service.UserWantedRecipeService;
+import com.wgxhl.recipe.want.vo.WantNotifyPreviewVO;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -58,5 +63,22 @@ public class UserWantedRecipeController {
     @PostMapping("/check")
     public ApiResponse<Boolean> check(@RequestBody WantedRecipeUserRecipeDTO dto) {
         return userWantedRecipeService.check(dto.getUserId(), dto.getRecipeId());
+    }
+
+    @PostMapping("/notifyPreview")
+    public ApiResponse<WantNotifyPreviewVO> notifyPreview(HttpServletRequest request) {
+        AppUser currentUser = currentUser(request);
+        return userWantedRecipeService.notifyPreview(currentUser);
+    }
+
+    @PostMapping("/notify")
+    public ApiResponse<Integer> notify(@RequestBody WantNotifyDTO dto, HttpServletRequest request) {
+        AppUser currentUser = currentUser(request);
+        return userWantedRecipeService.notifyPrepare(currentUser, dto);
+    }
+
+    private AppUser currentUser(HttpServletRequest request) {
+        Object value = request.getAttribute(AuthRequestAttributes.CURRENT_USER);
+        return value instanceof AppUser ? (AppUser) value : null;
     }
 }

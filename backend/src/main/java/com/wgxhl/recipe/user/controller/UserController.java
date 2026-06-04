@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -99,6 +101,14 @@ public class UserController {
     @PostMapping("/preview")
     public ApiResponse<UserPreviewVO> preview(@RequestBody UserUsernameDTO dto) {
         return appUserService.previewByUsername(dto == null ? null : dto.getUsername());
+    }
+
+    /***
+     * @Description 可通知的家庭成员列表（登录即可）
+     **/
+    @PostMapping("/members")
+    public ApiResponse<List<UserPreviewVO>> members() {
+        return appUserService.listMembers();
     }
 
     /***

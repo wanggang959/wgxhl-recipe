@@ -11,3 +11,9 @@ cos:
   region: ${COS_REGION:ap-guangzhou}
   bucket: ${COS_BUCKET:your-bucket-name}
   base-url: ${COS_BASE_URL:https://your-bucket-name.cos.ap-guangzhou.myqcloud.com}
+
+push:
+  vapid:
+    public-key: ${PUSH_VAPID_PUBLIC_KEY:}
+    private-key: ${PUSH_VAPID_PRIVATE_KEY:}
+    subject: ${PUSH_VAPID_SUBJECT:mailto:admin@wgxhl.space}

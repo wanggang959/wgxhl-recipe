@@ -1,11 +1,12 @@
 <script setup>
-import { computed, nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog } from 'vant'
 import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
 import { pickDefaultAvatar, userAvatarSrc } from '../utils/avatar'
+import { disablePushNotification, enablePushNotification, loadPushState } from '../utils/pushNotification'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -15,6 +16,15 @@ const actionStatus = ref('')
 const actionStatusType = ref('success')
 const showMemberForm = ref(false)
 const memberPanelBodyRef = ref(null)
+const pushLoading = ref(false)
+const pushState = ref({
+  supported: false,
+  permission: 'default',
+  subscribed: false,
+  configured: false,
+  publicKey: '',
+  needsStandalone: false,
+})
 let actionStatusTimer = null
 
 const userForm = reactive({
@@ -33,6 +43,21 @@ const isEditingUser = computed(() => Boolean(userForm.id))
 const editingBuiltinAdmin = ref(false)
 
 const GUEST_ID = 'guest'
+
+const canTogglePush = computed(() => (
+  pushState.value.supported
+    && pushState.value.configured
+    && !pushState.value.needsStandalone
+    && pushState.value.permission !== 'denied'
+))
+
+const pushStatusText = computed(() => {
+  if (!pushState.value.supported) return '当前浏览器不支持'
+  if (pushState.value.needsStandalone) return '添加到主屏幕后可开启'
+  if (!pushState.value.configured) return '服务端未配置'
+  if (pushState.value.permission === 'denied') return '系统权限已关闭'
+  return pushState.value.subscribed ? '已开启' : '未开启'
+})
 
 function isBuiltinAdminUser(item) {
   return item?.id === BUILTIN_ADMIN_ID || item?.username === BUILTIN_ADMIN_USERNAME
@@ -69,11 +94,40 @@ async function loadUsers() {
   }
 }
 
-function logout() {
+async function logout() {
+  try {
+    await disablePushNotification()
+  } catch (error) {
+    // Continue logout even if the browser cannot update notification state.
+  }
   userStore.logout()
   users.value = []
   resetUserForm()
   showActionStatus('已退出登录')
+}
+
+async function refreshPushState() {
+  if (!userStore.isLogin) return
+  pushState.value = await loadPushState()
+}
+
+async function togglePushNotification() {
+  if (!userStore.isLogin || pushLoading.value) return
+  pushLoading.value = true
+  try {
+    if (pushState.value.subscribed) {
+      pushState.value = await disablePushNotification()
+      showActionStatus('已关闭手机通知')
+    } else {
+      pushState.value = await enablePushNotification()
+      showActionStatus('已开启手机通知')
+    }
+  } catch (error) {
+    await refreshPushState()
+    showActionStatus(error.message || '通知设置失败', 'error')
+  } finally {
+    pushLoading.value = false
+  }
 }
 
 function resetUserForm() {
@@ -283,6 +337,10 @@ const currentProfileUser = computed(() => {
 if (userStore.isAdmin) {
   loadUsers()
 }
+
+onMounted(() => {
+  refreshPushState()
+})
 </script>
 
 <template>
@@ -325,6 +383,23 @@ if (userStore.isAdmin) {
       <h2>账号</h2>
       <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
       <van-cell title="权限" :value="userStore.roleText" />
+      <div v-if="userStore.isLogin" class="push-setting">
+        <div>
+          <strong>手机通知</strong>
+          <span>{{ pushStatusText }}</span>
+        </div>
+        <van-button
+          plain
+          round
+          size="small"
+          type="warning"
+          :loading="pushLoading"
+          :disabled="!canTogglePush"
+          @click="togglePushNotification"
+        >
+          {{ pushState.subscribed ? '关闭' : '开启' }}
+        </van-button>
+      </div>
       <van-button plain round type="danger" block @click="logout">退出登录</van-button>
     </section>
     </div>
@@ -600,6 +675,31 @@ h2 {
   justify-content: center;
   gap: 6px;
   font-weight: 700;
+}
+
+.push-setting {
+  margin: 8px 0 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff7ed;
+  border: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.push-setting strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 14px;
+}
+
+.push-setting span {
+  display: block;
+  margin-top: 3px;
+  color: var(--app-muted);
+  font-size: 12px;
 }
 
 h2 {

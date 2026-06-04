@@ -5,7 +5,8 @@ const request = axios.create({
   timeout: 15000,
 })
 
-/** 无需登录的接口（登录页预览头像等不能带过期 token） */
+const STORAGE_KEY = 'wgxhl_recipe_user'
+
 const PUBLIC_API_PATHS = ['/user/login', '/user/guestLogin', '/user/preview']
 
 function isPublicApi(url) {
@@ -14,11 +15,18 @@ function isPublicApi(url) {
   return PUBLIC_API_PATHS.some((item) => path === item || path.endsWith(item))
 }
 
+function clearLoginAndRedirect() {
+  localStorage.removeItem(STORAGE_KEY)
+  if (!window.location.hash.includes('/login')) {
+    window.location.hash = '#/login'
+  }
+}
+
 request.interceptors.request.use((config) => {
   if (isPublicApi(config.url)) {
     return config
   }
-  const raw = localStorage.getItem('wgxhl_recipe_user')
+  const raw = localStorage.getItem(STORAGE_KEY)
   if (raw) {
     try {
       const user = JSON.parse(raw)
@@ -26,7 +34,7 @@ request.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${user.token}`
       }
     } catch (error) {
-      localStorage.removeItem('wgxhl_recipe_user')
+      localStorage.removeItem(STORAGE_KEY)
     }
   }
   return config
@@ -36,11 +44,11 @@ request.interceptors.response.use(
   (response) => {
     const res = response.data
     if (res.status !== 200) {
+      if (res.status === 401) {
+        clearLoginAndRedirect()
+      }
       if (res.status === 403 && /禁用/.test(res.message || '')) {
-        localStorage.removeItem('wgxhl_recipe_user')
-        if (!window.location.hash.includes('/login')) {
-          window.location.hash = '#/login'
-        }
+        clearLoginAndRedirect()
       }
       return Promise.reject(new Error(res.message || '请求失败'))
     }

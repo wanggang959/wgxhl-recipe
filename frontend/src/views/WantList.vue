@@ -2,10 +2,20 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
-import { deleteWantedRecipe, listWantedDates, pageWantedRecipe, updateWantedDate } from '../api/want'
+import { listMembers } from '../api/user'
+import {
+  deleteWantedRecipe,
+  getWantNotifyPreview,
+  listWantedDates,
+  notifyWantPrepare,
+  pageWantedRecipe,
+  updateWantedDate,
+} from '../api/want'
 import EmptyState from '../components/EmptyState.vue'
 import { useUserStore } from '../stores/user'
 import { getRecipeImage } from '../utils/imageUrl'
+
+const DEFAULT_NOTIFY_USER_ID = 'admin-wangshifu'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -16,17 +26,30 @@ const selectedDate = ref(formatDate(new Date()))
 const editVisible = ref(false)
 const editTarget = ref(null)
 const editDate = ref('')
+const notifyVisible = ref(false)
+const notifyLoading = ref(false)
+const notifyMembers = ref([])
+const selectedNotifyIds = ref([])
+const notifyPreviewText = ref('')
 
 const today = computed(() => formatDate(new Date()))
 const tomorrow = computed(() => addDays(1))
 const minDate = computed(() => today.value)
+const actorName = computed(() => userStore.user?.nickname || userStore.user?.username || '家人')
+
+/** 有今天及之后的想吃即可显示通知按钮，不依赖预览接口 */
+const showNotifyBtn = computed(() => (
+  Boolean(userStore.userId)
+  && (dateList.value.length > 0 || list.value.length > 0)
+))
+
 const filterDates = computed(() => {
   const fixed = [
     { value: today.value, label: '今日' },
     { value: tomorrow.value, label: '明日' },
   ]
   const extra = dateList.value
-    .filter((date) => date !== today.value && date !== tomorrow.value)
+    .filter((date) => !isPastDate(date) && date !== today.value && date !== tomorrow.value)
     .map((date) => ({ value: date, label: formatDateLabel(date) }))
   return fixed.concat(extra)
 })
@@ -36,7 +59,7 @@ onMounted(async () => {
 })
 
 async function refresh() {
-  await Promise.all([loadDateList(), loadWanted()])
+  await Promise.all([loadDateList(), loadWanted(), loadNotifyPreview()])
 }
 
 async function loadDateList() {
@@ -46,7 +69,8 @@ async function loadDateList() {
   }
   try {
     const res = await listWantedDates(userStore.userId)
-    dateList.value = res.data || []
+    dateList.value = (res.data || []).filter((date) => !isPastDate(date))
+    ensureSelectedDate()
   } catch (error) {
     showFailToast(error.message || '想吃日期加载失败')
   }
@@ -141,6 +165,139 @@ function formatDateLabel(dateText) {
   const [, month, day] = dateText.split('-')
   return `${Number(month)}月${Number(day)}日`
 }
+
+function isPastDate(dateText) {
+  return dateText < today.value
+}
+
+function ensureSelectedDate() {
+  if (isPastDate(selectedDate.value)) {
+    selectedDate.value = today.value
+  }
+}
+
+async function loadNotifyPreview() {
+  if (!userStore.userId) {
+    notifyPreviewText.value = ''
+    return
+  }
+  try {
+    const res = await getWantNotifyPreview()
+    if (res.data?.previewBody) {
+      notifyPreviewText.value = res.data.previewBody
+      return
+    }
+  } catch (error) {
+    // 后端未更新时走本地预览，避免通知按钮消失
+  }
+  notifyPreviewText.value = await buildNotifyPreviewFallback()
+}
+
+async function buildNotifyPreviewFallback() {
+  try {
+    const res = await pageWantedRecipe({
+      current: 1,
+      size: 200,
+      userId: userStore.userId,
+      plannedDateStart: today.value,
+    })
+    const records = (res.data?.records || []).slice().sort((a, b) => {
+      const dateCompare = String(a.plannedDate).localeCompare(String(b.plannedDate))
+      if (dateCompare !== 0) return dateCompare
+      return String(a.recipeName || '').localeCompare(String(b.recipeName || ''))
+    })
+    if (!records.length) return ''
+    const date = records[0].plannedDate
+    const names = records
+      .filter((item) => item.plannedDate === date)
+      .map((item) => item.recipeName)
+      .filter(Boolean)
+    return `${actorName.value}${dayLabel(date)}想吃${joinRecipeNames(names)}，点击前往备菜`
+  } catch (error) {
+    return ''
+  }
+}
+
+function dayLabel(dateText) {
+  if (dateText === today.value) return '今天'
+  if (dateText === tomorrow.value) return '明天'
+  const dayAfter = addDays(2)
+  if (dateText === dayAfter) return '后天'
+  return formatDateLabel(dateText)
+}
+
+function joinRecipeNames(names) {
+  if (!names.length) return '几道菜'
+  if (names.length === 1) return names[0]
+  if (names.length === 2) return `${names[0]}和${names[1]}`
+  return `${names.slice(0, -1).join('、')}和${names[names.length - 1]}`
+}
+
+function memberLabel(member) {
+  return member.nickname || member.username || '家人'
+}
+
+function isNotifyTargetSelected(userId) {
+  return selectedNotifyIds.value.includes(userId)
+}
+
+function toggleNotifyTarget(userId) {
+  if (isNotifyTargetSelected(userId)) {
+    selectedNotifyIds.value = selectedNotifyIds.value.filter((id) => id !== userId)
+    return
+  }
+  selectedNotifyIds.value = [...selectedNotifyIds.value, userId]
+}
+
+async function openNotifySheet() {
+  if (!showNotifyBtn.value) {
+    showFailToast('今天及之后还没有想吃的菜')
+    return
+  }
+  await loadNotifyPreview()
+  if (!notifyPreviewText.value) {
+    showFailToast('今天及之后还没有想吃的菜')
+    return
+  }
+  try {
+    const res = await listMembers()
+    notifyMembers.value = res.data || []
+    const defaults = notifyMembers.value
+      .filter((member) => member.id === DEFAULT_NOTIFY_USER_ID)
+      .map((member) => member.id)
+    selectedNotifyIds.value = defaults.length
+      ? defaults
+      : notifyMembers.value.slice(0, 1).map((member) => member.id)
+    notifyVisible.value = true
+  } catch (error) {
+    showFailToast(error.message || '家人列表加载失败')
+  }
+}
+
+function closeNotifySheet() {
+  notifyVisible.value = false
+}
+
+async function submitNotify() {
+  if (!selectedNotifyIds.value.length) {
+    showFailToast('请至少选择一位家人')
+    return
+  }
+  notifyLoading.value = true
+  try {
+    const res = await notifyWantPrepare({
+      targetUserIds: selectedNotifyIds.value,
+    })
+    closeToast()
+    showSuccessToast({ message: res.message || '已发送通知', duration: 1600 })
+    closeNotifySheet()
+  } catch (error) {
+    closeToast()
+    showFailToast({ message: error.message || '通知发送失败', duration: 1800 })
+  } finally {
+    notifyLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -150,7 +307,7 @@ function formatDateLabel(dateText) {
         <p>我的菜单</p>
         <h1>想吃</h1>
       </div>
-      <span v-if="userStore.userId">{{ list.length }} 道</span>
+      <span v-if="userStore.userId" class="page-head-count">{{ list.length }} 道</span>
     </div>
 
     <EmptyState
@@ -171,6 +328,16 @@ function formatDateLabel(dateText) {
           {{ item.label }}
         </button>
       </div>
+
+      <button
+        v-if="showNotifyBtn"
+        type="button"
+        class="notify-bar-btn"
+        @click="openNotifySheet"
+      >
+        <van-icon name="bell" />
+        通知家人备菜
+      </button>
 
       <van-loading v-if="loading" size="24px" class="loading">加载中...</van-loading>
       <EmptyState
@@ -199,6 +366,28 @@ function formatDateLabel(dateText) {
         </article>
       </div>
     </template>
+
+    <van-popup v-model:show="notifyVisible" position="bottom" round>
+      <div class="notify-sheet">
+        <h3>通知家人备菜</h3>
+        <p class="notify-preview">{{ notifyPreviewText }}</p>
+        <div class="notify-members">
+          <button
+            v-for="member in notifyMembers"
+            :key="member.id"
+            type="button"
+            :class="{ active: isNotifyTargetSelected(member.id) }"
+            @click="toggleNotifyTarget(member.id)"
+          >
+            {{ memberLabel(member) }}
+          </button>
+        </div>
+        <button type="button" class="primary" :disabled="notifyLoading" @click="submitNotify">
+          {{ notifyLoading ? '发送中...' : '发送通知' }}
+        </button>
+        <button type="button" @click="closeNotifySheet">取消</button>
+      </div>
+    </van-popup>
 
     <van-popup v-model:show="editVisible" position="bottom" round>
       <div class="edit-sheet">
@@ -248,9 +437,25 @@ function formatDateLabel(dateText) {
   font-size: 26px;
 }
 
-.page-head span {
+.page-head-count {
   color: var(--app-muted);
   font-size: 13px;
+}
+
+.notify-bar-btn {
+  width: 100%;
+  height: 42px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+  color: var(--app-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 15px;
+  box-shadow: 0 8px 18px rgba(234, 88, 12, 0.12);
 }
 
 .date-tabs {
@@ -384,9 +589,71 @@ function formatDateLabel(dateText) {
   outline: 0;
 }
 
-.edit-sheet button.primary {
+.edit-sheet button.primary,
+.notify-sheet button.primary {
   background: var(--app-primary);
   color: #fff;
   border-color: var(--app-primary);
+}
+
+.notify-sheet {
+  padding: 18px 14px max(18px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fffaf2;
+}
+
+.notify-sheet h3 {
+  margin: 0;
+  color: var(--app-text);
+  text-align: center;
+  font-size: 17px;
+}
+
+.notify-preview {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--app-border);
+  color: #7c5c46;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.notify-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.notify-members button {
+  height: 36px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0 14px;
+  background: #fff;
+  color: #7c5c46;
+  font-weight: 800;
+}
+
+.notify-members button.active {
+  background: var(--app-primary);
+  color: #fff;
+  border-color: var(--app-primary);
+}
+
+.notify-sheet button {
+  height: 42px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #fffaf2;
+  color: #7c5c46;
+  font-weight: 800;
+}
+
+.notify-sheet button:disabled {
+  opacity: 0.6;
 }
 </style>

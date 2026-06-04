@@ -46,7 +46,7 @@ const isTodayMode = computed(() => route.query.pick === 'today')
   position: sticky;
   top: 0;
   z-index: 30;
-  width: min(100%, var(--app-shell-width));
+  width: min(100vw, var(--app-shell-width));
   margin: 0 auto;
   min-height: var(--app-top-bar-height);
   padding: calc(10px + var(--safe-area-top)) 12px 10px;

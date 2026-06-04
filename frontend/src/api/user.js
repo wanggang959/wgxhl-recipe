@@ -16,6 +16,10 @@ export function pageUser(params) {
   return post('/user/page', params)
 }
 
+export function listMembers() {
+  return post('/user/members')
+}
+
 export function createUser(payload) {
   return post('/user/create', payload)
 }

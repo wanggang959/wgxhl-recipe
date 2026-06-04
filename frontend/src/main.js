@@ -10,6 +10,7 @@ applyIosSafeAreaFallback()
 syncThemeColor()
 setupShareMetadata()
 setupMobileZoomLock()
+setupViewportMetrics()
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -20,12 +21,123 @@ app.use(router)
 const userStore = useUserStore(pinia)
 userStore.restore()
 
+let pendingNotificationPath = readPendingNotificationPath()
+
+setupNotificationNavigation()
+
 app.mount('#app')
+
+if (pendingNotificationPath) {
+  navigateFromNotification(pendingNotificationPath)
+  pendingNotificationPath = null
+}
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })
+}
+
+function setupNotificationNavigation() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
+
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const data = event.data || {}
+    if (data.type === 'reload-to' && data.url) {
+      window.location.replace(String(data.url))
+      return
+    }
+    if (data.type !== 'navigate' || !data.url) return
+    refreshViewportMetrics()
+    navigateFromNotification(String(data.url))
+  })
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshViewportMetrics()
+      syncRouteFromHash()
+    }
+  })
+
+  window.addEventListener('focus', () => {
+    refreshViewportMetrics()
+    syncRouteFromHash()
+  })
+  window.addEventListener('hashchange', () => {
+    refreshViewportMetrics()
+    syncRouteFromHash()
+  })
+}
+
+function getPathFromHash() {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash.replace(/^#/, '')
+  if (!hash) return null
+  return hash.startsWith('/') ? hash : `/${hash}`
+}
+
+function readPendingNotificationPath() {
+  const path = getPathFromHash()
+  if (!path) return null
+  return path === '/todo' || path.startsWith('/todo/') ? path : null
+}
+
+function syncRouteFromHash() {
+  const path = getPathFromHash()
+  if (!path || router.currentRoute.value.path === path) return
+  router.replace(path).then(() => {
+    window.dispatchEvent(new CustomEvent('app:route-refresh', { detail: { path } }))
+  }).catch(() => {
+    window.location.hash = path
+  })
+}
+
+function navigateFromNotification(url) {
+  const path = url.startsWith('/') ? url : `/${url}`
+  const go = () => {
+    refreshViewportMetrics()
+    router.replace(path).then(() => {
+      refreshViewportMetrics()
+      window.dispatchEvent(new CustomEvent('app:route-refresh', { detail: { path } }))
+    }).catch(() => {
+      window.location.replace(`${window.location.origin}${window.location.pathname}#${path}`)
+    })
+  }
+
+  if (typeof router.isReady === 'function') {
+    router.isReady().then(() => {
+      go()
+      window.setTimeout(go, 120)
+    })
+    return
+  }
+  go()
+}
+
+function setupViewportMetrics() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+  refreshViewportMetrics()
+  window.addEventListener('resize', refreshViewportMetrics)
+  window.addEventListener('orientationchange', () => {
+    refreshViewportMetrics()
+    window.setTimeout(refreshViewportMetrics, 180)
+  })
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', refreshViewportMetrics)
+    window.visualViewport.addEventListener('scroll', refreshViewportMetrics)
+  }
+}
+
+function refreshViewportMetrics() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+  const viewport = window.visualViewport
+  const height = Math.round(viewport?.height || window.innerHeight || document.documentElement.clientHeight || 0)
+  if (height > 0) {
+    document.documentElement.style.setProperty('--app-viewport-height', `${height}px`)
+  }
 }
 
 function applyIosSafeAreaFallback() {

@@ -8,6 +8,8 @@ import com.wgxhl.recipe.user.dto.UserPageDTO;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.vo.UserPreviewVO;
 
+import java.util.List;
+
 public interface AppUserService extends IService<AppUser> {
 
     ApiResponse<Page<AppUser>> page(UserPageDTO dto);
@@ -25,6 +27,8 @@ public interface AppUserService extends IService<AppUser> {
     ApiResponse<AppUser> guestLogin();
 
     ApiResponse<UserPreviewVO> previewByUsername(String username);
+
+    ApiResponse<List<UserPreviewVO>> listMembers();
 
     ApiResponse<Void> setStatus(String id, String status);
 }

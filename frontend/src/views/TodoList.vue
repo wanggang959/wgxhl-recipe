@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageUser } from '../api/user'
 import { deleteWantedRecipe, pageWantedRecipe } from '../api/want'
@@ -9,6 +9,7 @@ import { useUserStore } from '../stores/user'
 import { getRecipeImage } from '../utils/imageUrl'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const loading = ref(false)
 const list = ref([])
@@ -31,9 +32,30 @@ const groupedList = computed(() => {
   return groups
 })
 
+function handleRouteRefresh(event) {
+  const path = event?.detail?.path
+  if (!path || path === '/todo' || path.startsWith('/todo')) {
+    loadTodo()
+  }
+}
+
 onMounted(() => {
   loadTodo()
+  window.addEventListener('app:route-refresh', handleRouteRefresh)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('app:route-refresh', handleRouteRefresh)
+})
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path === '/todo') {
+      loadTodo()
+    }
+  },
+)
 
 async function loadTodo() {
   if (!userStore.userId) {
@@ -161,9 +183,22 @@ function getUserName(userId) {
 
 <style scoped>
 .todo-page {
+  min-height: calc(
+    var(--app-viewport-height)
+    - var(--app-top-bar-height)
+    - var(--app-bottom-nav-height)
+    - 24px
+  );
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.todo-page::after {
+  content: "";
+  display: block;
+  flex: 1 1 auto;
+  min-height: 1px;
 }
 
 .page-head {

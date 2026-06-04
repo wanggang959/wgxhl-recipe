@@ -17,12 +17,15 @@
   --app-danger: #ef4444;
   --app-shadow: 0 12px 32px rgba(154, 52, 18, 0.1);
   --app-shell-width: 430px;
+  --app-viewport-height: 100dvh;
+  --app-nav-safe-bottom: min(var(--safe-area-bottom), 12px);
   --ios-safe-area-top-fallback: 0px;
   --ios-safe-area-bottom-fallback: 0px;
   --safe-area-top: max(env(safe-area-inset-top, 0px), var(--ios-safe-area-top-fallback));
-  --safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--ios-safe-area-bottom-fallback));
+  /* iOS 从通知恢复时偶发返回异常大的 bottom inset，限制到常见 Home Indicator 高度。 */
+  --safe-area-bottom: min(max(env(safe-area-inset-bottom, 0px), var(--ios-safe-area-bottom-fallback)), 34px);
   --app-top-bar-height: calc(56px + var(--safe-area-top));
-  --app-bottom-nav-height: calc(64px + var(--safe-area-bottom));
+  --app-bottom-nav-height: calc(64px + var(--app-nav-safe-bottom));
 }
 
 * {
@@ -38,9 +41,11 @@ html {
 
 body {
   margin: 0;
+  width: 100%;
   min-width: 320px;
   min-height: 100vh;
   min-height: 100dvh;
+  min-height: var(--app-viewport-height);
   overflow-x: hidden;
   touch-action: pan-x pan-y;
   background:
@@ -51,12 +56,14 @@ body {
 #app {
   min-height: 100vh;
   min-height: 100dvh;
+  min-height: var(--app-viewport-height);
 }
 
 .page-wrap {
-  width: min(100%, var(--app-shell-width));
+  width: min(100vw, var(--app-shell-width));
+  min-height: calc(var(--app-viewport-height) - var(--app-top-bar-height));
   margin: 0 auto;
-  padding: 12px 12px calc(92px + var(--safe-area-bottom));
+  padding: 12px 12px calc(82px + var(--app-nav-safe-bottom));
 }
 
 .card-panel {
@@ -71,9 +78,10 @@ body {
 }
 
 .app-shell {
-  width: min(100%, var(--app-shell-width));
+  width: min(100vw, var(--app-shell-width));
   min-height: 100vh;
   min-height: 100dvh;
+  min-height: var(--app-viewport-height);
   margin: 0 auto;
   background: rgba(255, 250, 242, 0.9);
   box-shadow: 0 0 0 1px rgba(245, 223, 199, 0.5);

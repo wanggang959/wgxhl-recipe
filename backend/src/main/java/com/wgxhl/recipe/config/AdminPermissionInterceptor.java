@@ -138,6 +138,9 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
 
     private boolean requiresAdmin(String uri) {
         String path = normalizePath(uri);
+        if ("/user/members".equals(path)) {
+            return false;
+        }
         return path.startsWith("/category/")
                 || path.startsWith("/ingredient/")
                 || path.startsWith("/seasoning/")

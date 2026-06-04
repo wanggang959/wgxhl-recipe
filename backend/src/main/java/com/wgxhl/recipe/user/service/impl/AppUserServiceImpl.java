@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.config.JwtAuthUtil;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
+import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.record.service.RecipeViewRecordService;
 import com.wgxhl.recipe.user.dto.UserLoginDTO;
 import com.wgxhl.recipe.user.dto.UserPageDTO;
@@ -21,7 +22,9 @@ import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
@@ -41,15 +44,18 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     private final UserFavoriteService userFavoriteService;
     private final RecipeViewRecordService recipeViewRecordService;
     private final UserWantedRecipeService userWantedRecipeService;
+    private final UserPushSubscriptionService userPushSubscriptionService;
     private final JwtAuthUtil jwtAuthUtil;
 
     public AppUserServiceImpl(UserFavoriteService userFavoriteService,
                               RecipeViewRecordService recipeViewRecordService,
                               UserWantedRecipeService userWantedRecipeService,
+                              UserPushSubscriptionService userPushSubscriptionService,
                               JwtAuthUtil jwtAuthUtil) {
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
         this.userWantedRecipeService = userWantedRecipeService;
+        this.userPushSubscriptionService = userPushSubscriptionService;
         this.jwtAuthUtil = jwtAuthUtil;
     }
 
@@ -287,6 +293,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         userFavoriteService.deleteByUserId(id);
         recipeViewRecordService.deleteByUserId(id);
         userWantedRecipeService.deleteByUserId(id);
+        userPushSubscriptionService.deleteByUserId(id);
         removeById(id);
         return ApiResponse.success("删除成功", null);
     }
@@ -346,6 +353,29 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         preview.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername());
         preview.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getId()));
         return ApiResponse.success(preview);
+    }
+
+    @Override
+    public ApiResponse<List<UserPreviewVO>> listMembers() {
+        List<UserPreviewVO> members = lambdaQuery()
+                .eq(AppUser::getStatus, STATUS_NORMAL)
+                .ne(AppUser::getId, GUEST_ID)
+                .orderByDesc(AppUser::getUserRole)
+                .orderByAsc(AppUser::getNickname)
+                .list()
+                .stream()
+                .map(this::toPreview)
+                .collect(Collectors.toList());
+        return ApiResponse.success(members);
+    }
+
+    private UserPreviewVO toPreview(AppUser user) {
+        UserPreviewVO preview = new UserPreviewVO();
+        preview.setId(user.getId());
+        preview.setUsername(user.getUsername());
+        preview.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername());
+        preview.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getId()));
+        return preview;
     }
 
     @Override

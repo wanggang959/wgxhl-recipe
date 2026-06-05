@@ -94,9 +94,11 @@ const isTodayMode = computed(() => route.query.pick === 'today')
 }
 
 .profile-shell {
-  height: calc(100dvh - var(--app-top-bar-height) - var(--app-bottom-nav-height));
+  min-height: calc(100dvh - var(--app-top-bar-height) - var(--app-bottom-nav-height));
   max-height: calc(100dvh - var(--app-top-bar-height) - var(--app-bottom-nav-height));
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: 10px;
   display: flex;
   flex-direction: column;

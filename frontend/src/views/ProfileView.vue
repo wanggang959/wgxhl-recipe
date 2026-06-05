@@ -1,12 +1,17 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { closeToast, showConfirmDialog } from 'vant'
+import { closeToast, showConfirmDialog, showLoadingToast } from 'vant'
 import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
 import { pickDefaultAvatar, userAvatarSrc } from '../utils/avatar'
-import { disablePushNotification, enablePushNotification, loadPushState } from '../utils/pushNotification'
+import {
+  disablePushNotification,
+  enablePushNotification,
+  loadPushState,
+  teardownPushOnLogout,
+} from '../utils/pushNotification'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -17,6 +22,7 @@ const actionStatusType = ref('success')
 const showMemberForm = ref(false)
 const memberPanelBodyRef = ref(null)
 const pushLoading = ref(false)
+const loggingOut = ref(false)
 const pushState = ref({
   supported: false,
   permission: 'default',
@@ -94,16 +100,33 @@ async function loadUsers() {
   }
 }
 
+function goLoginPage() {
+  const loginUrl = `${window.location.origin}${window.location.pathname}#/login`
+  window.location.replace(loginUrl)
+}
+
 async function logout() {
+  if (loggingOut.value) return
+  loggingOut.value = true
+  closeToast()
+  showLoadingToast({ message: '正在退出...', forbidClick: true, duration: 0 })
+
   try {
-    await disablePushNotification()
+    await Promise.race([
+      teardownPushOnLogout(),
+      new Promise((resolve) => {
+        window.setTimeout(resolve, 1200)
+      }),
+    ])
   } catch (error) {
-    // Continue logout even if the browser cannot update notification state.
+    // 推送清理失败也继续退出
   }
+
   userStore.logout()
   users.value = []
   resetUserForm()
-  showActionStatus('已退出登录')
+  closeToast()
+  goLoginPage()
 }
 
 async function refreshPushState() {
@@ -356,7 +379,7 @@ onMounted(() => {
         />
         <van-icon v-else name="contact-o" size="32" />
       </div>
-      <div>
+      <div class="profile-card-main">
         <p>我的</p>
         <h1>{{ userStore.user?.nickname || userStore.user?.username || '未登录' }}</h1>
         <span>{{ userStore.isLogin ? userStore.roleText : '登录后可收藏家里的菜单' }}</span>
@@ -400,7 +423,18 @@ onMounted(() => {
           {{ pushState.subscribed ? '关闭' : '开启' }}
         </van-button>
       </div>
-      <van-button plain round type="danger" block @click="logout">退出登录</van-button>
+      <van-button
+        v-if="userStore.isLogin"
+        plain
+        round
+        type="danger"
+        block
+        :loading="loggingOut"
+        :disabled="loggingOut"
+        @click="logout"
+      >
+        退出登录
+      </van-button>
     </section>
     </div>
 
@@ -570,9 +604,7 @@ onMounted(() => {
 }
 
 .profile-page--fill {
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
+  min-height: 100%;
 }
 
 .profile-page-top {
@@ -593,9 +625,13 @@ onMounted(() => {
 
 .profile-card {
   display: grid;
-  grid-template-columns: 58px 1fr;
+  grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+.profile-card-main {
+  min-width: 0;
 }
 
 .avatar {
@@ -745,8 +781,9 @@ h2 {
 }
 
 .member-panel {
-  flex: 1;
-  min-height: 0;
+  flex: 0 1 auto;
+  max-height: min(58vh, 520px);
+  min-height: 220px;
   display: flex;
   flex-direction: column;
   padding: 18px 16px 16px;

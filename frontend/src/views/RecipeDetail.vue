@@ -1,10 +1,10 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { closeToast, showFailToast, showSuccessToast } from 'vant'
+import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
 import { pageIngredient } from '../api/ingredient'
-import { getRecipeDetail } from '../api/recipe'
+import { deleteRecipe, getRecipeDetail } from '../api/recipe'
 import { pageSeasoning } from '../api/seasoning'
 import RecipeDetail from '../components/RecipeDetail.vue'
 import { useUserStore } from '../stores/user'
@@ -130,6 +130,21 @@ async function toggleFavoriteSafe() {
     favoritePending.value = false
   }
 }
+
+async function removeRecipe() {
+  const name = detail.value.recipe?.recipeName || '这道菜'
+  try {
+    await showConfirmDialog({
+      title: '删除菜谱',
+      message: `确认删除「${name}」吗？删除后无法恢复。`,
+    })
+    await deleteRecipe(route.params.id)
+    showSuccessToast('菜谱已删除')
+    router.replace('/')
+  } catch (error) {
+    if (error?.message) showFailToast(error.message)
+  }
+}
 </script>
 
 <template>
@@ -148,6 +163,7 @@ async function toggleFavoriteSafe() {
         @back="router.back()"
         @favorite="toggleFavoriteSafe"
         @edit="router.push(`/recipe/${route.params.id}/edit`)"
+        @delete="removeRecipe"
       />
     </main>
   </div>

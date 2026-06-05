@@ -1,5 +1,22 @@
 import { getPushStatus, subscribePush, unsubscribePush } from '../api/push'
 
+const SW_READY_TIMEOUT_MS = 2500
+const SW_REG_TIMEOUT_MS = 1500
+
+function withTimeout(promise, ms, fallback = undefined) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      window.setTimeout(() => resolve(fallback), ms)
+    }),
+  ])
+}
+
+async function getServiceWorkerRegistration() {
+  if (!isPushSupported()) return null
+  return withTimeout(navigator.serviceWorker.getRegistration('/'), SW_REG_TIMEOUT_MS, null)
+}
+
 export function isPushSupported() {
   return typeof window !== 'undefined'
     && 'serviceWorker' in navigator
@@ -43,9 +60,9 @@ export async function loadPushState() {
   }
 
   try {
-    await navigator.serviceWorker.ready
-    const registration = await navigator.serviceWorker.getRegistration('/')
-    const subscription = await registration?.pushManager.getSubscription()
+    await withTimeout(navigator.serviceWorker.ready, SW_READY_TIMEOUT_MS)
+    const registration = await getServiceWorkerRegistration()
+    const subscription = await registration?.pushManager?.getSubscription?.()
     // 服务端记录为准；iOS 上 getSubscription 有时为空但推送仍有效
     state.subscribed = state.subscribed || Boolean(subscription)
   } catch (error) {
@@ -90,20 +107,42 @@ export async function enablePushNotification() {
   return loadPushState()
 }
 
+/** 退出登录时调用：带超时，不等待 loadPushState，避免 iOS PWA 卡住 */
+export async function teardownPushOnLogout() {
+  if (!isPushSupported()) return
+
+  const registration = await getServiceWorkerRegistration()
+  const subscription = registration
+    ? await withTimeout(registration.pushManager.getSubscription(), SW_REG_TIMEOUT_MS, null)
+    : null
+  const payload = subscription ? subscriptionToPayload(subscription) : {}
+
+  if (payload.endpoint) {
+    await withTimeout(unsubscribePush(payload), 3000).catch(() => {})
+  }
+  if (subscription) {
+    await withTimeout(subscription.unsubscribe(), 2000).catch(() => {})
+  }
+}
+
 export async function disablePushNotification() {
   if (!isPushSupported()) {
     return loadPushState()
   }
 
-  const registration = await navigator.serviceWorker.getRegistration('/')
-  const subscription = await registration?.pushManager.getSubscription()
+  const registration = await getServiceWorkerRegistration()
+  const subscription = registration
+    ? await registration.pushManager.getSubscription()
+    : null
   const payload = subscription ? subscriptionToPayload(subscription) : {}
 
   try {
-    await unsubscribePush(payload)
+    await withTimeout(unsubscribePush(payload), 8000)
+  } catch (error) {
+    // 服务端失败时仍尝试本地退订
   } finally {
     if (subscription) {
-      await subscription.unsubscribe()
+      await withTimeout(subscription.unsubscribe(), 2000).catch(() => {})
     }
   }
 
@@ -111,12 +150,12 @@ export async function disablePushNotification() {
 }
 
 async function ensureServiceWorkerRegistration() {
-  let registration = await navigator.serviceWorker.getRegistration('/')
+  let registration = await getServiceWorkerRegistration()
   if (!registration) {
     registration = await navigator.serviceWorker.register('/sw.js')
   }
-  await navigator.serviceWorker.ready
-  return registration
+  await withTimeout(navigator.serviceWorker.ready, SW_READY_TIMEOUT_MS)
+  return registration || await getServiceWorkerRegistration()
 }
 
 function subscriptionToPayload(subscription) {

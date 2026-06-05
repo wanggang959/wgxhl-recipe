@@ -19,7 +19,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['back', 'favorite', 'edit'])
+const emit = defineEmits(['back', 'favorite', 'edit', 'delete'])
 
 const recipe = computed(() => props.detail.recipe || {})
 const cover = computed(() => getRecipeImage(recipe.value.coverImage))
@@ -50,9 +50,14 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
     <section class="summary">
       <div class="title-line">
         <h1>{{ recipe.recipeName }}</h1>
-        <van-button v-if="canEdit" round size="small" type="warning" icon="edit" @click="emit('edit')">
-          编辑
-        </van-button>
+        <div v-if="canEdit" class="title-actions">
+          <van-button round size="small" type="warning" icon="edit" @click="emit('edit')">
+            编辑
+          </van-button>
+          <van-button round size="small" plain type="danger" icon="delete-o" @click="emit('delete')">
+            删除
+          </van-button>
+        </div>
       </div>
       <p v-if="recipe.recipeDesc">{{ recipe.recipeDesc }}</p>
       <div class="meta-grid">
@@ -223,6 +228,14 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.title-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 h1 {

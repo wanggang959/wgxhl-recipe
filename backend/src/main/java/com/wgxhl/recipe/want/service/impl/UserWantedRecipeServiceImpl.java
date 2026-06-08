@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.common.AppZoneDates;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
@@ -75,7 +76,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
         if (!StringUtils.hasText(userId)) {
             return ApiResponse.success(java.util.Collections.emptyList());
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppZoneDates.today();
         List<LocalDate> dates = lambdaQuery()
                 .eq(UserWantedRecipe::getUserId, userId)
                 .ge(UserWantedRecipe::getPlannedDate, today)
@@ -173,7 +174,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
         if (!StringUtils.hasText(userId) || !StringUtils.hasText(recipeId)) {
             return ApiResponse.success(false);
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppZoneDates.today();
         boolean exists = lambdaQuery()
                 .eq(UserWantedRecipe::getUserId, userId)
                 .eq(UserWantedRecipe::getRecipeId, recipeId)
@@ -184,7 +185,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
 
     @Override
     public int purgeExpiredBeforeToday() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppZoneDates.today();
         long count = lambdaQuery()
                 .lt(UserWantedRecipe::getPlannedDate, today)
                 .count();
@@ -273,7 +274,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
         if (!StringUtils.hasText(userId)) {
             return null;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppZoneDates.today();
         List<UserWantedRecipe> futureList = lambdaQuery()
                 .eq(UserWantedRecipe::getUserId, userId)
                 .ge(UserWantedRecipe::getPlannedDate, today)
@@ -297,7 +298,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
     }
 
     private String dayLabel(LocalDate plannedDate) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppZoneDates.today();
         if (plannedDate.equals(today)) {
             return "今天";
         }

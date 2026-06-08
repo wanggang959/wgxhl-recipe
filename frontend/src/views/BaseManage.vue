@@ -50,6 +50,8 @@ const seasoningForm = reactive({
 
 const editingIngredientId = ref('')
 const editingSeasoningId = ref('')
+const ingredientKeyword = ref('')
+const seasoningKeyword = ref('')
 
 const editingIngredientForm = reactive({
   id: '',
@@ -239,13 +241,41 @@ async function loadCategory() {
 }
 
 async function loadIngredient() {
-  const res = await pageIngredient({ current: 1, size: 200 })
+  const keyword = ingredientKeyword.value.trim()
+  const res = await pageIngredient({
+    current: 1,
+    size: 200,
+    ...(keyword ? { ingredientName: keyword } : {}),
+  })
   ingredientList.value = res.data.records || []
 }
 
 async function loadSeasoning() {
-  const res = await pageSeasoning({ current: 1, size: 200 })
+  const keyword = seasoningKeyword.value.trim()
+  const res = await pageSeasoning({
+    current: 1,
+    size: 200,
+    ...(keyword ? { seasoningName: keyword } : {}),
+  })
   seasoningList.value = res.data.records || []
+}
+
+async function searchIngredient() {
+  await loadIngredient()
+}
+
+async function searchSeasoning() {
+  await loadSeasoning()
+}
+
+async function clearIngredientSearch() {
+  ingredientKeyword.value = ''
+  await loadIngredient()
+}
+
+async function clearSeasoningSearch() {
+  seasoningKeyword.value = ''
+  await loadSeasoning()
 }
 
 async function saveCategory() {
@@ -419,6 +449,15 @@ if (userStore.isAdmin) {
               <van-button size="small" @click="resetIngredientForm">清空</van-button>
             </div>
           </div>
+          <form class="search-card" @submit.prevent="searchIngredient">
+            <van-icon name="search" size="18" />
+            <input v-model="ingredientKeyword" placeholder="搜索食材名称" />
+            <button v-if="ingredientKeyword" type="button" @click="clearIngredientSearch">清空</button>
+            <button v-else type="submit">搜索</button>
+          </form>
+          <div v-if="ingredientKeyword && ingredientList.length === 0" class="search-empty">
+            没有找到「{{ ingredientKeyword }}」相关食材
+          </div>
           <div class="ingredient-list">
             <article v-for="item in ingredientList" :key="item.id" class="ingredient-card">
               <img
@@ -473,6 +512,15 @@ if (userStore.isAdmin) {
               <van-button type="warning" size="small" @click="saveSeasoning">新增</van-button>
               <van-button size="small" @click="resetSeasoningForm">清空</van-button>
             </div>
+          </div>
+          <form class="search-card" @submit.prevent="searchSeasoning">
+            <van-icon name="search" size="18" />
+            <input v-model="seasoningKeyword" placeholder="搜索调料名称" />
+            <button v-if="seasoningKeyword" type="button" @click="clearSeasoningSearch">清空</button>
+            <button v-else type="submit">搜索</button>
+          </form>
+          <div v-if="seasoningKeyword && seasoningList.length === 0" class="search-empty">
+            没有找到「{{ seasoningKeyword }}」相关调料
           </div>
           <div class="ingredient-list">
             <article v-for="item in seasoningList" :key="item.id" class="ingredient-card">
@@ -596,6 +644,52 @@ if (userStore.isAdmin) {
 .cell-actions {
   display: flex;
   gap: 6px;
+}
+
+.search-card {
+  margin: 0 12px 10px;
+  height: 48px;
+  padding: 0 8px 0 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(154, 52, 18, 0.07);
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-primary);
+}
+
+.search-card input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--app-text);
+  font-size: 14px;
+  background: transparent;
+}
+
+.search-card button {
+  width: 64px;
+  min-width: 64px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--app-primary-soft);
+  color: #c2410c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.search-empty {
+  margin: 0 12px 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  text-align: center;
 }
 
 .ingredient-list {

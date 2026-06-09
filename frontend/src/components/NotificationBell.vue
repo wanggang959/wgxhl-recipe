@@ -137,12 +137,18 @@ async function openNotice(item) {
 .bell-button {
   width: 36px;
   height: 36px;
+  min-width: 36px;
   border: 1px solid var(--app-border);
   border-radius: 50%;
+  padding: 0;
   background: #fff;
   color: var(--app-primary);
-  display: grid;
+  display: inline-grid;
   place-items: center;
+  line-height: 1;
+  vertical-align: middle;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .notice-layer {
@@ -157,6 +163,7 @@ async function openNotice(item) {
 }
 
 .notice-panel {
+  position: relative;
   width: min(100vw, var(--app-shell-width));
   height: min(78dvh, 620px);
   max-height: calc(100dvh - 28px - var(--safe-area-top));
@@ -179,6 +186,7 @@ async function openNotice(item) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
+  padding-right: 52px;
 }
 
 .notice-title span,
@@ -207,14 +215,29 @@ async function openNotice(item) {
 }
 
 .close-button {
-  width: 36px;
-  height: 36px;
+  position: absolute;
+  top: 18px;
+  right: 14px;
+  width: 42px;
+  height: 42px;
   border: 1px solid rgba(249, 115, 22, 0.16);
   border-radius: 50%;
+  padding: 0;
   background: #fff;
   color: var(--app-primary);
-  display: grid;
+  display: inline-grid;
   place-items: center;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: 0 10px 20px rgba(154, 52, 18, 0.08);
+}
+
+.close-button :deep(.van-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .notice-toolbar {

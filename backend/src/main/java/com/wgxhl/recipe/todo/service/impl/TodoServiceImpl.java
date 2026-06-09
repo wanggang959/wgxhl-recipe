@@ -409,43 +409,75 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (owners.isEmpty()) {
             owners = Collections.singletonList(null);
         }
+        log.info("Todo notify start, todoId={}, title={}, ruleId={}, targetTime={}, owners={}, notifySite={}, notifyEmail={}, notifyPush={}",
+                todo.getId(), todo.getTitle(), rule.getId(), targetTime, owners.size(),
+                todo.getNotifySite(), todo.getNotifyEmail(), todo.getNotifyPush());
         for (AppUser owner : owners) {
-            if (Boolean.TRUE.equals(todo.getNotifySite()) && allowNotify(owner, NOTICE_SITE)) {
+            if (!Boolean.TRUE.equals(todo.getNotifySite())) {
+                log.info("Todo site notice skipped, todoId={}, owner={}, reason=disabled", todo.getId(), ownerLabel(owner));
+            } else if (!allowNotify(owner, NOTICE_SITE)) {
+                log.info("Todo site notice skipped, todoId={}, owner={}, preference={}, reason=preference",
+                        todo.getId(), ownerLabel(owner), owner == null ? null : owner.getNotificationPreference());
+            } else {
                 String userId = owner == null ? null : owner.getId();
                 notificationService.createSiteNotice(userId, todo.getTitle(), content, "TODO", todo.getId());
                 logSend(todo, rule, NOTICE_SITE, "SUCCESS", null);
+                log.info("Todo site notice sent, todoId={}, owner={}, userId={}", todo.getId(), ownerLabel(owner), userId);
                 sent++;
             }
-            if (Boolean.TRUE.equals(todo.getNotifyEmail()) && allowNotify(owner, NOTICE_EMAIL)) {
+
+            if (!Boolean.TRUE.equals(todo.getNotifyEmail())) {
+                log.info("Todo email skipped, todoId={}, owner={}, reason=disabled", todo.getId(), ownerLabel(owner));
+            } else if (!allowNotify(owner, NOTICE_EMAIL)) {
+                log.info("Todo email skipped, todoId={}, owner={}, preference={}, reason=preference",
+                        todo.getId(), ownerLabel(owner), owner == null ? null : owner.getNotificationPreference());
+            } else {
                 try {
                     sendEmail(owner, title, content);
                     logSend(todo, rule, NOTICE_EMAIL, "SUCCESS", null);
+                    log.info("Todo email sent, todoId={}, owner={}, to={}", todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()));
                     sent++;
                 } catch (Exception ex) {
-                    log.warn("Send todo email failed, todoId={}", todo.getId(), ex);
+                    log.warn("Todo email failed, todoId={}, owner={}, to={}, reason={}",
+                            todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()), ex.getMessage(), ex);
                     logSend(todo, rule, NOTICE_EMAIL, "FAIL", ex.getMessage());
                 }
             }
         }
-        if (Boolean.TRUE.equals(todo.getNotifyPush())) {
+        if (!Boolean.TRUE.equals(todo.getNotifyPush())) {
+            log.info("Todo push skipped, todoId={}, reason=disabled", todo.getId());
+        } else {
             List<String> pushUserIds = owners.stream()
                     .filter(owner -> allowNotify(owner, NOTICE_PUSH))
                     .map(owner -> owner == null ? null : owner.getId())
                     .filter(StringUtils::hasText)
                     .distinct()
                     .collect(Collectors.toList());
-            int delivered = userPushSubscriptionService.sendToUserIds(
-                    pushUserIds,
-                    todo.getTitle(),
-                    content,
-                    "/#/todo/" + todo.getId(),
-                    "todo-" + todo.getId() + "-" + rule.getId()
-            );
-            if (delivered > 0) {
-                logSend(todo, rule, NOTICE_PUSH, "SUCCESS", "delivered=" + delivered);
-                sent += delivered;
+            List<String> skippedPushOwners = owners.stream()
+                    .filter(owner -> !allowNotify(owner, NOTICE_PUSH))
+                    .map(this::ownerLabel)
+                    .collect(Collectors.toList());
+            if (!skippedPushOwners.isEmpty()) {
+                log.info("Todo push preference skipped, todoId={}, owners={}", todo.getId(), skippedPushOwners);
+            }
+            if (pushUserIds.isEmpty()) {
+                log.info("Todo push skipped, todoId={}, reason=no_allowed_owner", todo.getId());
             } else {
-                logSend(todo, rule, NOTICE_PUSH, "SKIP", "客户端未开启PWA通知或服务端未配置");
+                int delivered = userPushSubscriptionService.sendToUserIds(
+                        pushUserIds,
+                        todo.getTitle(),
+                        content,
+                        "/#/todo/" + todo.getId(),
+                        "todo-" + todo.getId() + "-" + rule.getId()
+                );
+                if (delivered > 0) {
+                    logSend(todo, rule, NOTICE_PUSH, "SUCCESS", "delivered=" + delivered);
+                    log.info("Todo push sent, todoId={}, targetUserIds={}, delivered={}", todo.getId(), pushUserIds, delivered);
+                    sent += delivered;
+                } else {
+                    logSend(todo, rule, NOTICE_PUSH, "SKIP", "客户端未开启PWA通知或服务端未配置");
+                    log.info("Todo push skipped, todoId={}, targetUserIds={}, delivered=0", todo.getId(), pushUserIds);
+                }
             }
         }
         if (sent == 0
@@ -455,6 +487,25 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             logSend(todo, rule, "none", "SKIP", "未开启通知方式");
         }
         return sent;
+    }
+
+    private String ownerLabel(AppUser owner) {
+        if (owner == null) {
+            return "none";
+        }
+        String name = StringUtils.hasText(owner.getNickname()) ? owner.getNickname() : owner.getUsername();
+        return StringUtils.hasText(name) ? owner.getId() + "(" + name + ")" : owner.getId();
+    }
+
+    private String maskEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return "none";
+        }
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***" + (atIndex >= 0 ? email.substring(atIndex) : "");
+        }
+        return email.charAt(0) + "***" + email.substring(atIndex);
     }
 
     private void sendEmail(AppUser owner, String title, String content) {
@@ -510,7 +561,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         return todoSendLogMapper.selectCount(new LambdaQueryWrapper<TodoSendLog>()
                 .eq(TodoSendLog::getTodoId, todoId)
                 .eq(TodoSendLog::getRuleId, ruleId)
-                .ne(TodoSendLog::getSendStatus, "FAIL")
+                .eq(TodoSendLog::getSendStatus, "SUCCESS")
                 .ge(TodoSendLog::getSendTime, targetTime)) > 0;
     }
 

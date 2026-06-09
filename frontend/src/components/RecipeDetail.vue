@@ -186,13 +186,15 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
   height: 38px;
   border: 0;
   border-radius: 50%;
+  padding: 0;
   background: rgba(47, 38, 31, 0.38);
   color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
   line-height: 1;
   overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
   backdrop-filter: blur(10px);
 }
 
@@ -239,6 +241,14 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.title-actions :deep(.van-button) {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 h1 {
@@ -449,5 +459,17 @@ h2 {
   color: #7c5c46;
   line-height: 1.7;
   white-space: pre-wrap;
+}
+
+@media (max-width: 430px) {
+  .title-line {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .title-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>

@@ -158,7 +158,7 @@ function applyIosSafeAreaFallback() {
   if (!looksLikeProMax) return
 
   const root = document.documentElement
-  root.style.setProperty('--ios-safe-area-top-fallback', '47px')
+  root.style.setProperty('--ios-safe-area-top-fallback', '59px')
   root.style.setProperty('--ios-safe-area-bottom-fallback', '34px')
 }
 

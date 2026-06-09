@@ -220,14 +220,19 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
             return ApiResponse.fail(401, "请先登录");
         }
         if (dto == null || dto.getTargetUserIds() == null || dto.getTargetUserIds().isEmpty()) {
+            log.info("Wanted recipe notify skipped, actor={}, reason=no_target_user", actor.getId());
             return ApiResponse.fail("请选择要通知的家人");
         }
 
         NotifyTarget target = resolveNotifyTarget(actor.getId(), actor);
         if (target == null) {
+            log.info("Wanted recipe notify skipped, actor={}, targetUserIds={}, reason=no_wanted_recipe",
+                    actor.getId(), dto.getTargetUserIds());
             return ApiResponse.fail("还没有可通知的想吃菜单");
         }
 
+        log.info("Wanted recipe notify sending, actor={}, targetUserIds={}, plannedDate={}",
+                actor.getId(), dto.getTargetUserIds(), target.plannedDate);
         int delivered = userPushSubscriptionService.sendToUserIds(
                 dto.getTargetUserIds(),
                 "备菜提醒",
@@ -236,8 +241,12 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
                 "prepare-" + target.plannedDate
         );
         if (delivered <= 0) {
+            log.info("Wanted recipe notify failed, actor={}, targetUserIds={}, plannedDate={}, delivered=0",
+                    actor.getId(), dto.getTargetUserIds(), target.plannedDate);
             return ApiResponse.fail("对方尚未开启手机通知，或未选择有效用户");
         }
+        log.info("Wanted recipe notify sent, actor={}, targetUserIds={}, plannedDate={}, delivered={}",
+                actor.getId(), dto.getTargetUserIds(), target.plannedDate, delivered);
         return ApiResponse.success("已发送通知", delivered);
     }
 

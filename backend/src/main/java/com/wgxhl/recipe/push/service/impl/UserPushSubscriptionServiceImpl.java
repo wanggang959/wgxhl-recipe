@@ -46,6 +46,7 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
     @PostConstruct
     public void initPushService() {
         if (!isConfigured()) {
+            log.info("Web Push delivery disabled, VAPID public/private key is not configured.");
             return;
         }
         try {
@@ -54,6 +55,8 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
                     pushProperties.getVapid().getPrivateKey(),
                     pushProperties.getVapid().getSubject()
             );
+            log.info("Web Push delivery initialized, subject={}, ttlSeconds={}",
+                    pushProperties.getVapid().getSubject(), pushProperties.getTtlSeconds());
         } catch (Exception ex) {
             pushService = null;
             log.warn("Web Push VAPID config is invalid, push delivery disabled.", ex);
@@ -136,7 +139,14 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
 
     @Override
     public int sendToUserIds(List<String> targetUserIds, String title, String body, String url, String tag) {
-        if (pushService == null || targetUserIds == null || targetUserIds.isEmpty()) {
+        log.info("Web Push send requested, rawTargets={}, title={}, tag={}, configured={}",
+                targetUserIds == null ? 0 : targetUserIds.size(), title, tag, pushService != null);
+        if (pushService == null) {
+            log.info("Web Push send skipped, reason=not_configured_or_invalid_vapid");
+            return 0;
+        }
+        if (targetUserIds == null || targetUserIds.isEmpty()) {
+            log.info("Web Push send skipped, reason=no_target_user");
             return 0;
         }
         List<String> userIds = targetUserIds.stream()
@@ -144,6 +154,7 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
                 .distinct()
                 .collect(java.util.stream.Collectors.toList());
         if (userIds.isEmpty()) {
+            log.info("Web Push send skipped, reason=no_valid_target_user");
             return 0;
         }
 
@@ -152,9 +163,11 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
                 .eq(UserPushSubscription::getEnabled, true)
                 .list();
         if (subscriptions.isEmpty()) {
+            log.info("Web Push send skipped, targetUserIds={}, reason=no_enabled_subscription", userIds);
             return 0;
         }
 
+        log.info("Web Push sending, targetUserIds={}, subscriptionCount={}", userIds, subscriptions.size());
         Map<String, Object> payload = buildPushPayload(title, body, url, tag);
         int delivered = 0;
         for (UserPushSubscription subscription : subscriptions) {
@@ -162,6 +175,8 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
                 delivered++;
             }
         }
+        log.info("Web Push send finished, targetUserIds={}, subscriptionCount={}, delivered={}",
+                userIds, subscriptions.size(), delivered);
         return delivered;
     }
 
@@ -214,6 +229,7 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
                         code, endpointHost(subscription.getEndpoint()));
                 return false;
             }
+            log.info("Web Push delivered, userId={}, host={}", subscription.getUserId(), endpointHost(subscription.getEndpoint()));
             return true;
         } catch (Exception ex) {
             log.warn("Web Push delivery failed, host={}", endpointHost(subscription.getEndpoint()), ex);

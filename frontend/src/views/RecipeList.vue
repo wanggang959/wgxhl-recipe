@@ -520,7 +520,9 @@ function submitCustomWantDate() {
         <button type="button" :class="{ active: wantedMap[suggestRecipe.id] }" @click="openWantAction(suggestRecipe)">
           <ActionIcon name="cart" :size="16" />
         </button>
-        <van-icon name="arrow" size="18" />
+        <button type="button" class="detail-action" aria-label="查看详情" @click="openDetail(suggestRecipe)">
+          <van-icon name="arrow" size="18" />
+        </button>
       </div>
     </section>
 
@@ -1072,15 +1074,14 @@ function submitCustomWantDate() {
 }
 
 .today-card {
-  position: relative;
   min-height: 86px;
-  padding: 10px 104px 10px 10px;
+  padding: 10px;
   border-radius: 18px;
   background: #fff;
   border: 1px solid var(--app-border);
   box-shadow: 0 12px 26px rgba(154, 52, 18, 0.08);
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
 }
@@ -1112,36 +1113,39 @@ function submitCustomWantDate() {
 }
 
 .today-card-actions {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  width: 84px;
-  transform: translateY(-50%);
+  width: 98px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 7px;
+  gap: 6px;
   color: #9b7d66;
 }
 
 .today-card-actions button {
+  flex: 0 0 30px;
   width: 30px;
   height: 30px;
   border: 1px solid var(--app-border);
   border-radius: 50%;
+  padding: 0;
   background: #fffaf2;
   color: #9b7d66;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
   line-height: 1;
   overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .today-card-actions button.active {
   color: #f97316;
   background: #fff7e8;
   border-color: #fed7aa;
+}
+
+.today-card-actions .detail-action {
+  color: #9b7d66;
 }
 
 .list-head {

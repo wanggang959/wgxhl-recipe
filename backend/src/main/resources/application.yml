@@ -8,10 +8,10 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
   mail:
-    host: ${MAIL_HOST:smtp.qq.com}
+    host: ${MAIL_HOST:}
     port: ${MAIL_PORT:465}
-    username: ${MAIL_USERNAME:2326488943@qq.com}
-    password: ${MAIL_PASSWORD:zgzjffpidesmdidi}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     protocol: smtps
     properties:
       mail:
@@ -35,12 +35,12 @@ mybatis-plus:
 
 auth:
   jwt:
-    secret: ${JWT_SECRET:wgxhl-recipe-secret-key}
+    secret: ${JWT_SECRET:}
     expire-hours: ${JWT_EXPIRE_HOURS:168}
 
 push:
   vapid:
     public-key: ${PUSH_VAPID_PUBLIC_KEY:}
     private-key: ${PUSH_VAPID_PRIVATE_KEY:}
-    subject: ${PUSH_VAPID_SUBJECT:mailto:admin@wgxhl.space}
+    subject: ${PUSH_VAPID_SUBJECT:}
   ttl-seconds: ${PUSH_TTL_SECONDS:604800}

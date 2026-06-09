@@ -1,9 +1,15 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://wgxhl.space:3306/recipe?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-    username: recipe
-    password: 123456
+    url: jdbc:mysql://localhost:3306/recipe?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: your-db-user
+    password: your-db-password
+
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:your-email@qq.com}
+    password: ${MAIL_PASSWORD:your-mail-auth-code}
 
 cos:
   secret-id: ${COS_SECRET_ID:your-secret-id}
@@ -12,8 +18,13 @@ cos:
   bucket: ${COS_BUCKET:your-bucket-name}
   base-url: ${COS_BASE_URL:https://your-bucket-name.cos.ap-guangzhou.myqcloud.com}
 
+auth:
+  jwt:
+    secret: ${JWT_SECRET:your-local-jwt-secret}
+    expire-hours: ${JWT_EXPIRE_HOURS:168}
+
 push:
   vapid:
-    public-key: ${PUSH_VAPID_PUBLIC_KEY:}
-    private-key: ${PUSH_VAPID_PRIVATE_KEY:}
-    subject: ${PUSH_VAPID_SUBJECT:mailto:admin@wgxhl.space}
+    public-key: ${PUSH_VAPID_PUBLIC_KEY:your-vapid-public-key}
+    private-key: ${PUSH_VAPID_PRIVATE_KEY:your-vapid-private-key}
+    subject: ${PUSH_VAPID_SUBJECT:mailto:admin@example.com}

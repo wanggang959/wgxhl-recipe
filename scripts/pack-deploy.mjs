@@ -15,6 +15,24 @@ const backendJarSrc = path.join(root, 'backend', 'target', backendJarName)
 const backendJarDest = path.join(root, 'deploy', 'backend', backendJarName)
 const frontendDistSrc = path.join(root, 'frontend', 'dist')
 const frontendDistDest = path.join(root, 'deploy', 'frontend', 'dist')
+const localJavaRoot = 'D:\\software\\java'
+const localJavaHome = path.join(localJavaRoot, 'jdk8')
+const localMavenHome = path.join(localJavaRoot, 'maven')
+
+function setupLocalBuildTools() {
+  const binDirs = []
+  if (fs.existsSync(path.join(localJavaHome, 'bin', 'java.exe'))) {
+    process.env.JAVA_HOME = process.env.JAVA_HOME || localJavaHome
+    binDirs.push(path.join(localJavaHome, 'bin'))
+  }
+  if (fs.existsSync(path.join(localMavenHome, 'bin', 'mvn.cmd'))) {
+    process.env.MAVEN_HOME = process.env.MAVEN_HOME || localMavenHome
+    binDirs.push(path.join(localMavenHome, 'bin'))
+  }
+  if (binDirs.length > 0) {
+    process.env.PATH = `${binDirs.join(path.delimiter)}${path.delimiter}${process.env.PATH || ''}`
+  }
+}
 
 function run(cmd, cwd) {
   console.log(`> ${cmd}`)
@@ -30,6 +48,8 @@ function copyDir(src, dest) {
   fs.rmSync(dest, { recursive: true, force: true })
   fs.cpSync(src, dest, { recursive: true })
 }
+
+setupLocalBuildTools()
 
 console.log('\n[1/4] 打包后端...')
 run('mvn clean package -DskipTests', path.join(root, 'backend'))

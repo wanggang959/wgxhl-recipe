@@ -40,7 +40,12 @@ const isTodayMode = computed(() => route.query.pick === 'today')
       class="page-wrap content"
       :class="{ 'showcase-content': isShowcase, 'profile-shell': route.path === '/profile' && userStore.isAdmin }"
     >
-      <router-view />
+      <router-view v-slot="{ Component, route: viewRoute }">
+        <keep-alive>
+          <component :is="Component" v-if="viewRoute.meta.keepAlive" :key="viewRoute.name" />
+        </keep-alive>
+        <component :is="Component" v-if="!viewRoute.meta.keepAlive" :key="viewRoute.fullPath" />
+      </router-view>
     </main>
 
     <BottomNav v-if="!isShowcase" />

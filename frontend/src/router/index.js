@@ -18,21 +18,25 @@ const routes = [
         path: '/recipes',
         name: 'RecipeList',
         component: () => import('../views/RecipeList.vue'),
+        meta: { keepAlive: true },
       },
       {
         path: '/favorites',
         name: 'FavoriteList',
         component: () => import('../views/FavoriteList.vue'),
+        meta: { keepAlive: true },
       },
       {
         path: '/want',
         name: 'WantList',
         component: () => import('../views/WantList.vue'),
+        meta: { keepAlive: true },
       },
       {
         path: '/todo',
         name: 'TodoList',
         component: () => import('../views/TodoList.vue'),
+        meta: { keepAlive: true },
       },
       {
         path: '/todo/create',
@@ -58,6 +62,7 @@ const routes = [
         path: '/profile',
         name: 'Profile',
         component: () => import('../views/ProfileView.vue'),
+        meta: { keepAlive: true },
       },
     ],
   },

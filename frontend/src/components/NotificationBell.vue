@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import {
+  deleteNotification,
   deleteReadNotifications,
   markAllNotificationRead,
   markNotificationRead,
@@ -17,12 +18,66 @@ const unread = ref(0)
 const items = ref([])
 const loading = ref(false)
 
+const NOTICE_DIALOG_OPTIONS = {
+  teleport: 'body',
+  overlayClass: 'notice-dialog-overlay',
+  className: 'notice-dialog-panel',
+}
+
 const noticeSummary = computed(() => (unread.value > 0 ? `${unread.value} 条未读` : '暂无未读'))
 const hasRead = computed(() => items.value.some((item) => item.isRead))
+
+let bodyScrollLockCount = 0
+let lockedScrollY = 0
 
 onMounted(() => {
   refreshUnread()
 })
+
+onUnmounted(() => {
+  unlockBodyScroll()
+})
+
+watch(visible, (open) => {
+  if (open) {
+    lockBodyScroll()
+  } else {
+    unlockBodyScroll()
+  }
+})
+
+function lockBodyScroll() {
+  if (bodyScrollLockCount === 0) {
+    lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${lockedScrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+  }
+  bodyScrollLockCount += 1
+}
+
+function unlockBodyScroll() {
+  if (bodyScrollLockCount === 0) return
+  bodyScrollLockCount -= 1
+  if (bodyScrollLockCount > 0) return
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.left = ''
+  document.body.style.right = ''
+  document.body.style.overflow = ''
+  document.documentElement.style.overflow = ''
+  window.scrollTo(0, lockedScrollY)
+}
+
+function showNoticeConfirm(options) {
+  return showConfirmDialog({
+    ...NOTICE_DIALOG_OPTIONS,
+    ...options,
+  })
+}
 
 async function refreshUnread() {
   try {
@@ -65,13 +120,30 @@ async function markAll() {
 async function removeRead() {
   if (!hasRead.value) return
   try {
-    await showConfirmDialog({
+    await showNoticeConfirm({
       title: '删除已读',
       message: '确认删除所有已读消息吗？未读消息会保留。',
     })
     await deleteReadNotifications()
+    items.value = items.value.filter((item) => !item.isRead)
     showSuccessToast({ message: '已删除已读消息', duration: 1400 })
-    await loadList()
+  } catch (error) {
+    if (error?.message) showFailToast(error.message || '删除失败')
+  }
+}
+
+async function removeOne(item) {
+  try {
+    await showNoticeConfirm({
+      title: '删除消息',
+      message: `确认删除「${item.title || '这条消息'}」吗？`,
+    })
+    await deleteNotification(item.id)
+    items.value = items.value.filter((notice) => notice.id !== item.id)
+    if (!item.isRead && unread.value > 0) {
+      unread.value -= 1
+    }
+    showSuccessToast({ message: '已删除', duration: 1200 })
   } catch (error) {
     if (error?.message) showFailToast(error.message || '删除失败')
   }
@@ -97,7 +169,7 @@ async function openNotice(item) {
 
   <Teleport to="body">
     <div v-if="visible" class="notice-layer" @click.self="visible = false">
-      <section class="notice-panel">
+      <section class="notice-panel" @click.stop>
         <header class="notice-header">
           <div class="notice-title">
             <span>家庭通知</span>
@@ -134,6 +206,7 @@ async function openNotice(item) {
             :readonly="!userStore.canMutate"
             @open="openNotice"
             @read="markRead"
+            @delete="removeOne"
           />
         </div>
       </section>
@@ -168,6 +241,8 @@ async function openNotice(item) {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  overflow: hidden;
+  touch-action: none;
 }
 
 .notice-panel {
@@ -186,6 +261,8 @@ async function openNotice(item) {
   box-shadow: 0 -18px 42px rgba(154, 52, 18, 0.18);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
 }
 
 .notice-header {
@@ -314,12 +391,25 @@ async function openNotice(item) {
 .notice-content {
   min-height: 0;
   flex: 1 1 auto;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 2px 0 4px;
 }
 
 .loading {
   margin-top: 42px;
+}
+</style>
+
+<style>
+.notice-dialog-overlay {
+  z-index: 4000 !important;
+}
+
+.notice-dialog-panel {
+  z-index: 4001 !important;
 }
 </style>

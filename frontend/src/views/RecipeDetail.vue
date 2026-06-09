@@ -8,6 +8,7 @@ import { deleteRecipe, getRecipeDetail } from '../api/recipe'
 import { pageSeasoning } from '../api/seasoning'
 import RecipeDetail from '../components/RecipeDetail.vue'
 import { useUserStore } from '../stores/user'
+import { DATA_SCOPE, markDataChanged, markDataStale } from '../utils/dataRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,10 +94,12 @@ async function toggleFavorite() {
       await deleteFavoriteByRecipeId(userStore.userId, route.params.id)
       showSuccessToast('已取消收藏')
       isFavorite.value = false
+      markDataStale(DATA_SCOPE.favorites)
     } else {
       await createFavorite({ userId: userStore.userId, recipeId: route.params.id })
       showSuccessToast('收藏成功')
       isFavorite.value = true
+      markDataStale(DATA_SCOPE.favorites)
     }
   } catch (error) {
     showFailToast(error.message || '收藏操作失败')
@@ -115,11 +118,13 @@ async function toggleFavoriteSafe() {
     if (isFavorite.value) {
       await deleteFavoriteByRecipeId(userStore.userId, route.params.id)
       isFavorite.value = false
+      markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '已取消收藏', duration: 1400 })
     } else {
       await createFavorite({ userId: userStore.userId, recipeId: route.params.id })
       isFavorite.value = true
+      markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '收藏成功', duration: 1400 })
     }
@@ -139,6 +144,7 @@ async function removeRecipe() {
       message: `确认删除「${name}」吗？删除后无法恢复。`,
     })
     await deleteRecipe(route.params.id)
+    markDataChanged([DATA_SCOPE.recipes, DATA_SCOPE.favorites, DATA_SCOPE.wanted, DATA_SCOPE.todos])
     showSuccessToast('菜谱已删除')
     router.replace('/')
   } catch (error) {

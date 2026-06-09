@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { deleteFavorite, pageFavorite } from '../api/favorite'
@@ -9,30 +9,61 @@ import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
 import { useUserStore } from '../stores/user'
+import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markDataStale, rememberDataVersions } from '../utils/dataRefresh'
+
+const CACHE_MAX_AGE = 60 * 1000
+const favoriteListCache = {
+  userId: '',
+  list: [],
+  wantedMap: {},
+  savedAt: 0,
+}
 
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
-const list = ref([])
-const wantedMap = ref({})
+const list = ref(favoriteListCache.userId === userStore.userId ? [...favoriteListCache.list] : [])
+const wantedMap = ref(favoriteListCache.userId === userStore.userId ? { ...favoriteListCache.wantedMap } : {})
 const wantedPendingMap = ref({})
 const wantActionVisible = ref(false)
 const wantDateVisible = ref(false)
 const wantTargetRecipe = ref(null)
 const customWantDate = ref('')
+const watchedDataScopes = [DATA_SCOPE.favorites, DATA_SCOPE.wanted, DATA_SCOPE.recipes]
+const seenDataVersions = {}
 
 const minWantDate = computed(() => formatDate(new Date()))
 
 onMounted(() => {
+  window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+  if (list.value.length > 0) {
+    if (hasDataChanged(watchedDataScopes, seenDataVersions) || isCacheStale()) {
+      loadFavorite({ keepExisting: true, silent: true })
+    }
+    return
+  }
   loadFavorite()
 })
 
-async function loadFavorite() {
+onActivated(() => {
+  if (list.value.length > 0 && (hasDataChanged(watchedDataScopes, seenDataVersions) || isCacheStale())) {
+    loadFavorite({ keepExisting: true, silent: true })
+  }
+})
+
+onBeforeUnmount(() => {
+  saveFavoriteCache()
+  window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+})
+
+async function loadFavorite(options = {}) {
   if (!userStore.userId) {
     list.value = []
+    saveFavoriteCache()
     return
   }
-  loading.value = true
+  const showLoading = !options.keepExisting && list.value.length === 0
+  if (showLoading) loading.value = true
   try {
     const res = await pageFavorite({
       current: 1,
@@ -46,11 +77,31 @@ async function loadFavorite() {
     }))
     list.value = await enrichFavoriteRecipes(favorites)
     await syncWantedState(list.value)
+    saveFavoriteCache()
+    rememberDataVersions(watchedDataScopes, seenDataVersions)
   } catch (error) {
-    showFailToast(error.message || '收藏加载失败')
+    if (!options.silent || list.value.length === 0) {
+      showFailToast(error.message || '收藏加载失败')
+    }
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
   }
+}
+
+function handleDataRefresh(event) {
+  if (!hasMatchingScope(event, watchedDataScopes)) return
+  loadFavorite({ keepExisting: list.value.length > 0, silent: true })
+}
+
+function isCacheStale() {
+  return !favoriteListCache.savedAt || Date.now() - favoriteListCache.savedAt > CACHE_MAX_AGE
+}
+
+function saveFavoriteCache() {
+  favoriteListCache.userId = userStore.userId || ''
+  favoriteListCache.list = [...list.value]
+  favoriteListCache.wantedMap = { ...wantedMap.value }
+  favoriteListCache.savedAt = Date.now()
 }
 
 async function enrichFavoriteRecipes(records) {
@@ -82,8 +133,10 @@ async function syncWantedState(records) {
 async function remove(item) {
   try {
     await deleteFavorite(item.favoriteId)
+    list.value = list.value.filter((entry) => entry.favoriteId !== item.favoriteId)
+    saveFavoriteCache()
+    markDataStale(DATA_SCOPE.favorites)
     showSuccessToast('已取消收藏')
-    await loadFavorite()
   } catch (error) {
     showFailToast(error.message || '操作失败')
   }
@@ -92,9 +145,11 @@ async function remove(item) {
 async function removeSafe(item) {
   try {
     await deleteFavorite(item.favoriteId)
+    list.value = list.value.filter((entry) => entry.favoriteId !== item.favoriteId)
+    saveFavoriteCache()
+    markDataStale(DATA_SCOPE.favorites)
     closeToast()
     showSuccessToast({ message: '已取消收藏', duration: 1400 })
-    await loadFavorite()
   } catch (error) {
     closeToast()
     showFailToast({ message: error.message || '操作失败', duration: 1800 })
@@ -148,9 +203,11 @@ async function addWantedByDate(plannedDate) {
       plannedDate,
     })
     wantedMap.value[recipe.id] = true
+    markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
     closeToast()
     showSuccessToast({ message: res.message || '已添加到想吃', duration: 1400 })
     closeWantPanels()
+    saveFavoriteCache()
   } catch (error) {
     closeToast()
     showFailToast({ message: error.message || '添加想吃失败', duration: 1800 })
@@ -184,7 +241,7 @@ function submitCustomWantDate() {
       button-text="去登录"
       @action="router.push('/profile')"
     />
-    <van-loading v-else-if="loading" size="24px" class="loading">加载中...</van-loading>
+    <van-loading v-else-if="loading && list.length === 0" size="24px" class="loading">加载中...</van-loading>
     <EmptyState
       v-else-if="list.length === 0"
       text="还没有收藏菜谱，先去菜单里挑一道吧"

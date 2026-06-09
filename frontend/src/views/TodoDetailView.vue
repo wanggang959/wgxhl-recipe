@@ -5,6 +5,7 @@ import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from '
 import { completeTodo, deleteTodo, getTodoDetail } from '../api/todo'
 import TodoDetail from '../components/TodoDetail.vue'
 import { useUserStore } from '../stores/user'
+import { markTodoRefreshRequired } from '../utils/todoRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,6 +39,7 @@ async function finish(item) {
         message: `确认完成「${item.title}」吗？生日提醒只能当天完成。`,
       })
       await completeTodo(route.params.id)
+      markTodoRefreshRequired()
       closeToast()
       showSuccessToast('已完成')
       await loadTodo()
@@ -64,6 +66,7 @@ async function remove() {
       message: `确认删除「${todo.value?.title || ''}」吗？`,
     })
     await deleteTodo(route.params.id)
+    markTodoRefreshRequired()
     showSuccessToast('已删除')
     router.replace('/todo')
   } catch (error) {

@@ -5,6 +5,7 @@ import { showFailToast, showSuccessToast } from 'vant'
 import { listMembers } from '../api/user'
 import { createTodo, getTodoDetail, updateTodo } from '../api/todo'
 import TodoForm from '../components/TodoForm.vue'
+import { markTodoRefreshRequired } from '../utils/todoRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,10 +62,12 @@ async function submit(payload) {
   try {
     if (isEdit.value) {
       await updateTodo(payload)
+      markTodoRefreshRequired()
       showSuccessToast(isNextCycle.value ? '已进入下一个周期' : '已保存')
       router.replace(`/todo/${route.params.id}`)
     } else {
       const res = await createTodo(payload)
+      markTodoRefreshRequired()
       showSuccessToast('已创建')
       router.replace(`/todo/${res.data.id}`)
     }

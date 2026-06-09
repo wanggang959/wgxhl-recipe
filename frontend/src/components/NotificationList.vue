@@ -10,7 +10,7 @@ defineProps({
   },
 })
 
-const emit = defineEmits(['open', 'read'])
+const emit = defineEmits(['open', 'read', 'delete'])
 
 function formatTime(value) {
   if (!value) return ''
@@ -26,30 +26,41 @@ function formatTime(value) {
       <span>新的家庭提醒会出现在这里</span>
     </div>
 
-    <button
+    <van-swipe-cell
       v-for="item in items"
       :key="item.id"
-      type="button"
-      class="notice-item"
-      :class="{ unread: !item.isRead }"
-      @click="emit('open', item)"
+      class="notice-swipe"
+      :disabled="readonly"
     >
-      <span class="notice-icon">
-        <van-icon name="volume-o" size="18" />
-      </span>
-      <span class="notice-body">
-        <span class="notice-row">
-          <strong>{{ item.title }}</strong>
-          <em v-if="!item.isRead">未读</em>
+      <button
+        type="button"
+        class="notice-item"
+        :class="{ unread: !item.isRead }"
+        @click="emit('open', item)"
+      >
+        <span class="notice-icon">
+          <van-icon name="volume-o" size="18" />
         </span>
-        <p>{{ item.content }}</p>
-        <span class="notice-meta">
-          <time>{{ formatTime(item.createTime) }}</time>
-          <span v-if="item.relatedId">待办详情</span>
+        <span class="notice-body">
+          <span class="notice-row">
+            <strong>{{ item.title }}</strong>
+            <em v-if="!item.isRead">未读</em>
+          </span>
+          <p>{{ item.content }}</p>
+          <span class="notice-meta">
+            <time>{{ formatTime(item.createTime) }}</time>
+            <span v-if="item.relatedId">待办详情</span>
+          </span>
         </span>
-      </span>
-      <span v-if="!readonly && !item.isRead" class="read-link" @click.stop="emit('read', item)">标为已读</span>
-    </button>
+        <span v-if="!readonly && !item.isRead" class="read-link" @click.stop="emit('read', item)">标为已读</span>
+      </button>
+      <template v-if="!readonly" #right>
+        <button type="button" class="swipe-delete" @click="emit('delete', item)">
+          <van-icon name="delete-o" size="18" />
+          删除
+        </button>
+      </template>
+    </van-swipe-cell>
   </div>
 </template>
 
@@ -58,6 +69,11 @@ function formatTime(value) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.notice-swipe {
+  border-radius: 18px;
+  overflow: hidden;
 }
 
 .empty-notice {
@@ -188,6 +204,22 @@ function formatTime(value) {
   background: #fff;
   color: #c2410c;
   font-size: 12px;
+  font-weight: 800;
+}
+
+.swipe-delete {
+  width: 78px;
+  height: 100%;
+  min-height: 96px;
+  border: 0;
+  background: #ef4444;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
   font-weight: 800;
 }
 </style>

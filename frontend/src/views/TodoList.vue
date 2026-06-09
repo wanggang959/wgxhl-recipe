@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { completeTodo, deleteTodo, getTodoSummary, pageTodo } from '../api/todo'
@@ -9,23 +9,40 @@ import EmptyState from '../components/EmptyState.vue'
 import TodoCard from '../components/TodoCard.vue'
 import { useUserStore } from '../stores/user'
 import { getRecipeImage } from '../utils/imageUrl'
+import { consumeTodoRefreshRequired } from '../utils/todoRefresh'
+import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markDataStale, rememberDataVersions } from '../utils/dataRefresh'
+
+const CACHE_MAX_AGE = 60 * 1000
+const todoListCache = {
+  userId: '',
+  list: [],
+  wantedList: [],
+  userNameMap: {},
+  activeCategory: '',
+  activeTime: 'all',
+  summary: null,
+  savedAt: 0,
+}
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const isGuest = computed(() => userStore.isGuest)
 const loading = ref(false)
-const list = ref([])
-const wantedList = ref([])
-const userNameMap = ref({})
-const activeCategory = ref('')
-const activeTime = ref('all')
-const summary = ref({
+const cacheMatchesUser = todoListCache.userId === userStore.userId
+const list = ref(cacheMatchesUser ? [...todoListCache.list] : [])
+const wantedList = ref(cacheMatchesUser ? [...todoListCache.wantedList] : [])
+const userNameMap = ref(cacheMatchesUser ? { ...todoListCache.userNameMap } : {})
+const activeCategory = ref(cacheMatchesUser ? todoListCache.activeCategory : '')
+const activeTime = ref(cacheMatchesUser ? todoListCache.activeTime : 'all')
+const summary = ref(cacheMatchesUser && todoListCache.summary ? { ...todoListCache.summary } : {
   todayCount: 0,
   doneCount: 0,
   dueSoonCount: 0,
   totalCount: 0,
 })
+const watchedDataScopes = [DATA_SCOPE.todos, DATA_SCOPE.wanted, DATA_SCOPE.users]
+const seenDataVersions = {}
 
 const timeFilters = [
   ['all', '全部'],
@@ -100,27 +117,49 @@ const displayDueSoonCount = computed(() => combinedItems.value.filter((item) => 
 function handleRouteRefresh(event) {
   const path = event?.detail?.path
   if (!path || path === '/todo' || path.startsWith('/todo')) {
-    loadTodo()
+    loadTodo({ showLoading: false })
   }
 }
 
 onMounted(() => {
-  loadTodo()
+  refreshTodoOnEnter()
   window.addEventListener('app:route-refresh', handleRouteRefresh)
+  window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
 })
 
-onUnmounted(() => {
+onActivated(() => {
+  refreshTodoOnEnter()
+})
+
+onBeforeUnmount(() => {
+  saveTodoCache()
   window.removeEventListener('app:route-refresh', handleRouteRefresh)
+  window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
 })
 
 watch(
   () => route.path,
   (path) => {
     if (path === '/todo') {
-      loadTodo()
+      refreshTodoOnEnter()
     }
   },
 )
+
+function refreshTodoOnEnter() {
+  const hasData = list.value.length > 0 || wantedList.value.length > 0
+  if (consumeTodoRefreshRequired()) {
+    loadTodo({ showLoading: !hasData, silent: hasData })
+    return
+  }
+  if (!hasData) {
+    loadTodo()
+    return
+  }
+  if (hasDataChanged(watchedDataScopes, seenDataVersions) || isCacheStale()) {
+    loadTodo({ showLoading: false, silent: true })
+  }
+}
 
 async function loadTodo(options = {}) {
   if (!userStore.userId) return
@@ -142,11 +181,35 @@ async function loadTodo(options = {}) {
     list.value = pageRes.data.records || []
     summary.value = summaryRes.data || summary.value
     wantedList.value = wantedRes.data.records || []
+    saveTodoCache()
+    rememberDataVersions(watchedDataScopes, seenDataVersions)
   } catch (error) {
-    showFailToast(error.message || '待办加载失败')
+    if (!options.silent || (list.value.length === 0 && wantedList.value.length === 0)) {
+      showFailToast(error.message || '待办加载失败')
+    }
   } finally {
     if (showLoading) loading.value = false
   }
+}
+
+function handleDataRefresh(event) {
+  if (!hasMatchingScope(event, watchedDataScopes)) return
+  loadTodo({ showLoading: false, silent: true })
+}
+
+function isCacheStale() {
+  return !todoListCache.savedAt || Date.now() - todoListCache.savedAt > CACHE_MAX_AGE
+}
+
+function saveTodoCache() {
+  todoListCache.userId = userStore.userId || ''
+  todoListCache.list = [...list.value]
+  todoListCache.wantedList = [...wantedList.value]
+  todoListCache.userNameMap = { ...userNameMap.value }
+  todoListCache.activeCategory = activeCategory.value
+  todoListCache.activeTime = activeTime.value
+  todoListCache.summary = { ...summary.value }
+  todoListCache.savedAt = Date.now()
 }
 
 async function loadFamilyMembers() {
@@ -156,6 +219,7 @@ async function loadFamilyMembers() {
     nextMap[user.id] = user.nickname || user.username || '家人'
   })
   userNameMap.value = nextMap
+  saveTodoCache()
 }
 
 function categoryMatches(item) {
@@ -228,9 +292,11 @@ async function finishWanted(item) {
       message: `确认完成「${item.recipeName}」吗？`,
     })
     await deleteWantedRecipe(item.id)
+    wantedList.value = wantedList.value.filter((entry) => entry.id !== item.id)
+    saveTodoCache()
+    markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
     closeToast()
     showSuccessToast({ message: '已完成', duration: 1400 })
-    await loadTodo({ showLoading: false })
   } catch (error) {
     if (error?.message) showFailToast(error.message || '操作失败')
   }
@@ -274,8 +340,10 @@ async function remove(item) {
       message: `确认删除「${item.title}」吗？`,
     })
     await deleteTodo(item.id)
+    list.value = list.value.filter((entry) => entry.id !== item.id)
+    saveTodoCache()
+    markDataStale(DATA_SCOPE.todos)
     showSuccessToast('已删除')
-    await loadTodo({ showLoading: false })
   } catch (error) {
     if (error?.message) showFailToast(error.message)
   }

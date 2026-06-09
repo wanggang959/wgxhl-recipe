@@ -10,6 +10,7 @@ import BottomNav from '../components/BottomNav.vue'
 import ImageCropper from '../components/ImageCropper.vue'
 import ImageUploader from '../components/ImageUploader.vue'
 import { useUserStore } from '../stores/user'
+import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
 import { transcodeImageToWebp } from '../utils/image'
 import { getImageUrl, toObjectPath } from '../utils/imageUrl'
 
@@ -287,6 +288,7 @@ async function saveCategory() {
       await createCategory({ ...categoryForm })
       showActionStatus('分类已新增')
     }
+    markDataStale([DATA_SCOPE.base, DATA_SCOPE.recipes])
     resetCategoryForm()
     await loadCategory()
   } catch (error) {
@@ -297,6 +299,7 @@ async function saveCategory() {
 async function saveIngredient() {
   try {
     await createIngredient({ ...ingredientForm, id: '' })
+    markDataStale(DATA_SCOPE.base)
     showActionStatus('食材已新增')
     resetIngredientForm()
     await loadIngredient()
@@ -308,6 +311,7 @@ async function saveIngredient() {
 async function saveEditingIngredient() {
   try {
     await updateIngredient({ ...editingIngredientForm })
+    markDataStale(DATA_SCOPE.base)
     showActionStatus('食材已更新')
     cancelEditIngredient()
     await loadIngredient()
@@ -319,6 +323,7 @@ async function saveEditingIngredient() {
 async function saveSeasoning() {
   try {
     await createSeasoning({ ...seasoningForm, id: '' })
+    markDataStale(DATA_SCOPE.base)
     showActionStatus('调料已新增')
     resetSeasoningForm()
     await loadSeasoning()
@@ -330,6 +335,7 @@ async function saveSeasoning() {
 async function saveEditingSeasoning() {
   try {
     await updateSeasoning({ ...editingSeasoningForm })
+    markDataStale(DATA_SCOPE.base)
     showActionStatus('调料已更新')
     cancelEditSeasoning()
     await loadSeasoning()
@@ -345,6 +351,7 @@ async function removeCategory(item) {
       message: `确认删除「${item.categoryName}」吗？`,
     })
     await deleteCategory(item.id)
+    markDataStale([DATA_SCOPE.base, DATA_SCOPE.recipes])
     showActionStatus('分类已删除')
     await loadCategory()
   } catch (error) {
@@ -359,6 +366,7 @@ async function removeIngredient(item) {
       message: `确认删除「${item.ingredientName}」吗？`,
     })
     await deleteIngredient(item.id)
+    markDataStale(DATA_SCOPE.base)
     showActionStatus('食材已删除')
     await loadIngredient()
   } catch (error) {
@@ -373,6 +381,7 @@ async function removeSeasoning(item) {
       message: `确认删除「${item.seasoningName}」吗？`,
     })
     await deleteSeasoning(item.id)
+    markDataStale(DATA_SCOPE.base)
     showActionStatus('调料已删除')
     await loadSeasoning()
   } catch (error) {

@@ -50,6 +50,11 @@ public class NotificationController {
         return notificationService.deleteRead(currentUserId(request));
     }
 
+    @PostMapping("/delete")
+    public ApiResponse<Void> delete(@RequestBody IdDTO dto, HttpServletRequest request) {
+        return notificationService.delete(dto.getId(), currentUserId(request));
+    }
+
     private String currentUserId(HttpServletRequest request) {
         Object value = request.getAttribute(AuthRequestAttributes.CURRENT_USER);
         return value instanceof AppUser ? ((AppUser) value).getId() : null;

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { listMembers } from '../api/user'
@@ -13,16 +13,27 @@ import {
 } from '../api/want'
 import EmptyState from '../components/EmptyState.vue'
 import { useUserStore } from '../stores/user'
+import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markDataStale, rememberDataVersions } from '../utils/dataRefresh'
 import { getRecipeImage } from '../utils/imageUrl'
 
 const DEFAULT_NOTIFY_USER_ID = 'admin-wangshifu'
+const CACHE_MAX_AGE = 60 * 1000
+const wantListCache = {
+  userId: '',
+  list: [],
+  dateList: [],
+  selectedDate: '',
+  notifyPreviewText: '',
+  savedAt: 0,
+}
 
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
-const list = ref([])
-const dateList = ref([])
-const selectedDate = ref(formatDate(new Date()))
+const cacheMatchesUser = wantListCache.userId === userStore.userId
+const list = ref(cacheMatchesUser ? [...wantListCache.list] : [])
+const dateList = ref(cacheMatchesUser ? [...wantListCache.dateList] : [])
+const selectedDate = ref(cacheMatchesUser && wantListCache.selectedDate ? wantListCache.selectedDate : formatDate(new Date()))
 const editVisible = ref(false)
 const editTarget = ref(null)
 const editDate = ref('')
@@ -30,7 +41,9 @@ const notifyVisible = ref(false)
 const notifyLoading = ref(false)
 const notifyMembers = ref([])
 const selectedNotifyIds = ref([])
-const notifyPreviewText = ref('')
+const notifyPreviewText = ref(cacheMatchesUser ? wantListCache.notifyPreviewText : '')
+const watchedDataScopes = [DATA_SCOPE.wanted, DATA_SCOPE.recipes]
+const seenDataVersions = {}
 
 const today = computed(() => formatDate(new Date()))
 const tomorrow = computed(() => addDays(1))
@@ -55,16 +68,41 @@ const filterDates = computed(() => {
 })
 
 onMounted(async () => {
+  window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+  if (list.value.length > 0 || dateList.value.length > 0) {
+    if (hasDataChanged(watchedDataScopes, seenDataVersions) || isCacheStale()) {
+      refresh({ keepExisting: true, silent: true })
+    }
+    return
+  }
   await refresh()
 })
 
-async function refresh() {
-  await Promise.all([loadDateList(), loadWanted(), loadNotifyPreview()])
+onActivated(() => {
+  if ((list.value.length > 0 || dateList.value.length > 0) && (hasDataChanged(watchedDataScopes, seenDataVersions) || isCacheStale())) {
+    refresh({ keepExisting: true, silent: true })
+  }
+})
+
+onBeforeUnmount(() => {
+  saveWantCache()
+  window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+})
+
+async function refresh(options = {}) {
+  await Promise.all([
+    loadDateList(options),
+    loadWanted(options),
+    loadNotifyPreview(options),
+  ])
+  saveWantCache()
+  rememberDataVersions(watchedDataScopes, seenDataVersions)
 }
 
-async function loadDateList() {
+async function loadDateList(options = {}) {
   if (!userStore.userId) {
     dateList.value = []
+    saveWantCache()
     return
   }
   try {
@@ -72,16 +110,18 @@ async function loadDateList() {
     dateList.value = (res.data || []).filter((date) => !isPastDate(date))
     ensureSelectedDate()
   } catch (error) {
-    showFailToast(error.message || '想吃日期加载失败')
+    if (!options.silent) showFailToast(error.message || '想吃日期加载失败')
   }
 }
 
-async function loadWanted() {
+async function loadWanted(options = {}) {
   if (!userStore.userId) {
     list.value = []
+    saveWantCache()
     return
   }
-  loading.value = true
+  const showLoading = !options.keepExisting && list.value.length === 0
+  if (showLoading) loading.value = true
   try {
     const res = await pageWantedRecipe({
       current: 1,
@@ -90,16 +130,39 @@ async function loadWanted() {
       plannedDate: selectedDate.value,
     })
     list.value = res.data.records || []
+    saveWantCache()
   } catch (error) {
-    showFailToast(error.message || '想吃列表加载失败')
+    if (!options.silent || list.value.length === 0) {
+      showFailToast(error.message || '想吃列表加载失败')
+    }
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
   }
 }
 
 async function pickDate(date) {
   selectedDate.value = date
+  list.value = []
+  saveWantCache()
   await loadWanted()
+}
+
+function isCacheStale() {
+  return !wantListCache.savedAt || Date.now() - wantListCache.savedAt > CACHE_MAX_AGE
+}
+
+function saveWantCache() {
+  wantListCache.userId = userStore.userId || ''
+  wantListCache.list = [...list.value]
+  wantListCache.dateList = [...dateList.value]
+  wantListCache.selectedDate = selectedDate.value
+  wantListCache.notifyPreviewText = notifyPreviewText.value
+  wantListCache.savedAt = Date.now()
+}
+
+function handleDataRefresh(event) {
+  if (!hasMatchingScope(event, watchedDataScopes)) return
+  refresh({ keepExisting: list.value.length > 0 || dateList.value.length > 0, silent: true })
 }
 
 function openEdit(item) {
@@ -128,6 +191,7 @@ async function submitEdit() {
     showSuccessToast({ message: '已修改想吃日期', duration: 1400 })
     selectedDate.value = editDate.value
     closeEdit()
+    markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
     await refresh()
   } catch (error) {
     closeToast()
@@ -138,9 +202,11 @@ async function submitEdit() {
 async function remove(item) {
   try {
     await deleteWantedRecipe(item.id)
+    list.value = list.value.filter((entry) => entry.id !== item.id)
+    saveWantCache()
+    markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
     closeToast()
     showSuccessToast({ message: '已删除', duration: 1400 })
-    await refresh()
   } catch (error) {
     closeToast()
     showFailToast({ message: error.message || '删除失败', duration: 1800 })
@@ -176,9 +242,10 @@ function ensureSelectedDate() {
   }
 }
 
-async function loadNotifyPreview() {
+async function loadNotifyPreview(options = {}) {
   if (!userStore.userId) {
     notifyPreviewText.value = ''
+    saveWantCache()
     return
   }
   try {
@@ -191,6 +258,7 @@ async function loadNotifyPreview() {
     // 后端未更新时走本地预览，避免通知按钮消失
   }
   notifyPreviewText.value = await buildNotifyPreviewFallback()
+  saveWantCache()
 }
 
 async function buildNotifyPreviewFallback() {
@@ -339,7 +407,7 @@ async function submitNotify() {
         通知家人备菜
       </button>
 
-      <van-loading v-if="loading" size="24px" class="loading">加载中...</van-loading>
+      <van-loading v-if="loading && list.length === 0" size="24px" class="loading">加载中...</van-loading>
       <EmptyState
         v-else-if="list.length === 0"
         text="这天还没有想吃的菜"

@@ -7,6 +7,7 @@ import { createTodo } from '../api/todo'
 import { pageWantedRecipe } from '../api/want'
 import EmptyState from '../components/EmptyState.vue'
 import { getImageUrl } from '../utils/imageUrl'
+import { markTodoRefreshRequired } from '../utils/todoRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -121,6 +122,7 @@ async function confirmPurchaseTodo() {
       notifyEmail: false,
       noticeMinutes: [0],
     })
+    markTodoRefreshRequired()
     showSuccessToast('已加入待办')
     purchasePreviewVisible.value = false
     purchasePreviewLines.value = []

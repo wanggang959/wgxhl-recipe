@@ -38,6 +38,7 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
         Page<Notification> result = lambdaQuery()
                 .eq(StringUtils.hasText(currentUserId), Notification::getUserId, currentUserId)
                 .eq(dto.getIsRead() != null, Notification::getIsRead, dto.getIsRead())
+                .orderByAsc(Notification::getIsRead)
                 .orderByDesc(Notification::getCreateTime)
                 .page(page);
         return ApiResponse.success(result);
@@ -90,6 +91,22 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
                 .eq(Notification::getUserId, currentUserId)
                 .eq(Notification::getIsRead, true));
         return ApiResponse.success("已删除已读消息", null);
+    }
+
+    @Override
+    public ApiResponse<Void> delete(String id, String currentUserId) {
+        if (!StringUtils.hasText(id)) {
+            return ApiResponse.fail("通知id不能为空");
+        }
+        Notification notice = super.getById(id);
+        if (notice == null) {
+            return ApiResponse.fail("通知不存在");
+        }
+        if (StringUtils.hasText(currentUserId) && !currentUserId.equals(notice.getUserId())) {
+            return ApiResponse.fail(403, "不能操作其他成员的通知");
+        }
+        removeById(id);
+        return ApiResponse.success("已删除", null);
     }
 
     @Override

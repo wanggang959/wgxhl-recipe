@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
@@ -11,45 +11,70 @@ import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
 import { useUserStore } from '../stores/user'
+import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markDataStale, rememberDataVersions } from '../utils/dataRefresh'
 import { getRecipeImage } from '../utils/imageUrl'
 import { formatRecipeVersionLabel } from '../utils/recipeVersion'
 
-const route = useRoute()
-const router = useRouter()
-const userStore = useUserStore()
-const canMutate = computed(() => userStore.canMutate)
-
-const categories = ref([])
-const list = ref([])
-const loading = ref(false)
-const finished = ref(false)
-const total = ref(0)
-const favoriteMap = ref({})
-const favoritePendingMap = ref({})
-const wantedMap = ref({})
-const wantedPendingMap = ref({})
-const saveMessage = ref('')
-const recommendMessage = ref('')
-const suggestRecipe = ref(null)
-const errorText = ref('')
-const wantActionVisible = ref(false)
-const wantDateVisible = ref(false)
-const wantTargetRecipe = ref(null)
-const customWantDate = ref('')
-let recommendMessageTimer = null
-
-const query = reactive({
+const CACHE_MAX_AGE = 60 * 1000
+const DEFAULT_QUERY = {
   current: 1,
   size: 8,
   recipeName: '',
   categoryId: '',
   difficulty: '',
   status: '上架',
+}
+const DEFAULT_FILTER = {
+  recipeName: '',
+  categoryId: '',
+}
+const recipeListCache = {
+  categories: [],
+  list: [],
+  total: 0,
+  finished: false,
+  favoriteMap: {},
+  wantedMap: {},
+  suggestRecipe: null,
+  query: null,
+  filter: null,
+  savedAt: 0,
+}
+
+const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+const canMutate = computed(() => userStore.canMutate)
+
+const categories = ref([...recipeListCache.categories])
+const list = ref([...recipeListCache.list])
+const loading = ref(false)
+const finished = ref(recipeListCache.finished)
+const total = ref(recipeListCache.total)
+const favoriteMap = ref({ ...recipeListCache.favoriteMap })
+const favoritePendingMap = ref({})
+const wantedMap = ref({ ...recipeListCache.wantedMap })
+const wantedPendingMap = ref({})
+const saveMessage = ref('')
+const recommendMessage = ref('')
+const suggestRecipe = ref(recipeListCache.suggestRecipe)
+const errorText = ref('')
+const wantActionVisible = ref(false)
+const wantDateVisible = ref(false)
+const wantTargetRecipe = ref(null)
+const customWantDate = ref('')
+let recommendMessageTimer = null
+const watchedDataScopes = [DATA_SCOPE.recipes, DATA_SCOPE.favorites, DATA_SCOPE.wanted, DATA_SCOPE.base]
+const seenDataVersions = {}
+
+const query = reactive({
+  ...DEFAULT_QUERY,
+  ...(recipeListCache.query || {}),
 })
 
 const filter = reactive({
-  recipeName: '',
-  categoryId: '',
+  ...DEFAULT_FILTER,
+  ...(recipeListCache.filter || {}),
 })
 
 const hasData = computed(() => list.value.length > 0)
@@ -66,7 +91,9 @@ const showcaseRecipes = computed(() => {
 const minWantDate = computed(() => formatDate(new Date()))
 
 onMounted(async () => {
+  window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
   const message = sessionStorage.getItem('recipeSaveMessage')
+  const shouldForceRefresh = Boolean(message)
   if (message) {
     saveMessage.value = message
     sessionStorage.removeItem('recipeSaveMessage')
@@ -74,10 +101,34 @@ onMounted(async () => {
       saveMessage.value = ''
     }, 2400)
   }
-  await Promise.all([loadCategory(), refreshList()])
+  if (categories.value.length === 0) {
+    await loadCategory()
+  }
+  if (list.value.length > 0 && !shouldForceRefresh) {
+    if (hasDataChanged(watchedDataScopes, seenDataVersions)) {
+      refreshList({ keepExisting: true, silent: true })
+    } else if (isCacheStale()) {
+      refreshList({ keepExisting: true, silent: true })
+    }
+  } else {
+    await refreshList({ keepExisting: list.value.length > 0 })
+  }
   if (route.query.pick === 'today') {
     chooseRandomRecipe({ showMessage: true })
   }
+})
+
+onActivated(() => {
+  if (list.value.length > 0 && hasDataChanged(watchedDataScopes, seenDataVersions)) {
+    refreshList({ keepExisting: true, silent: true })
+  } else if (list.value.length > 0 && isCacheStale()) {
+    refreshList({ keepExisting: true, silent: true })
+  }
+})
+
+onBeforeUnmount(() => {
+  saveRecipeListCache()
+  window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
 })
 
 watch(
@@ -92,29 +143,39 @@ async function loadCategory() {
   try {
     const res = await pageCategory({ current: 1, size: 100 })
     categories.value = res.data.records || []
+    saveRecipeListCache()
   } catch (error) {
     showFailToast(error.message || '分类加载失败')
   }
 }
 
-async function refreshList() {
+async function refreshList(options = {}) {
+  const keepExisting = Boolean(options.keepExisting)
   query.current = 1
-  list.value = []
+  if (!keepExisting) {
+    list.value = []
+  }
   finished.value = false
-  suggestRecipe.value = null
+  if (!keepExisting) {
+    suggestRecipe.value = null
+  }
   errorText.value = ''
-  await loadMore()
+  await loadMore({
+    replace: keepExisting,
+    silent: Boolean(options.silent),
+  })
 }
 
-async function loadMore() {
+async function loadMore(options = {}) {
   if (finished.value || loading.value) return
+  const currentPage = query.current
   loading.value = true
   try {
     const res = await pageRecipe({ ...query })
     const records = res.data.records || []
     total.value = Number(res.data.total || 0)
-    list.value = list.value.concat(records)
-    query.current += 1
+    list.value = options.replace ? records : list.value.concat(records)
+    query.current = currentPage + 1
     if (list.value.length >= total.value || records.length === 0) {
       finished.value = true
     }
@@ -122,12 +183,43 @@ async function loadMore() {
     if (!suggestRecipe.value && list.value.length > 0) {
       chooseRandomRecipe()
     }
+    saveRecipeListCache()
+    rememberDataVersions(watchedDataScopes, seenDataVersions)
   } catch (error) {
-    errorText.value = error.message || '菜谱加载失败'
-    showFailToast(errorText.value)
+    const message = error.message || '菜谱加载失败'
+    if (!options.silent || list.value.length === 0) {
+      errorText.value = message
+      showFailToast(errorText.value)
+    }
   } finally {
     loading.value = false
   }
+}
+
+function handleDataRefresh(event) {
+  if (!hasMatchingScope(event, watchedDataScopes)) return
+  if (list.value.length > 0) {
+    refreshList({ keepExisting: true, silent: true })
+    return
+  }
+  refreshList({ silent: true })
+}
+
+function isCacheStale() {
+  return !recipeListCache.savedAt || Date.now() - recipeListCache.savedAt > CACHE_MAX_AGE
+}
+
+function saveRecipeListCache() {
+  recipeListCache.categories = [...categories.value]
+  recipeListCache.list = [...list.value]
+  recipeListCache.total = total.value
+  recipeListCache.finished = finished.value
+  recipeListCache.favoriteMap = { ...favoriteMap.value }
+  recipeListCache.wantedMap = { ...wantedMap.value }
+  recipeListCache.suggestRecipe = suggestRecipe.value
+  recipeListCache.query = { ...query }
+  recipeListCache.filter = { ...filter }
+  recipeListCache.savedAt = Date.now()
 }
 
 async function syncFavoriteState(records) {
@@ -261,10 +353,12 @@ async function toggleFavorite(item) {
     if (favoriteMap.value[item.id]) {
       await deleteFavoriteByRecipeId(userStore.userId, item.id)
       favoriteMap.value[item.id] = false
+      markDataStale(DATA_SCOPE.favorites)
       showSuccessToast('已取消收藏')
     } else {
       await createFavorite({ userId: userStore.userId, recipeId: item.id })
       favoriteMap.value[item.id] = true
+      markDataStale(DATA_SCOPE.favorites)
       showSuccessToast('收藏成功')
     }
   } catch (error) {
@@ -284,11 +378,13 @@ async function toggleFavoriteSafe(item) {
     if (favoriteMap.value[item.id]) {
       await deleteFavoriteByRecipeId(userStore.userId, item.id)
       favoriteMap.value[item.id] = false
+      markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '已取消收藏', duration: 1400 })
     } else {
       await createFavorite({ userId: userStore.userId, recipeId: item.id })
       favoriteMap.value[item.id] = true
+      markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '收藏成功', duration: 1400 })
     }
@@ -297,6 +393,7 @@ async function toggleFavoriteSafe(item) {
     showFailToast({ message: error.message || '收藏操作失败', duration: 1800 })
   } finally {
     favoritePendingMap.value[item.id] = false
+    saveRecipeListCache()
   }
 }
 
@@ -347,6 +444,7 @@ async function addWantedByDate(plannedDate) {
       plannedDate,
     })
     wantedMap.value[recipe.id] = true
+    markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
     closeToast()
     showSuccessToast({ message: res.message || '已添加到想吃', duration: 1400 })
     closeWantPanels()
@@ -355,6 +453,7 @@ async function addWantedByDate(plannedDate) {
     showFailToast({ message: error.message || '添加想吃失败', duration: 1800 })
   } finally {
     wantedPendingMap.value[recipe.id] = false
+    saveRecipeListCache()
   }
 }
 

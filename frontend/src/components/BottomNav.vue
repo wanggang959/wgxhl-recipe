@@ -2,11 +2,9 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ActionIcon from './ActionIcon.vue'
-import { useUserStore } from '../stores/user'
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
 
 const active = computed(() => {
   if (route.path.startsWith('/recipes') && route.query.pick === 'today') return 'today'
@@ -19,12 +17,12 @@ const active = computed(() => {
 })
 
 const items = computed(() => [
-  { key: '/recipes', path: '/recipes', label: '首页', icon: 'wap-home-o' },
-  { key: 'today', path: '/recipes?pick=today', label: '今天吃什么', icon: 'fire-o' },
-  { key: '/favorites', path: '/favorites', label: '收藏', icon: 'star-o' },
-  { key: '/want', path: '/want', label: '想吃', icon: 'cart-o' },
-  { key: '/todo', path: '/todo', label: '待办', icon: 'todo-list-o' },
-  { key: '/profile', path: '/profile', label: '我的', icon: 'contact-o' },
+  { key: '/recipes', path: '/recipes', label: '首页', icon: 'home' },
+  { key: 'today', path: '/recipes?pick=today', label: '今天吃什么', icon: 'fire' },
+  { key: '/favorites', path: '/favorites', label: '收藏', icon: 'star' },
+  { key: '/want', path: '/want', label: '想吃', icon: 'cart' },
+  { key: '/todo', path: '/todo', label: '待办', icon: 'todo' },
+  { key: '/profile', path: '/profile', label: '我的', icon: 'user' },
 ])
 
 function go(item) {
@@ -52,8 +50,7 @@ function go(item) {
       type="button"
       @click="go(item)"
     >
-      <ActionIcon v-if="item.icon === 'cart-o'" name="cart" :size="21" />
-      <van-icon v-else :name="item.icon" size="21" />
+      <ActionIcon :name="item.icon" :size="21" />
       <span>{{ item.label }}</span>
     </button>
   </nav>

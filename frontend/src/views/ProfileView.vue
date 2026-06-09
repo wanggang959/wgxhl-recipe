@@ -13,6 +13,7 @@ import {
   loadPushState,
   teardownPushOnLogout,
 } from '../utils/pushNotification'
+import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -285,9 +286,11 @@ async function saveUser() {
     }
     if (isEditingUser.value) {
       await updateUser(payload)
+      markDataStale([DATA_SCOPE.users, DATA_SCOPE.todos])
       showActionStatus('成员已更新')
     } else {
       await createUser(payload)
+      markDataStale([DATA_SCOPE.users, DATA_SCOPE.todos])
       showActionStatus('成员已新增')
     }
     syncCurrentUserAfterSave(payload)
@@ -311,8 +314,9 @@ async function removeUser(item) {
       message: `确认删除「${item.nickname || item.username}」吗？`,
     })
     await deleteUser(item.id)
+    users.value = users.value.filter((user) => user.id !== item.id)
+    markDataStale([DATA_SCOPE.users, DATA_SCOPE.todos])
     showActionStatus('成员已删除')
-    await loadUsers()
   } catch (error) {
     if (error?.message) showActionStatus(error.message, 'error')
   }
@@ -348,6 +352,7 @@ async function toggleUserStatus(item) {
       id: item.id,
       status: disabled ? 'normal' : 'disabled',
     })
+    markDataStale([DATA_SCOPE.users, DATA_SCOPE.todos])
     showActionStatus(disabled ? '已恢复登录权限' : '已禁止该用户登录')
     await loadUsers()
   } catch (error) {

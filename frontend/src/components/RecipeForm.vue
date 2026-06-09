@@ -7,6 +7,7 @@ import { uploadImage } from '../api/file'
 import { createIngredient, pageIngredient } from '../api/ingredient'
 import { createRecipe, getRecipeDetail, updateRecipe } from '../api/recipe'
 import { createSeasoning, pageSeasoning } from '../api/seasoning'
+import { DATA_SCOPE, markDataChanged, markDataStale } from '../utils/dataRefresh'
 import { transcodeImageToWebp } from '../utils/image'
 import { getImageUrl, toObjectPath } from '../utils/imageUrl'
 import { DEFAULT_RECIPE_VERSION, isValidRecipeVersion, normalizeRecipeVersion } from '../utils/recipeVersion'
@@ -286,6 +287,7 @@ async function createQuickIngredient() {
     const created = res.data
     ingredients.value = [created, ...ingredients.value.filter((item) => item.id !== created.id)]
     selectCreatedIngredient(created.id)
+    markDataStale(DATA_SCOPE.base)
     resetQuickIngredientForm()
     showQuickIngredient.value = false
     showSuccessToast('食材已添加')
@@ -310,6 +312,7 @@ async function createQuickSeasoning() {
     const created = res.data
     seasonings.value = [created, ...seasonings.value.filter((item) => item.id !== created.id)]
     selectCreatedSeasoning(created.id)
+    markDataStale(DATA_SCOPE.base)
     resetQuickSeasoningForm()
     showQuickSeasoning.value = false
     showSuccessToast('调料已添加')
@@ -444,6 +447,7 @@ async function submit() {
       const res = await createRecipe(payload)
       targetRecipeId = res.data?.recipe?.id || res.data?.id || payload.recipe.id
     }
+    markDataChanged([DATA_SCOPE.recipes, DATA_SCOPE.favorites, DATA_SCOPE.wanted, DATA_SCOPE.todos])
     if (targetRecipeId) {
       await router.replace(`/recipe/${targetRecipeId}`)
     } else {

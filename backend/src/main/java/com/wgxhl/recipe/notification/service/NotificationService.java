@@ -18,5 +18,7 @@ public interface NotificationService extends IService<Notification> {
 
     ApiResponse<Void> deleteRead(String currentUserId);
 
+    ApiResponse<Void> delete(String id, String currentUserId);
+
     Notification createSiteNotice(String userId, String title, String content, String type, String relatedId);
 }

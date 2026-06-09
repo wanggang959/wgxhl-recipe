@@ -6,6 +6,10 @@ defineProps({
     type: Object,
     required: true,
   },
+  readonly: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['back', 'edit', 'complete', 'completeBlocked', 'delete'])
@@ -16,10 +20,12 @@ const emit = defineEmits(['back', 'edit', 'complete', 'completeBlocked', 'delete
     <header>
       <button type="button" @click="emit('back')"><van-icon name="arrow-left" /></button>
       <h1>待办详情</h1>
-      <button type="button" @click="emit('edit', todo)"><van-icon name="edit" /></button>
+      <button v-if="!readonly" type="button" @click="emit('edit', todo)"><van-icon name="edit" /></button>
+      <span v-else class="header-spacer" aria-hidden="true"></span>
     </header>
     <TodoCard
       :todo="todo"
+      :readonly="readonly"
       @open="() => {}"
       @complete="emit('complete', todo)"
       @complete-blocked="emit('completeBlocked', todo)"
@@ -56,9 +62,13 @@ header h1 {
   font-size: 22px;
 }
 
-header button {
+header button,
+.header-spacer {
   width: 36px;
   height: 36px;
+}
+
+header button {
   border: 0;
   border-radius: 50%;
   background: #fff7e8;

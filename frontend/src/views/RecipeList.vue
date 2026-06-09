@@ -17,6 +17,7 @@ import { formatRecipeVersionLabel } from '../utils/recipeVersion'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const canMutate = computed(() => userStore.canMutate)
 
 const categories = ref([])
 const list = ref([])
@@ -396,7 +397,7 @@ function submitCustomWantDate() {
         @click="openDetail(item)"
       >
         <img :src="getRecipeImage(item.coverImage)" :alt="item.recipeName" />
-        <div class="showcase-actions" @click.stop>
+        <div v-if="canMutate" class="showcase-actions" @click.stop>
           <button class="showcase-action" type="button" :class="{ active: favoriteMap[item.id] }" @click="toggleFavoriteSafe(item)">
             <ActionIcon name="heart" :filled="Boolean(favoriteMap[item.id])" :size="20" />
           </button>
@@ -467,7 +468,7 @@ function submitCustomWantDate() {
               <van-icon name="description-o" />
               查看做法
             </button>
-            <button type="button" class="want-action" @click="openWantAction(suggestRecipe)">
+            <button v-if="canMutate" type="button" class="want-action" @click="openWantAction(suggestRecipe)">
               <ActionIcon name="cart" :size="17" />
               {{ wantedMap[suggestRecipe.id] ? '已想吃' : '想吃' }}
             </button>
@@ -513,7 +514,7 @@ function submitCustomWantDate() {
           <template v-if="suggestRecipe.ownerName">{{ suggestRecipe.ownerName }} · </template>{{ formatRecipeVersionLabel(suggestRecipe.recipeVersion) }} · {{ suggestRecipe.taste || '家常' }} · {{ suggestRecipe.cookingTime || '用时未记录' }}
         </p>
       </div>
-      <div class="today-card-actions" @click.stop>
+      <div v-if="canMutate" class="today-card-actions" @click.stop>
         <button type="button" :class="{ active: favoriteMap[suggestRecipe.id] }" @click="toggleFavoriteSafe(suggestRecipe)">
           <ActionIcon name="heart" :filled="Boolean(favoriteMap[suggestRecipe.id])" :size="16" />
         </button>
@@ -544,6 +545,8 @@ function submitCustomWantDate() {
           :recipe="item"
           :favorite="Boolean(favoriteMap[item.id])"
           :wanted="Boolean(wantedMap[item.id])"
+          :show-favorite-button="canMutate"
+          :show-want-button="canMutate"
           @open="openDetail"
           @favorite="toggleFavoriteSafe"
           @want="openWantAction"

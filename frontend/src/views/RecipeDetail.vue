@@ -160,6 +160,8 @@ async function removeRecipe() {
         :detail="detail"
         :favorite="isFavorite"
         :can-edit="userStore.isAdmin"
+        :show-favorite="userStore.canMutate"
+        :show-todo-action="userStore.canMutate"
         @back="router.back()"
         @favorite="toggleFavoriteSafe"
         @todo="router.push({ path: '/todo/create', query: { title: detail.recipe?.recipeName, category: 'COOK', relatedType: 'RECIPE', relatedId: detail.recipe?.id } })"

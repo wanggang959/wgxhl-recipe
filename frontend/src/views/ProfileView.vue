@@ -452,7 +452,7 @@ onMounted(() => {
       <h2>账号</h2>
       <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
       <van-cell title="权限" :value="userStore.roleText" />
-      <div v-if="userStore.isLogin" class="push-setting">
+      <div v-if="userStore.isLogin && !userStore.isGuest" class="push-setting">
         <div>
           <strong>手机通知</strong>
           <span>{{ pushStatusText }}</span>

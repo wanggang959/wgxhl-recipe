@@ -24,6 +24,11 @@ export const useUserStore = defineStore('user', {
     },
     isNormalUser: (state) => Boolean(state.user?.id && state.user?.token && state.user?.userRole === 'user'),
     isGuest: (state) => state.user?.id === 'guest' || state.user?.username === 'guest',
+    canMutate: (state) => {
+      const user = state.user
+      if (!user?.id || !user?.token) return false
+      return user.id !== 'guest' && user.username !== 'guest'
+    },
     roleText: (state) => {
       if (state.user?.id === 'guest' || state.user?.username === 'guest') return '游客'
       if (state.user?.userRole === 'super_admin' || state.user?.username === '王师傅') return '超级管理员'

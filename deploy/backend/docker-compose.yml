@@ -1,14 +1,17 @@
 services:
   recipe-backend:
-    build: .
-    image: wgxhl-recipe-backend:1.0.0
+    image: eclipse-temurin:17-jre
     container_name: wgxhl-recipe-backend
     restart: unless-stopped
+    working_dir: /app
+    command: java -jar /app/app.jar
     ports:
       - "${APP_PORT:-9001}:9001"
+    volumes:
+      - ./recipe-backend-1.0.0-SNAPSHOT.jar:/app/app.jar
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
-      APP_PORT: 9001
+      APP_PORT: ${APP_PORT:-9001}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
@@ -27,3 +30,8 @@ services:
       PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY}
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-mailto:admin@wgxhl.space}
       PUSH_TTL_SECONDS: ${PUSH_TTL_SECONDS:-604800}
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"

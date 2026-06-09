@@ -8,6 +8,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  readonly: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['open', 'complete', 'completeBlocked', 'edit', 'delete'])
@@ -65,7 +69,7 @@ function handleComplete() {
       <div v-if="todo.description && !compact" class="todo-description">
         <span v-for="line in descriptionLines(todo.description)" :key="line">{{ line }}</span>
       </div>
-      <div v-if="!compact" class="todo-actions" @click.stop>
+      <div v-if="!compact && !readonly" class="todo-actions" @click.stop>
         <button
           v-if="todo.status !== 'DONE'"
           type="button"

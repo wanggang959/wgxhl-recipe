@@ -54,6 +54,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private static final String STATUS_TODO = "TODO";
     private static final String STATUS_DONE = "DONE";
     private static final String REPEAT_NONE = "NONE";
+    private static final String CATEGORY_COOK = "COOK";
+    private static final String GUEST_ID = "guest";
     private static final String RELATED_BIRTHDAY = "MEMBER_BIRTHDAY";
     private static final String NOTICE_SITE = "site";
     private static final String NOTICE_EMAIL = "email";
@@ -112,11 +114,15 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     @Override
-    public ApiResponse<Page<Todo>> page(TodoPageDTO dto) {
+    public ApiResponse<Page<Todo>> page(TodoPageDTO dto, AppUser actor) {
         Page<Todo> page = new Page<>(dto.getCurrent(), dto.getSize());
+        String category = dto.getCategory();
+        if (isGuest(actor)) {
+            category = CATEGORY_COOK;
+        }
         Page<Todo> result = lambdaQuery()
                 .like(StringUtils.hasText(dto.getTitle()), Todo::getTitle, dto.getTitle())
-                .eq(StringUtils.hasText(dto.getCategory()), Todo::getCategory, dto.getCategory())
+                .eq(StringUtils.hasText(category), Todo::getCategory, category)
                 .in(StringUtils.hasText(dto.getOwnerId()), Todo::getId, todoIdsByOwner(dto.getOwnerId()))
                 .eq(StringUtils.hasText(dto.getStatus()), Todo::getStatus, dto.getStatus())
                 .ge(dto.getDueTimeStart() != null, Todo::getDueTime, dto.getDueTimeStart())
@@ -130,10 +136,11 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     @Override
-    public ApiResponse<List<Todo>> upcoming(int limit) {
+    public ApiResponse<List<Todo>> upcoming(int limit, AppUser actor) {
         int size = limit <= 0 ? 3 : Math.min(limit, 20);
         List<Todo> list = lambdaQuery()
                 .eq(Todo::getStatus, STATUS_TODO)
+                .eq(isGuest(actor), Todo::getCategory, CATEGORY_COOK)
                 .ge(Todo::getDueTime, LocalDateTime.now().minusHours(2))
                 .orderByAsc(Todo::getDueTime)
                 .last("limit " + size)
@@ -143,34 +150,45 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     @Override
-    public ApiResponse<TodoSummaryDTO> summary() {
+    public ApiResponse<TodoSummaryDTO> summary(AppUser actor) {
         LocalDate today = LocalDate.now();
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.plusDays(1).atStartOfDay().minusNanos(1);
+        boolean guest = isGuest(actor);
         TodoSummaryDTO dto = new TodoSummaryDTO();
         dto.setTodayCount(lambdaQuery()
                 .eq(Todo::getStatus, STATUS_TODO)
+                .eq(guest, Todo::getCategory, CATEGORY_COOK)
                 .ge(Todo::getDueTime, start)
                 .le(Todo::getDueTime, end)
                 .count());
-        dto.setDoneCount(lambdaQuery().eq(Todo::getStatus, STATUS_DONE).count());
+        dto.setDoneCount(lambdaQuery()
+                .eq(Todo::getStatus, STATUS_DONE)
+                .eq(guest, Todo::getCategory, CATEGORY_COOK)
+                .count());
         dto.setDueSoonCount(lambdaQuery()
                 .eq(Todo::getStatus, STATUS_TODO)
+                .eq(guest, Todo::getCategory, CATEGORY_COOK)
                 .ge(Todo::getDueTime, LocalDateTime.now())
                 .le(Todo::getDueTime, LocalDateTime.now().plusDays(7))
                 .count());
-        dto.setTotalCount(count());
+        dto.setTotalCount(guest
+                ? lambdaQuery().eq(Todo::getCategory, CATEGORY_COOK).count()
+                : count());
         return ApiResponse.success(dto);
     }
 
     @Override
-    public ApiResponse<Todo> detail(String id) {
+    public ApiResponse<Todo> detail(String id, AppUser actor) {
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("待办id不能为空");
         }
         Todo todo = super.getById(id);
         if (todo == null) {
             return ApiResponse.fail("待办不存在");
+        }
+        if (isGuest(actor) && !isCookTodo(todo)) {
+            return ApiResponse.fail("游客只能查看做饭相关待办");
         }
         enrich(Collections.singletonList(todo));
         return ApiResponse.success(todo);
@@ -209,6 +227,9 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ApiResponse<Todo> create(Todo entity, AppUser actor) {
+        if (isGuest(actor)) {
+            return ApiResponse.fail("游客不能创建待办");
+        }
         if (!StringUtils.hasText(entity.getTitle())) {
             return ApiResponse.fail("标题不能为空");
         }
@@ -234,13 +255,16 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ApiResponse<Void> update(Todo entity) {
+    public ApiResponse<Void> update(Todo entity, AppUser actor) {
         if (!StringUtils.hasText(entity.getId())) {
             return ApiResponse.fail("待办id不能为空");
         }
         Todo existing = super.getById(entity.getId());
         if (existing == null) {
             return ApiResponse.fail("待办不存在");
+        }
+        if (isGuest(actor)) {
+            return ApiResponse.fail("游客不能编辑待办");
         }
         if (!CollectionUtils.isEmpty(entity.getOwnerIds())) {
             entity.setOwnerId(firstOwnerId(entity.getOwnerIds()));
@@ -252,13 +276,16 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     @Override
-    public ApiResponse<Void> complete(String id) {
+    public ApiResponse<Void> complete(String id, AppUser actor) {
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("待办id不能为空");
         }
         Todo todo = super.getById(id);
         if (todo == null) {
             return ApiResponse.fail("待办不存在");
+        }
+        if (isGuest(actor)) {
+            return ApiResponse.fail("游客不能操作待办");
         }
         String disabledReason = completeDisabledReason(todo);
         if (StringUtils.hasText(disabledReason)) {
@@ -285,9 +312,16 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ApiResponse<Void> delete(String id) {
+    public ApiResponse<Void> delete(String id, AppUser actor) {
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("待办id不能为空");
+        }
+        Todo todo = super.getById(id);
+        if (todo == null) {
+            return ApiResponse.fail("待办不存在");
+        }
+        if (isGuest(actor)) {
+            return ApiResponse.fail("游客不能删除待办");
         }
         removeById(id);
         todoNoticeRuleMapper.delete(new LambdaQueryWrapper<TodoNoticeRule>().eq(TodoNoticeRule::getTodoId, id));
@@ -989,5 +1023,13 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         } catch (DateTimeException ex) {
             return LocalDate.of(year, 2, 28);
         }
+    }
+
+    private boolean isGuest(AppUser actor) {
+        return actor != null && GUEST_ID.equals(actor.getId());
+    }
+
+    private boolean isCookTodo(Todo todo) {
+        return todo != null && CATEGORY_COOK.equals(todo.getCategory());
     }
 }

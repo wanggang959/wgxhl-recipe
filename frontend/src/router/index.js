@@ -120,6 +120,17 @@ router.beforeEach((to) => {
     }
   }
 
+  const isGuest = user.id === 'guest' || user.username === 'guest'
+  if (isGuest) {
+    const guestWriteBlocked = to.path === '/todo/create'
+      || to.path === '/todo/summary'
+      || to.path === '/recipe/create'
+      || /^\/todo\/[^/]+\/edit$/.test(to.path)
+      || /^\/recipe\/[^/]+\/edit$/.test(to.path)
+      || to.path === '/manage/base'
+    if (guestWriteBlocked) return isGuestTodoPath(to.path) ? '/todo' : '/recipes'
+  }
+
   const adminOnly = to.path === '/manage/base'
     || to.path === '/recipe/create'
     || /^\/recipe\/[^/]+\/edit$/.test(to.path)
@@ -127,5 +138,11 @@ router.beforeEach((to) => {
   if (user.userRole === 'admin' || user.userRole === 'super_admin') return true
   return '/recipes'
 })
+
+function isGuestTodoPath(path) {
+  return path === '/todo/create'
+    || path === '/todo/summary'
+    || /^\/todo\/[^/]+\/edit$/.test(path)
+}
 
 export default router

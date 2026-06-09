@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { completeTodo, deleteTodo, getTodoDetail } from '../api/todo'
 import TodoDetail from '../components/TodoDetail.vue'
+import { useUserStore } from '../stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
 const todo = ref(null)
 
@@ -75,6 +77,7 @@ async function remove() {
   <TodoDetail
     v-else-if="todo"
     :todo="todo"
+    :readonly="userStore.isGuest"
     @back="router.back()"
     @edit="router.push(`/todo/${route.params.id}/edit`)"
     @complete="finish"

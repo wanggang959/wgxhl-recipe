@@ -6,10 +6,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.common.AppZoneDates;
+import com.wgxhl.recipe.notification.service.NotificationService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.want.dto.WantNotifyDTO;
 import com.wgxhl.recipe.want.dto.WantedRecipePageDTO;
 import com.wgxhl.recipe.want.entity.UserWantedRecipe;
@@ -18,11 +20,17 @@ import com.wgxhl.recipe.want.service.UserWantedRecipeService;
 import com.wgxhl.recipe.want.vo.WantNotifyPreviewVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,14 +38,29 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
         implements UserWantedRecipeService {
 
     private static final Logger log = LoggerFactory.getLogger(UserWantedRecipeServiceImpl.class);
+    private static final String NOTICE_SITE = "site";
+    private static final String NOTICE_EMAIL = "email";
+    private static final String NOTICE_PUSH = "push";
 
     private final RecipeMapper recipeMapper;
+    private final AppUserMapper appUserMapper;
+    private final NotificationService notificationService;
     private final UserPushSubscriptionService userPushSubscriptionService;
+    private final JavaMailSender mailSender;
+
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
 
     public UserWantedRecipeServiceImpl(RecipeMapper recipeMapper,
-                                       UserPushSubscriptionService userPushSubscriptionService) {
+                                       AppUserMapper appUserMapper,
+                                       NotificationService notificationService,
+                                       UserPushSubscriptionService userPushSubscriptionService,
+                                       ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.recipeMapper = recipeMapper;
+        this.appUserMapper = appUserMapper;
+        this.notificationService = notificationService;
         this.userPushSubscriptionService = userPushSubscriptionService;
+        this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
     @Override
@@ -233,13 +256,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
 
         log.info("Wanted recipe notify sending, actor={}, targetUserIds={}, plannedDate={}",
                 actor.getId(), dto.getTargetUserIds(), target.plannedDate);
-        int delivered = userPushSubscriptionService.sendToUserIds(
-                dto.getTargetUserIds(),
-                "备菜提醒",
-                target.body,
-                "/#/todo",
-                "prepare-" + target.plannedDate
-        );
+        int delivered = sendPrepareNotifications(dto.getTargetUserIds(), target);
         if (delivered <= 0) {
             log.info("Wanted recipe notify failed, actor={}, targetUserIds={}, plannedDate={}, delivered=0",
                     actor.getId(), dto.getTargetUserIds(), target.plannedDate);
@@ -248,6 +265,126 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
         log.info("Wanted recipe notify sent, actor={}, targetUserIds={}, plannedDate={}, delivered={}",
                 actor.getId(), dto.getTargetUserIds(), target.plannedDate, delivered);
         return ApiResponse.success("已发送通知", delivered);
+    }
+
+    private int sendPrepareNotifications(List<String> targetUserIds, NotifyTarget target) {
+        List<AppUser> targets = resolveTargetUsers(targetUserIds);
+        if (targets.isEmpty()) {
+            log.info("Wanted recipe notify skipped, reason=no_valid_target_user");
+            return 0;
+        }
+
+        String title = "备菜提醒";
+        int sent = 0;
+        for (AppUser user : targets) {
+            if (allowNotify(user, NOTICE_SITE)) {
+                notificationService.createSiteNotice(user.getId(), title, target.body, "WANT", null);
+                log.info("Wanted recipe site notice sent, user={}", userLabel(user));
+                sent++;
+            } else {
+                log.info("Wanted recipe site notice skipped, user={}, preference={}, reason=preference",
+                        userLabel(user), user.getNotificationPreference());
+            }
+
+            if (allowNotify(user, NOTICE_EMAIL)) {
+                try {
+                    sendEmail(user, "【王师傅家提醒】" + title, target.body);
+                    log.info("Wanted recipe email sent, user={}, to={}", userLabel(user), maskEmail(user.getEmail()));
+                    sent++;
+                } catch (Exception ex) {
+                    log.warn("Wanted recipe email failed, user={}, to={}, reason={}",
+                            userLabel(user), maskEmail(user.getEmail()), ex.getMessage(), ex);
+                }
+            } else {
+                log.info("Wanted recipe email skipped, user={}, preference={}, reason=preference",
+                        userLabel(user), user.getNotificationPreference());
+            }
+        }
+
+        List<String> pushUserIds = targets.stream()
+                .filter(user -> allowNotify(user, NOTICE_PUSH))
+                .map(AppUser::getId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        List<String> skippedPushUsers = targets.stream()
+                .filter(user -> !allowNotify(user, NOTICE_PUSH))
+                .map(this::userLabel)
+                .collect(Collectors.toList());
+        if (!skippedPushUsers.isEmpty()) {
+            log.info("Wanted recipe push preference skipped, users={}", skippedPushUsers);
+        }
+        if (!pushUserIds.isEmpty()) {
+            int delivered = userPushSubscriptionService.sendToUserIds(
+                    pushUserIds,
+                    title,
+                    target.body,
+                    "/#/todo",
+                    "prepare-" + target.plannedDate
+            );
+            log.info("Wanted recipe push sent, targetUserIds={}, delivered={}", pushUserIds, delivered);
+            sent += delivered;
+        } else {
+            log.info("Wanted recipe push skipped, reason=no_allowed_user");
+        }
+        return sent;
+    }
+
+    private List<AppUser> resolveTargetUsers(List<String> targetUserIds) {
+        if (targetUserIds == null || targetUserIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return targetUserIds.stream()
+                .filter(StringUtils::hasText)
+                .distinct()
+                .map(appUserMapper::selectById)
+                .filter(user -> user != null && "normal".equals(user.getStatus()))
+                .collect(Collectors.toList());
+    }
+
+    private void sendEmail(AppUser user, String title, String content) {
+        if (mailSender == null || !StringUtils.hasText(mailUsername)) {
+            throw new IllegalStateException("邮箱服务未配置");
+        }
+        if (user == null || !StringUtils.hasText(user.getEmail())) {
+            throw new IllegalStateException("用户邮箱未配置");
+        }
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(mailUsername);
+        message.setTo(user.getEmail());
+        message.setSubject(title);
+        message.setText(content);
+        mailSender.send(message);
+    }
+
+    private boolean allowNotify(AppUser user, String type) {
+        if (user == null || !StringUtils.hasText(user.getNotificationPreference())) {
+            return true;
+        }
+        Set<String> prefs = Arrays.stream(user.getNotificationPreference().split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        return prefs.contains(type);
+    }
+
+    private String userLabel(AppUser user) {
+        if (user == null) {
+            return "none";
+        }
+        String name = StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
+        return StringUtils.hasText(name) ? user.getId() + "(" + name + ")" : user.getId();
+    }
+
+    private String maskEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return "none";
+        }
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***" + (atIndex >= 0 ? email.substring(atIndex) : "");
+        }
+        return email.charAt(0) + "***" + email.substring(atIndex);
     }
 
     @Override

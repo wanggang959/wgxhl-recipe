@@ -12,21 +12,21 @@ import java.util.List;
 
 public interface TodoService extends IService<Todo> {
 
-    ApiResponse<Page<Todo>> page(TodoPageDTO dto);
+    ApiResponse<Page<Todo>> page(TodoPageDTO dto, AppUser actor);
 
-    ApiResponse<List<Todo>> upcoming(int limit);
+    ApiResponse<List<Todo>> upcoming(int limit, AppUser actor);
 
-    ApiResponse<TodoSummaryDTO> summary();
+    ApiResponse<TodoSummaryDTO> summary(AppUser actor);
 
-    ApiResponse<Todo> detail(String id);
+    ApiResponse<Todo> detail(String id, AppUser actor);
 
     ApiResponse<Todo> create(Todo entity, AppUser actor);
 
-    ApiResponse<Void> update(Todo entity);
+    ApiResponse<Void> update(Todo entity, AppUser actor);
 
-    ApiResponse<Void> complete(String id);
+    ApiResponse<Void> complete(String id, AppUser actor);
 
-    ApiResponse<Void> delete(String id);
+    ApiResponse<Void> delete(String id, AppUser actor);
 
     void syncBirthdayTodo(AppUser user);
 

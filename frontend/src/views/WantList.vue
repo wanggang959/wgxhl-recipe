@@ -39,7 +39,7 @@ const actorName = computed(() => userStore.user?.nickname || userStore.user?.use
 
 /** 有今天及之后的想吃即可显示通知按钮，不依赖预览接口 */
 const showNotifyBtn = computed(() => (
-  Boolean(userStore.userId)
+  userStore.canMutate
   && (dateList.value.length > 0 || list.value.length > 0)
 ))
 
@@ -353,7 +353,7 @@ async function submitNotify() {
             <strong>{{ item.recipeName }}</strong>
             <span>{{ formatDateLabel(item.plannedDate) }} 想吃</span>
           </div>
-          <div class="want-actions" @click.stop>
+          <div v-if="userStore.canMutate" class="want-actions" @click.stop>
             <button type="button" @click="openEdit(item)">
               <van-icon name="edit" />
               改日期

@@ -21,6 +21,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  showFavoriteButton: {
+    type: Boolean,
+    default: true,
+  },
   showActions: {
     type: Boolean,
     default: false,
@@ -42,7 +46,13 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   <article class="recipe-card" @click="emit('open', recipe)">
     <div class="cover-wrap">
       <img class="cover" :src="cover" :alt="recipe.recipeName" loading="lazy" />
-      <button class="favorite" :class="{ active: favorite }" type="button" @click.stop="emit('favorite', recipe)">
+      <button
+        v-if="showFavoriteButton"
+        class="favorite"
+        :class="{ active: favorite }"
+        type="button"
+        @click.stop="emit('favorite', recipe)"
+      >
         <ActionIcon name="heart" :filled="favorite" :size="20" />
       </button>
       <button

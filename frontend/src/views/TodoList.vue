@@ -13,6 +13,7 @@ import { getRecipeImage } from '../utils/imageUrl'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const isGuest = computed(() => userStore.isGuest)
 const loading = ref(false)
 const list = ref([])
 const wantedList = ref([])
@@ -45,7 +46,7 @@ const categories = [
   ['OTHER', '其他'],
 ]
 
-const combinedItems = computed(() => {
+const sourceItems = computed(() => {
   const todoItems = list.value.map((item) => ({
     type: 'todo',
     id: item.id,
@@ -63,6 +64,11 @@ const combinedItems = computed(() => {
     data: item,
   }))
   return [...todoItems, ...cookItems]
+})
+
+const combinedItems = computed(() => {
+  if (!isGuest.value) return sourceItems.value
+  return sourceItems.value.filter((item) => item.category === 'COOK')
 })
 
 const filteredItems = computed(() => combinedItems.value
@@ -121,8 +127,10 @@ async function loadTodo(options = {}) {
   const showLoading = options.showLoading ?? (list.value.length === 0 && wantedList.value.length === 0)
   if (showLoading) loading.value = true
   try {
+    const todoQuery = { current: 1, size: 200 }
+    if (userStore.isGuest) todoQuery.category = 'COOK'
     const [pageRes, summaryRes, wantedRes] = await Promise.all([
-      pageTodo({ current: 1, size: 200 }),
+      pageTodo(todoQuery),
       getTodoSummary(),
       pageWantedRecipe({
         current: 1,
@@ -278,11 +286,11 @@ async function remove(item) {
   <section class="todo-page">
     <div class="overview-card">
       <div>
-        <p>待办清单</p>
+        <p>{{ isGuest ? '做饭安排' : '待办清单' }}</p>
         <h1>今日 {{ displayTodayCount }} 件</h1>
         <span>已完成 {{ summary.doneCount }} 件 · 近期待办 {{ displayDueSoonCount }} 件</span>
       </div>
-      <div class="overview-actions">
+      <div v-if="!isGuest" class="overview-actions">
         <button type="button" @click="router.push('/todo/summary?range=today')">
           <van-icon name="cart-o" />
           采购汇总
@@ -309,7 +317,7 @@ async function remove(item) {
           </button>
         </div>
       </div>
-      <div class="filter-row category-row">
+      <div v-if="!isGuest" class="filter-row category-row">
         <span>类型</span>
         <div>
           <button
@@ -328,7 +336,8 @@ async function remove(item) {
     <van-loading v-if="loading" size="24px" class="loading">加载中...</van-loading>
     <EmptyState
       v-else-if="filteredItems.length === 0"
-      text="这个筛选下还没有待办"
+      :text="isGuest ? '暂无做饭相关安排' : '这个筛选下还没有待办'"
+      :show-button="!isGuest"
       button-text="新增待办"
       @action="router.push('/todo/create')"
     />
@@ -339,6 +348,7 @@ async function remove(item) {
           <TodoCard
             v-if="item.type === 'todo'"
             :todo="item.data"
+            :readonly="isGuest"
             @open="router.push(`/todo/${item.data.id}`)"
             @complete="finish"
             @complete-blocked="completeBlocked"
@@ -355,7 +365,11 @@ async function remove(item) {
               <strong>{{ item.data.recipeName }}</strong>
               <span>{{ getUserName(item.data.userId) }} · 计划 {{ item.data.plannedDate }}</span>
             </div>
-            <button type="button" @click="finishWanted(item.data)">
+            <button
+              v-if="!isGuest"
+              type="button"
+              @click.stop="finishWanted(item.data)"
+            >
               <van-icon name="success" />
               完成
             </button>
@@ -525,9 +539,13 @@ async function remove(item) {
   border: 1px solid rgba(245, 223, 199, 0.96);
   box-shadow: 0 12px 26px rgba(154, 52, 18, 0.07);
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) auto;
+  grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+.wanted-item:has(button) {
+  grid-template-columns: 58px minmax(0, 1fr) auto;
 }
 
 .wanted-item img {

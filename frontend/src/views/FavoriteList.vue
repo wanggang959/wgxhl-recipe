@@ -198,6 +198,8 @@ function submitCustomWantDate() {
         :recipe="item"
         favorite
         :wanted="Boolean(wantedMap[item.id])"
+        :show-favorite-button="userStore.canMutate"
+        :show-want-button="userStore.canMutate"
         @open="router.push(`/recipe/${item.id}`)"
         @favorite="removeSafe"
         @want="openWantAction"

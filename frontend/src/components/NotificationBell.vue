@@ -9,7 +9,9 @@ import {
   unreadNotificationCount,
 } from '../api/notification'
 import NotificationList from './NotificationList.vue'
+import { useUserStore } from '../stores/user'
 
+const userStore = useUserStore()
 const visible = ref(false)
 const unread = ref(0)
 const items = ref([])
@@ -76,7 +78,7 @@ async function removeRead() {
 }
 
 async function openNotice(item) {
-  if (!item.isRead) {
+  if (userStore.canMutate && !item.isRead) {
     await markRead(item)
   }
   if (item.relatedId) {
@@ -112,7 +114,7 @@ async function openNotice(item) {
             <strong>{{ items.length }}</strong>
             <span>条消息</span>
           </div>
-          <div class="toolbar-actions">
+          <div v-if="userStore.canMutate" class="toolbar-actions">
             <button type="button" class="ghost" :disabled="!hasRead" @click="removeRead">
               <van-icon name="delete-o" size="15" />
               删除已读
@@ -126,7 +128,13 @@ async function openNotice(item) {
 
         <div class="notice-content">
           <van-loading v-if="loading" size="24px" class="loading">加载中...</van-loading>
-          <NotificationList v-else :items="items" @open="openNotice" @read="markRead" />
+          <NotificationList
+            v-else
+            :items="items"
+            :readonly="!userStore.canMutate"
+            @open="openNotice"
+            @read="markRead"
+          />
         </div>
       </section>
     </div>

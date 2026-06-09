@@ -17,6 +17,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  showFavorite: {
+    type: Boolean,
+    default: true,
+  },
+  showTodoAction: {
+    type: Boolean,
+    default: true,
+  },
 })
 
 const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo'])
@@ -37,7 +45,13 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
         <button type="button" @click="emit('back')">
           <van-icon name="arrow-left" size="20" />
         </button>
-        <button class="favorite-action" :class="{ active: favorite }" type="button" @click="emit('favorite')">
+        <button
+          v-if="showFavorite"
+          class="favorite-action"
+          :class="{ active: favorite }"
+          type="button"
+          @click="emit('favorite')"
+        >
           <ActionIcon name="heart" :filled="favorite" :size="21" />
         </button>
       </div>
@@ -51,7 +65,14 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
       <div class="title-line">
         <h1>{{ recipe.recipeName }}</h1>
         <div class="title-actions">
-          <van-button round size="small" type="warning" icon="todo-list-o" @click="emit('todo', recipe)">
+          <van-button
+            v-if="showTodoAction"
+            round
+            size="small"
+            type="warning"
+            icon="todo-list-o"
+            @click="emit('todo', recipe)"
+          >
             加入待办
           </van-button>
           <van-button v-if="canEdit" round size="small" type="warning" icon="edit" @click="emit('edit')">

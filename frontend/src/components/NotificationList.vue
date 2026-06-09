@@ -4,6 +4,10 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  readonly: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['open', 'read'])
@@ -44,7 +48,7 @@ function formatTime(value) {
           <span v-if="item.relatedId">待办详情</span>
         </span>
       </span>
-      <span v-if="!item.isRead" class="read-link" @click.stop="emit('read', item)">标为已读</span>
+      <span v-if="!readonly && !item.isRead" class="read-link" @click.stop="emit('read', item)">标为已读</span>
     </button>
   </div>
 </template>

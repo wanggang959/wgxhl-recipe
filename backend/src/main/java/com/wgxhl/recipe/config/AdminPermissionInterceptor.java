@@ -72,8 +72,13 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         }
         request.setAttribute(AuthRequestAttributes.CURRENT_USER, currentUser);
 
-        String userRole = jwtAuthUtil.getUserRole(jwt);
         String path = normalizePath(request.getRequestURI());
+        if (isGuestUser(currentUser) && !isGuestReadOnlyPath(path)) {
+            writeJson(response, ApiResponse.fail(403, "游客仅可查看，无法执行此操作"));
+            return false;
+        }
+
+        String userRole = jwtAuthUtil.getUserRole(jwt);
         if (requiresSuperAdmin(path)) {
             if (ROLE_SUPER_ADMIN.equals(userRole)) {
                 return true;
@@ -99,8 +104,32 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         return "/user/setStatus".equals(path);
     }
 
+    private boolean isGuestUser(AppUser user) {
+        return user != null && (GUEST_ID.equals(user.getId()) || GUEST_USERNAME.equals(user.getUsername()));
+    }
+
+    private boolean isGuestReadOnlyPath(String path) {
+        if ("/health".equals(path)) {
+            return true;
+        }
+        if (PUBLIC_USER_PATHS.contains(path)) {
+            return true;
+        }
+        if ("/user/members".equals(path) || "/push/status".equals(path)) {
+            return true;
+        }
+        return path.endsWith("/page")
+                || path.endsWith("/getById")
+                || path.endsWith("/check")
+                || path.endsWith("/listByRecipeId")
+                || path.endsWith("/summary")
+                || path.endsWith("/upcoming")
+                || path.endsWith("/unreadCount")
+                || path.endsWith("/dateList");
+    }
+
     private String disabledAccountMessage(AppUser user) {
-        if (user != null && (GUEST_ID.equals(user.getId()) || GUEST_USERNAME.equals(user.getUsername()))) {
+        if (isGuestUser(user)) {
             return "当前系统已禁止游客登录，请联系管理员处理";
         }
         return "您的帐号已被禁用，请联系王师傅处理";

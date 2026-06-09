@@ -28,23 +28,23 @@ public class TodoController {
     }
 
     @PostMapping("/page")
-    public ApiResponse<Page<Todo>> page(@RequestBody TodoPageDTO dto) {
-        return todoService.page(dto);
+    public ApiResponse<Page<Todo>> page(@RequestBody TodoPageDTO dto, HttpServletRequest request) {
+        return todoService.page(dto, currentUser(request));
     }
 
     @PostMapping("/upcoming")
-    public ApiResponse<List<Todo>> upcoming(@RequestBody TodoPageDTO dto) {
-        return todoService.upcoming((int) dto.getSize());
+    public ApiResponse<List<Todo>> upcoming(@RequestBody TodoPageDTO dto, HttpServletRequest request) {
+        return todoService.upcoming((int) dto.getSize(), currentUser(request));
     }
 
     @PostMapping("/summary")
-    public ApiResponse<TodoSummaryDTO> summary() {
-        return todoService.summary();
+    public ApiResponse<TodoSummaryDTO> summary(HttpServletRequest request) {
+        return todoService.summary(currentUser(request));
     }
 
     @PostMapping("/getById")
-    public ApiResponse<Todo> getById(@RequestBody IdDTO dto) {
-        return todoService.detail(dto.getId());
+    public ApiResponse<Todo> getById(@RequestBody IdDTO dto, HttpServletRequest request) {
+        return todoService.detail(dto.getId(), currentUser(request));
     }
 
     @PostMapping("/create")
@@ -53,18 +53,18 @@ public class TodoController {
     }
 
     @PostMapping("/update")
-    public ApiResponse<Void> update(@RequestBody Todo entity) {
-        return todoService.update(entity);
+    public ApiResponse<Void> update(@RequestBody Todo entity, HttpServletRequest request) {
+        return todoService.update(entity, currentUser(request));
     }
 
     @PostMapping("/complete")
-    public ApiResponse<Void> complete(@RequestBody IdDTO dto) {
-        return todoService.complete(dto.getId());
+    public ApiResponse<Void> complete(@RequestBody IdDTO dto, HttpServletRequest request) {
+        return todoService.complete(dto.getId(), currentUser(request));
     }
 
     @PostMapping("/delete")
-    public ApiResponse<Void> delete(@RequestBody IdDTO dto) {
-        return todoService.delete(dto.getId());
+    public ApiResponse<Void> delete(@RequestBody IdDTO dto, HttpServletRequest request) {
+        return todoService.delete(dto.getId(), currentUser(request));
     }
 
     private AppUser currentUser(HttpServletRequest request) {

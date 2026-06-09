@@ -116,9 +116,10 @@ watch(
   },
 )
 
-async function loadTodo() {
+async function loadTodo(options = {}) {
   if (!userStore.userId) return
-  loading.value = true
+  const showLoading = options.showLoading ?? (list.value.length === 0 && wantedList.value.length === 0)
+  if (showLoading) loading.value = true
   try {
     const [pageRes, summaryRes, wantedRes] = await Promise.all([
       pageTodo({ current: 1, size: 200 }),
@@ -136,7 +137,7 @@ async function loadTodo() {
   } catch (error) {
     showFailToast(error.message || '待办加载失败')
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
   }
 }
 
@@ -221,7 +222,7 @@ async function finishWanted(item) {
     await deleteWantedRecipe(item.id)
     closeToast()
     showSuccessToast({ message: '已完成', duration: 1400 })
-    await loadTodo()
+    await loadTodo({ showLoading: false })
   } catch (error) {
     if (error?.message) showFailToast(error.message || '操作失败')
   }
@@ -241,7 +242,7 @@ async function finish(item) {
       await completeTodo(item.id)
       closeToast()
       showSuccessToast({ message: '已完成', duration: 1300 })
-      await loadTodo()
+      await loadTodo({ showLoading: false })
       return
     }
     await showConfirmDialog({
@@ -266,7 +267,7 @@ async function remove(item) {
     })
     await deleteTodo(item.id)
     showSuccessToast('已删除')
-    await loadTodo()
+    await loadTodo({ showLoading: false })
   } catch (error) {
     if (error?.message) showFailToast(error.message)
   }
@@ -277,25 +278,25 @@ async function remove(item) {
   <section class="todo-page">
     <div class="overview-card">
       <div>
-        <p>家庭待办</p>
-        <h1>{{ displayTodayCount }} 件今日待办</h1>
-        <span>已完成 {{ summary.doneCount }} · 即将到期 {{ displayDueSoonCount }}</span>
+        <p>待办清单</p>
+        <h1>今日 {{ displayTodayCount }} 件</h1>
+        <span>已完成 {{ summary.doneCount }} 件 · 近期待办 {{ displayDueSoonCount }} 件</span>
       </div>
       <div class="overview-actions">
         <button type="button" @click="router.push('/todo/summary?range=today')">
           <van-icon name="cart-o" />
-          采购清单
+          采购汇总
         </button>
         <button type="button" class="ghost" @click="router.push('/todo/create')">
           <van-icon name="plus" />
-          新增
+          新增待办
         </button>
       </div>
     </div>
 
     <div class="filter-card">
       <div class="filter-row time-row">
-        <span>时间</span>
+        <span>范围</span>
         <div>
           <button
             v-for="[value, label] in timeFilters"
@@ -309,7 +310,7 @@ async function remove(item) {
         </div>
       </div>
       <div class="filter-row category-row">
-        <span>分类</span>
+        <span>类型</span>
         <div>
           <button
             v-for="[value, label] in categories"
@@ -352,7 +353,7 @@ async function remove(item) {
             />
             <div @click="router.push(`/recipe/${item.data.recipeId}`)">
               <strong>{{ item.data.recipeName }}</strong>
-              <span>{{ getUserName(item.data.userId) }}想吃 · {{ item.data.plannedDate }}</span>
+              <span>{{ getUserName(item.data.userId) }} · 计划 {{ item.data.plannedDate }}</span>
             </div>
             <button type="button" @click="finishWanted(item.data)">
               <van-icon name="success" />
@@ -373,13 +374,14 @@ async function remove(item) {
 }
 
 .overview-card {
-  padding: 16px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #fff 0%, #fff7e8 100%);
-  border: 1px solid var(--app-border);
-  box-shadow: 0 14px 30px rgba(154, 52, 18, 0.1);
+  padding: 15px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(245, 223, 199, 0.96);
+  box-shadow: 0 12px 26px rgba(154, 52, 18, 0.07);
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
 }
 
@@ -398,7 +400,8 @@ async function remove(item) {
 .overview-card h1 {
   margin-top: 4px;
   color: var(--app-text);
-  font-size: 24px;
+  font-size: 25px;
+  line-height: 1.18;
 }
 
 .overview-card span {
@@ -416,10 +419,10 @@ async function remove(item) {
 }
 
 .overview-actions button {
-  height: 34px;
+  height: 36px;
   border: 0;
-  border-radius: 999px;
-  padding: 0 11px;
+  border-radius: 13px;
+  padding: 0 12px;
   background: var(--app-primary);
   color: #fff;
   display: inline-flex;
@@ -429,23 +432,24 @@ async function remove(item) {
   font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.18);
 }
 
 .overview-actions button.ghost {
   background: #fff;
   color: var(--app-primary);
   border: 1px solid #fed7aa;
+  box-shadow: none;
 }
 
 .filter-card {
-  padding: 10px;
+  padding: 11px;
   border: 1px solid rgba(245, 223, 199, 0.92);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 10px 24px rgba(154, 52, 18, 0.05);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
 }
 
 .filter-row {
@@ -476,7 +480,7 @@ async function remove(item) {
 
 .filter-row button {
   flex: 0 0 auto;
-  height: 32px;
+  height: 31px;
   border: 1px solid var(--app-border);
   border-radius: 999px;
   padding: 0 12px;
@@ -504,38 +508,40 @@ async function remove(item) {
 .todo-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 11px;
 }
 
 .todo-group h2 {
-  margin: 2px 2px 0;
+  margin: 4px 2px 0;
   color: var(--app-text);
-  font-size: 17px;
+  font-size: 18px;
+  line-height: 1.2;
 }
 
 .wanted-item {
-  padding: 10px;
+  padding: 12px;
   border-radius: 18px;
-  background: #fff;
-  border: 1px solid var(--app-border);
-  box-shadow: 0 12px 26px rgba(154, 52, 18, 0.08);
+  background: linear-gradient(180deg, #fff 0%, #fffdf9 100%);
+  border: 1px solid rgba(245, 223, 199, 0.96);
+  box-shadow: 0 12px 26px rgba(154, 52, 18, 0.07);
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wanted-item img {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
+  width: 58px;
+  height: 58px;
+  border-radius: 13px;
   object-fit: cover;
 }
 
 .wanted-item strong {
   display: block;
   color: var(--app-text);
-  font-size: 16px;
+  font-size: 17px;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
@@ -548,8 +554,8 @@ async function remove(item) {
 
 .wanted-item button {
   box-sizing: border-box;
-  min-width: 78px;
-  height: 36px;
+  min-width: 72px;
+  height: 34px;
   border: 0;
   border-radius: 999px;
   padding: 0 12px;
@@ -563,5 +569,6 @@ async function remove(item) {
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.18);
 }
 </style>

@@ -13,20 +13,27 @@ const props = defineProps({
 const emit = defineEmits(['open', 'complete', 'completeBlocked', 'edit', 'delete'])
 
 const categoryMap = {
-  COOK: ['🍲', '做饭'],
-  GROCERY: ['🛒', '采购'],
-  LIFE: ['📦', '生活'],
-  BIRTHDAY: ['🎂', '生日'],
-  ANNIVERSARY: ['💐', '纪念日'],
-  SERVER: ['💻', '服务器'],
-  DOMAIN: ['🌐', '域名'],
-  SSL: ['🔐', '证书'],
-  PAYMENT: ['💳', '缴费'],
-  OTHER: ['📝', '其他'],
+  COOK: ['fire-o', '做饭'],
+  GROCERY: ['cart-o', '采购'],
+  LIFE: ['notes-o', '生活'],
+  BIRTHDAY: ['birthday-cake-o', '生日'],
+  ANNIVERSARY: ['like-o', '纪念日'],
+  SERVER: ['desktop-o', '服务器'],
+  DOMAIN: ['cluster-o', '域名'],
+  SSL: ['shield-o', '证书'],
+  PAYMENT: ['balance-pay', '缴费'],
+  OTHER: ['todo-list-o', '其他'],
 }
 
 function categoryInfo(category) {
   return categoryMap[category] || categoryMap.OTHER
+}
+
+function descriptionLines(text) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
 }
 
 function handleComplete() {
@@ -40,20 +47,24 @@ function handleComplete() {
 
 <template>
   <article class="todo-card" :class="{ compact, done: todo.status === 'DONE' }" @click="emit('open', todo)">
-    <div class="todo-icon">{{ categoryInfo(todo.category)[0] }}</div>
+    <div class="todo-icon">
+      <van-icon :name="categoryInfo(todo.category)[0]" />
+    </div>
     <div class="todo-main">
       <div class="todo-title-line">
         <h3>{{ todo.title }}</h3>
         <span>{{ categoryInfo(todo.category)[1] }}</span>
       </div>
       <div class="todo-meta">
-        <span v-if="todo.ownerName">负责人：{{ todo.ownerName }}</span>
-        <span v-if="todo.birthdayDisplayText">生日：{{ todo.birthdayDisplayText }}</span>
-        <span v-else-if="todo.dueLabel">时间：{{ todo.dueLabel }}</span>
+        <span v-if="todo.ownerName"><van-icon name="contact-o" />{{ todo.ownerName }}</span>
+        <span v-if="todo.birthdayDisplayText"><van-icon name="birthday-cake-o" />{{ todo.birthdayDisplayText }}</span>
+        <span v-else-if="todo.dueLabel"><van-icon name="clock-o" />{{ todo.dueLabel }}</span>
         <span v-if="todo.remainText">{{ todo.remainText }}</span>
-        <span v-if="todo.nextNotifyLabel">下次通知时间：{{ todo.nextNotifyLabel }}</span>
+        <span v-if="todo.nextNotifyLabel"><van-icon name="bell" />提醒 {{ todo.nextNotifyLabel }}</span>
       </div>
-      <p v-if="todo.description && !compact">{{ todo.description }}</p>
+      <div v-if="todo.description && !compact" class="todo-description">
+        <span v-for="line in descriptionLines(todo.description)" :key="line">{{ line }}</span>
+      </div>
       <div v-if="!compact" class="todo-actions" @click.stop>
         <button
           v-if="todo.status !== 'DONE'"
@@ -79,14 +90,14 @@ function handleComplete() {
 
 <style scoped>
 .todo-card {
-  padding: 12px;
+  padding: 14px;
   border-radius: 18px;
-  background: #fff;
-  border: 1px solid var(--app-border);
-  box-shadow: 0 10px 24px rgba(154, 52, 18, 0.07);
+  background: linear-gradient(180deg, #fff 0%, #fffdf9 100%);
+  border: 1px solid rgba(245, 223, 199, 0.96);
+  box-shadow: 0 12px 26px rgba(154, 52, 18, 0.07);
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
 }
 
 .todo-card.compact {
@@ -101,13 +112,15 @@ function handleComplete() {
 }
 
 .todo-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: #fff7e8;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #fff7e8, #fff);
+  border: 1px solid #ffedd5;
+  color: var(--app-primary);
   display: grid;
   place-items: center;
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .todo-main {
@@ -124,14 +137,14 @@ function handleComplete() {
 .todo-title-line h3 {
   margin: 0;
   color: var(--app-text);
-  font-size: 16px;
-  line-height: 1.35;
+  font-size: 17px;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
 .todo-title-line span {
   flex: 0 0 auto;
-  padding: 4px 8px;
+  padding: 4px 9px;
   border-radius: 999px;
   background: var(--app-primary-soft);
   color: #c2410c;
@@ -140,42 +153,58 @@ function handleComplete() {
 }
 
 .todo-meta {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 4px;
+  gap: 6px;
   color: var(--app-muted);
   font-size: 12px;
   line-height: 1.45;
 }
 
 .todo-meta span {
-  display: block;
-  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  padding: 2px 0;
   overflow-wrap: anywhere;
 }
 
-.todo-main p {
-  margin: 8px 0 0;
-  color: #6f5a49;
-  font-size: 13px;
-  line-height: 1.5;
+.todo-description {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.todo-description span {
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #fff7e8;
+  color: #7c5c46;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .todo-actions {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .todo-actions button {
-  height: 34px;
+  height: 32px;
   min-width: 0;
   border: 1px solid var(--app-border);
   border-radius: 999px;
-  padding: 0 11px;
-  background: #fffaf2;
+  padding: 0 12px;
+  background: #fff;
   color: #7c5c46;
   display: inline-flex;
   align-items: center;
@@ -188,6 +217,7 @@ function handleComplete() {
   background: var(--app-primary);
   border-color: var(--app-primary);
   color: #fff;
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.18);
 }
 
 .todo-actions .primary.disabled {

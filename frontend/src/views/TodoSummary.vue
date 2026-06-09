@@ -19,6 +19,9 @@ const markCacheReady = ref(false)
 const buyEditorVisible = ref(false)
 const buyEditorTarget = ref(null)
 const buyQuantity = ref('')
+const purchasePreviewVisible = ref(false)
+const purchasePreviewLines = ref([])
+const purchaseSubmitting = ref(false)
 
 const MARK_CACHE_PREFIX = 'wgxhl_recipe_purchase_summary_marks_v1:'
 
@@ -82,15 +85,31 @@ function changeRange(range) {
   })
 }
 
-async function addPurchaseTodo() {
-  const lines = [
-    ...ingredientSummary.value.map((item) => `${item.name} ${item.amount}`),
-    ...seasoningSummary.value.map((item) => item.name),
+function getPurchaseLines() {
+  return [
+    ...ingredientSummary.value
+      .filter((item) => getMark(item.key).status === 'buy')
+      .map((item) => formatPurchaseLine(item)),
+    ...seasoningSummary.value
+      .filter((item) => getMark(item.key).status === 'buy')
+      .map((item) => formatPurchaseLine(item)),
   ]
+}
+
+function openPurchasePreview() {
+  const lines = getPurchaseLines()
   if (lines.length === 0) {
-    showFailToast('暂无可加入待办的采购项')
+    showFailToast('请先把要采购的食材或调料标记为待购')
     return
   }
+  purchasePreviewLines.value = lines
+  purchasePreviewVisible.value = true
+}
+
+async function confirmPurchaseTodo() {
+  const lines = purchasePreviewLines.value
+  if (lines.length === 0 || purchaseSubmitting.value) return
+  purchaseSubmitting.value = true
   try {
     await createTodo({
       title: '采购任务',
@@ -103,9 +122,19 @@ async function addPurchaseTodo() {
       noticeMinutes: [0],
     })
     showSuccessToast('已加入待办')
+    purchasePreviewVisible.value = false
+    purchasePreviewLines.value = []
   } catch (error) {
     showFailToast(error.message || '加入待办失败')
+  } finally {
+    purchaseSubmitting.value = false
   }
+}
+
+function formatPurchaseLine(item) {
+  const mark = getMark(item.key)
+  const quantity = mark.quantity || item.amount || ''
+  return quantity ? `${item.name} ${quantity}` : item.name
 }
 
 async function loadSummary() {
@@ -350,7 +379,7 @@ function isInRange(dateText, range) {
         <p>做饭安排</p>
         <h1>采购汇总</h1>
       </div>
-      <button type="button" class="add-todo-btn" @click="addPurchaseTodo">
+      <button type="button" class="add-todo-btn" @click="openPurchasePreview">
         <van-icon name="plus" />
         待办
       </button>
@@ -439,6 +468,24 @@ function isInRange(dateText, range) {
         <button type="button" @click="buyEditorVisible = false">取消</button>
       </div>
     </van-popup>
+
+    <van-popup v-model:show="purchasePreviewVisible" position="bottom" round>
+      <div class="purchase-preview">
+        <header>
+          <p>采购任务预览</p>
+          <h3>{{ purchasePreviewLines.length }} 项待购</h3>
+        </header>
+        <ol>
+          <li v-for="line in purchasePreviewLines" :key="line">{{ line }}</li>
+        </ol>
+        <div class="purchase-preview-actions">
+          <button type="button" @click="purchasePreviewVisible = false">取消</button>
+          <button type="button" class="primary" :disabled="purchaseSubmitting" @click="confirmPurchaseTodo">
+            {{ purchaseSubmitting ? '加入中...' : '确定加入' }}
+          </button>
+        </div>
+      </div>
+    </van-popup>
   </section>
 </template>
 
@@ -492,19 +539,28 @@ function isInRange(dateText, range) {
   font-size: 13px;
 }
 
-.add-todo-btn {
-  height: 34px;
+.page-head .add-todo-btn {
+  width: auto;
+  min-width: 74px;
+  height: 38px;
   border: 0;
-  border-radius: 999px;
-  padding: 0 10px;
+  border-radius: 14px;
+  padding: 0 12px;
   background: var(--app-primary);
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 13px;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.24);
+}
+
+.page-head .add-todo-btn .van-icon {
+  font-size: 16px;
 }
 
 .range-tabs {
@@ -759,5 +815,77 @@ function isInRange(dateText, range) {
   border-color: var(--app-primary);
   background: var(--app-primary);
   color: #fff;
+}
+
+.purchase-preview {
+  padding: 18px 14px max(18px, env(safe-area-inset-bottom));
+  background: #fffaf2;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.purchase-preview header p,
+.purchase-preview header h3 {
+  margin: 0;
+}
+
+.purchase-preview header p {
+  color: var(--app-primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.purchase-preview header h3 {
+  margin-top: 4px;
+  color: var(--app-text);
+  font-size: 20px;
+}
+
+.purchase-preview ol {
+  max-height: 42vh;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.purchase-preview li {
+  padding: 11px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.purchase-preview-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.purchase-preview-actions button {
+  height: 42px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #fff;
+  color: #7c5c46;
+  font-weight: 900;
+}
+
+.purchase-preview-actions button.primary {
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.22);
+}
+
+.purchase-preview-actions button:disabled {
+  opacity: 0.65;
 }
 </style>

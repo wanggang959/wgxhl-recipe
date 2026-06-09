@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showLoadingToast } from 'vant'
 import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
+import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
 import { pickDefaultAvatar, userAvatarSrc } from '../utils/avatar'
@@ -40,6 +41,15 @@ const userForm = reactive({
   password: '',
   userRole: 'user',
   avatar: '',
+  email: '',
+  birthday: '',
+  birthdayCalendar: 'SOLAR',
+  lunarBirthdayYear: new Date().getFullYear(),
+  lunarBirthdayMonth: 1,
+  lunarBirthdayDay: 1,
+  lunarBirthdayLeap: false,
+  remark: '',
+  notificationPreference: 'site',
 })
 
 const BUILTIN_ADMIN_ID = 'admin-wangshifu'
@@ -160,6 +170,15 @@ function resetUserForm() {
   userForm.password = ''
   userForm.userRole = 'user'
   userForm.avatar = ''
+  userForm.email = ''
+  userForm.birthday = ''
+  userForm.birthdayCalendar = 'SOLAR'
+  userForm.lunarBirthdayYear = new Date().getFullYear()
+  userForm.lunarBirthdayMonth = 1
+  userForm.lunarBirthdayDay = 1
+  userForm.lunarBirthdayLeap = false
+  userForm.remark = ''
+  userForm.notificationPreference = 'site'
   editingBuiltinAdmin.value = false
   showMemberForm.value = false
 }
@@ -177,6 +196,15 @@ function beginAddUser() {
   userForm.password = ''
   userForm.userRole = 'user'
   userForm.avatar = DEFAULT_AVATARS[0]
+  userForm.email = ''
+  userForm.birthday = ''
+  userForm.birthdayCalendar = 'SOLAR'
+  userForm.lunarBirthdayYear = new Date().getFullYear()
+  userForm.lunarBirthdayMonth = 1
+  userForm.lunarBirthdayDay = 1
+  userForm.lunarBirthdayLeap = false
+  userForm.remark = ''
+  userForm.notificationPreference = 'site'
   editingBuiltinAdmin.value = false
   showMemberForm.value = true
   scrollMemberPanelToTop()
@@ -189,6 +217,15 @@ function editUser(item) {
   userForm.password = ''
   userForm.userRole = item.userRole || 'user'
   userForm.avatar = item.avatar || pickDefaultAvatar(item.id)
+  userForm.email = item.email || ''
+  userForm.birthday = item.birthday || ''
+  userForm.birthdayCalendar = item.birthdayCalendar || 'SOLAR'
+  userForm.lunarBirthdayYear = item.lunarBirthdayYear || new Date().getFullYear()
+  userForm.lunarBirthdayMonth = item.lunarBirthdayMonth || 1
+  userForm.lunarBirthdayDay = item.lunarBirthdayDay || 1
+  userForm.lunarBirthdayLeap = Boolean(item.lunarBirthdayLeap)
+  userForm.remark = item.remark || ''
+  userForm.notificationPreference = item.notificationPreference || 'site'
   editingBuiltinAdmin.value = isBuiltinAdminUser(item)
   showMemberForm.value = true
   scrollMemberPanelToTop()
@@ -231,6 +268,15 @@ async function saveUser() {
       ...userForm,
       username: userForm.username.trim(),
       nickname: userForm.nickname.trim() || userForm.username.trim(),
+      email: userForm.email.trim(),
+      birthday: userForm.birthdayCalendar === 'SOLAR' ? (userForm.birthday || null) : null,
+      birthdayCalendar: userForm.birthdayCalendar,
+      lunarBirthdayYear: userForm.birthdayCalendar === 'LUNAR' ? Number(userForm.lunarBirthdayYear) : null,
+      lunarBirthdayMonth: userForm.birthdayCalendar === 'LUNAR' ? Number(userForm.lunarBirthdayMonth) : null,
+      lunarBirthdayDay: userForm.birthdayCalendar === 'LUNAR' ? Number(userForm.lunarBirthdayDay) : null,
+      lunarBirthdayLeap: userForm.birthdayCalendar === 'LUNAR' ? Boolean(userForm.lunarBirthdayLeap) : false,
+      remark: userForm.remark.trim(),
+      notificationPreference: userForm.notificationPreference,
       avatar,
       status: isEditingUser.value ? (editingUser?.status || 'normal') : 'normal',
     }
@@ -466,6 +512,39 @@ onMounted(() => {
           />
           <p v-if="editingBuiltinAdmin" class="builtin-hint">内置管理员用户名固定为「王师傅」，如需改名请只修改昵称。</p>
           <van-field v-model="userForm.nickname" class="form-field" label="昵称" placeholder="显示名称" />
+          <van-field v-model="userForm.email" class="form-field" label="邮箱" placeholder="用于邮箱提醒" />
+          <label class="role-field">
+            <span>生日历法</span>
+            <select v-model="userForm.birthdayCalendar">
+              <option value="SOLAR">公历生日</option>
+              <option value="LUNAR">农历生日</option>
+            </select>
+          </label>
+          <van-field
+            v-if="userForm.birthdayCalendar === 'SOLAR'"
+            v-model="userForm.birthday"
+            class="form-field"
+            label="生日"
+            type="date"
+          />
+          <div v-else class="lunar-birthday-fields">
+            <label>
+              <span>出生年</span>
+              <input v-model.number="userForm.lunarBirthdayYear" type="number" min="1900" max="2100" />
+            </label>
+            <label>
+              <span>农历月</span>
+              <input v-model.number="userForm.lunarBirthdayMonth" type="number" min="1" max="12" />
+            </label>
+            <label>
+              <span>农历日</span>
+              <input v-model.number="userForm.lunarBirthdayDay" type="number" min="1" max="30" />
+            </label>
+            <label class="lunar-leap">
+              <input v-model="userForm.lunarBirthdayLeap" type="checkbox" />
+              闰月
+            </label>
+          </div>
           <van-field
             v-model="userForm.password"
             class="form-field"
@@ -480,6 +559,17 @@ onMounted(() => {
               <option value="admin">管理员（完全控制）</option>
             </select>
           </label>
+          <label class="role-field">
+            <span>通知偏好</span>
+            <select v-model="userForm.notificationPreference">
+              <option value="site">仅站内</option>
+              <option value="email">仅邮箱</option>
+              <option value="site,email">站内+邮箱</option>
+              <option value="site,push">站内+App</option>
+              <option value="site,email,push">站内+邮箱+App</option>
+            </select>
+          </label>
+          <van-field v-model="userForm.remark" class="form-field" label="备注" placeholder="家庭称呼、提醒备注" />
           <div class="avatar-field">
             <span>头像</span>
             <div class="avatar-picker">
@@ -531,6 +621,18 @@ onMounted(() => {
                   <span class="member-status" :class="{ danger: u.status === 'disabled' }">
                     状态：{{ statusText(u.status) }}
                   </span>
+                  <div class="member-extra">
+                    <span>{{ u.email || '未填写邮箱' }}</span>
+                    <MemberBirthdayCard
+                      :birthday="u.birthday"
+                      :calendar="u.birthdayCalendar"
+                      :lunar-year="u.lunarBirthdayYear"
+                      :lunar-month="u.lunarBirthdayMonth"
+                      :lunar-day="u.lunarBirthdayDay"
+                      :lunar-leap="u.lunarBirthdayLeap"
+                    />
+                    <span>近期待办：{{ u.recentTodoCount || 0 }}</span>
+                  </div>
                   <div v-if="isGuestUser(u)" class="member-actions member-actions--guest">
                     <button
                       v-if="canManageStatus(u)"
@@ -1031,12 +1133,64 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .member-status {
   font-size: 13px;
   color: #6b7280;
   font-weight: 600;
+}
+
+.member-extra {
+  min-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: #8a7462;
+  font-size: 12px;
+}
+
+.lunar-birthday-fields {
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.78fr) minmax(0, 0.78fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.lunar-birthday-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.lunar-birthday-fields span {
+  color: var(--app-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lunar-birthday-fields input[type='number'] {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 0 10px;
+  background: #fffaf2;
+  color: var(--app-text);
+}
+
+.lunar-leap {
+  height: 42px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #c2410c;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px !important;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .member-status.danger {

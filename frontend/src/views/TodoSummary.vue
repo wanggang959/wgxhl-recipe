@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showFailToast } from 'vant'
+import { showFailToast, showSuccessToast } from 'vant'
 import { getRecipeDetail } from '../api/recipe'
+import { createTodo } from '../api/todo'
 import { pageWantedRecipe } from '../api/want'
 import EmptyState from '../components/EmptyState.vue'
 import { getImageUrl } from '../utils/imageUrl'
@@ -79,6 +80,32 @@ function changeRange(range) {
     path: '/todo/summary',
     query: { range },
   })
+}
+
+async function addPurchaseTodo() {
+  const lines = [
+    ...ingredientSummary.value.map((item) => `${item.name} ${item.amount}`),
+    ...seasoningSummary.value.map((item) => item.name),
+  ]
+  if (lines.length === 0) {
+    showFailToast('暂无可加入待办的采购项')
+    return
+  }
+  try {
+    await createTodo({
+      title: '采购任务',
+      category: 'GROCERY',
+      description: lines.join('\n'),
+      dueTime: `${formatDate(new Date())}T18:00:00`,
+      repeatType: 'NONE',
+      notifySite: true,
+      notifyEmail: false,
+      noticeMinutes: [0],
+    })
+    showSuccessToast('已加入待办')
+  } catch (error) {
+    showFailToast(error.message || '加入待办失败')
+  }
 }
 
 async function loadSummary() {
@@ -323,7 +350,10 @@ function isInRange(dateText, range) {
         <p>做饭安排</p>
         <h1>采购汇总</h1>
       </div>
-      <span>{{ filteredWantedList.length }} 项</span>
+      <button type="button" class="add-todo-btn" @click="addPurchaseTodo">
+        <van-icon name="plus" />
+        待办
+      </button>
     </div>
 
     <div class="range-tabs">
@@ -460,6 +490,21 @@ function isInRange(dateText, range) {
 .page-head span {
   color: var(--app-muted);
   font-size: 13px;
+}
+
+.add-todo-btn {
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--app-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .range-tabs {

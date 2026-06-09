@@ -35,6 +35,21 @@ const routes = [
         component: () => import('../views/TodoList.vue'),
       },
       {
+        path: '/todo/create',
+        name: 'TodoCreate',
+        component: () => import('../views/TodoEditor.vue'),
+      },
+      {
+        path: '/todo/:id/edit',
+        name: 'TodoEdit',
+        component: () => import('../views/TodoEditor.vue'),
+      },
+      {
+        path: '/todo/:id',
+        name: 'TodoDetail',
+        component: () => import('../views/TodoDetailView.vue'),
+      },
+      {
         path: '/todo/summary',
         name: 'TodoSummary',
         component: () => import('../views/TodoSummary.vue'),

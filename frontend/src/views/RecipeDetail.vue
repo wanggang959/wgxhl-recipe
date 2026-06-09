@@ -162,6 +162,7 @@ async function removeRecipe() {
         :can-edit="userStore.isAdmin"
         @back="router.back()"
         @favorite="toggleFavoriteSafe"
+        @todo="router.push({ path: '/todo/create', query: { title: detail.recipe?.recipeName, category: 'COOK', relatedType: 'RECIPE', relatedId: detail.recipe?.id } })"
         @edit="router.push(`/recipe/${route.params.id}/edit`)"
         @delete="removeRecipe"
       />

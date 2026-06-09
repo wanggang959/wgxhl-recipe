@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
+import NotificationBell from '../components/NotificationBell.vue'
 import { useUserStore } from '../stores/user'
 
 const route = useRoute()
@@ -15,19 +16,22 @@ const isTodayMode = computed(() => route.query.pick === 'today')
   <div class="app-shell" :class="{ 'showcase-shell': isShowcase }">
     <header v-if="!isShowcase" class="top-bar">
       <button class="brand" type="button" @click="router.push('/recipes')">
-        <span>王刚家</span>
-        <strong>家常菜谱</strong>
+        <span>王师傅家</span>
+        <strong>家庭生活助手</strong>
       </button>
-      <van-button
-        v-if="!isTodayMode && userStore.isAdmin"
-        round
-        type="warning"
-        size="small"
-        icon="plus"
-        @click="router.push('/recipe/create')"
-      >
-        添加
-      </van-button>
+      <div class="top-actions">
+        <NotificationBell />
+        <van-button
+          v-if="!isTodayMode && userStore.isAdmin"
+          round
+          type="warning"
+          size="small"
+          icon="plus"
+          @click="router.push('/recipe/create')"
+        >
+          添加
+        </van-button>
+      </div>
     </header>
 
     <main
@@ -77,6 +81,12 @@ const isTodayMode = computed(() => route.query.pick === 'today')
 .brand strong {
   font-size: 18px;
   line-height: 1.2;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .content {

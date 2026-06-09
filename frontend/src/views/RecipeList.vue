@@ -5,11 +5,13 @@ import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
 import { pageRecipe } from '../api/recipe'
+import { getUpcomingTodos } from '../api/todo'
 import { checkWantedRecipe, createWantedRecipe } from '../api/want'
 import CategoryTabs from '../components/CategoryTabs.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
+import UpcomingTodoCard from '../components/UpcomingTodoCard.vue'
 import { useUserStore } from '../stores/user'
 import { getRecipeImage } from '../utils/imageUrl'
 import { formatRecipeVersionLabel } from '../utils/recipeVersion'
@@ -30,6 +32,7 @@ const wantedPendingMap = ref({})
 const saveMessage = ref('')
 const recommendMessage = ref('')
 const suggestRecipe = ref(null)
+const upcomingTodos = ref([])
 const errorText = ref('')
 const wantActionVisible = ref(false)
 const wantDateVisible = ref(false)
@@ -73,7 +76,7 @@ onMounted(async () => {
       saveMessage.value = ''
     }, 2400)
   }
-  await Promise.all([loadCategory(), refreshList()])
+  await Promise.all([loadCategory(), refreshList(), loadUpcomingTodos()])
   if (route.query.pick === 'today') {
     chooseRandomRecipe({ showMessage: true })
   }
@@ -93,6 +96,15 @@ async function loadCategory() {
     categories.value = res.data.records || []
   } catch (error) {
     showFailToast(error.message || '分类加载失败')
+  }
+}
+
+async function loadUpcomingTodos() {
+  try {
+    const res = await getUpcomingTodos(3)
+    upcomingTodos.value = res.data || []
+  } catch (error) {
+    upcomingTodos.value = []
   }
 }
 
@@ -522,6 +534,19 @@ function submitCustomWantDate() {
         </button>
         <van-icon name="arrow" size="18" />
       </div>
+    </section>
+
+    <section v-if="upcomingTodos.length > 0 && !isTodayMode" class="upcoming-section">
+      <div class="upcoming-head">
+        <h2>即将待办</h2>
+        <button type="button" @click="router.push('/todo')">查看全部</button>
+      </div>
+      <UpcomingTodoCard
+        v-for="item in upcomingTodos"
+        :key="item.id"
+        :todo="item"
+        @open="router.push(`/todo/${item.id}`)"
+      />
     </section>
 
     <div class="list-head">
@@ -1149,6 +1174,39 @@ function submitCustomWantDate() {
   align-items: end;
   justify-content: space-between;
   padding: 2px 2px 0;
+}
+
+.upcoming-section {
+  padding: 12px;
+  border-radius: 18px;
+  background: #fffaf2;
+  border: 1px solid var(--app-border);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.upcoming-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.upcoming-head h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 17px;
+}
+
+.upcoming-head button {
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--app-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .list-head h2 {

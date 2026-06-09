@@ -1,6 +1,7 @@
 package com.wgxhl.recipe.user.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.date.ChineseDate;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
@@ -8,6 +9,8 @@ import com.wgxhl.recipe.config.JwtAuthUtil;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.record.service.RecipeViewRecordService;
+import com.wgxhl.recipe.todo.entity.Todo;
+import com.wgxhl.recipe.todo.service.TodoService;
 import com.wgxhl.recipe.user.dto.UserLoginDTO;
 import com.wgxhl.recipe.user.dto.UserPageDTO;
 import com.wgxhl.recipe.user.entity.AppUser;
@@ -21,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -45,17 +50,20 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     private final RecipeViewRecordService recipeViewRecordService;
     private final UserWantedRecipeService userWantedRecipeService;
     private final UserPushSubscriptionService userPushSubscriptionService;
+    private final TodoService todoService;
     private final JwtAuthUtil jwtAuthUtil;
 
     public AppUserServiceImpl(UserFavoriteService userFavoriteService,
                               RecipeViewRecordService recipeViewRecordService,
                               UserWantedRecipeService userWantedRecipeService,
                               UserPushSubscriptionService userPushSubscriptionService,
+                              TodoService todoService,
                               JwtAuthUtil jwtAuthUtil) {
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
         this.userWantedRecipeService = userWantedRecipeService;
         this.userPushSubscriptionService = userPushSubscriptionService;
+        this.todoService = todoService;
         this.jwtAuthUtil = jwtAuthUtil;
     }
 
@@ -81,6 +89,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             admin.setUserRole(ROLE_SUPER_ADMIN);
             admin.setStatus(STATUS_NORMAL);
             admin.setAvatar(DefaultAvatars.ADMIN_AVATAR);
+            admin.setNotificationPreference("site,email");
             save(admin);
             return;
         }
@@ -109,6 +118,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             admin.setAvatar(DefaultAvatars.ADMIN_AVATAR);
             changed = true;
         }
+        if (!StringUtils.hasText(admin.getNotificationPreference())) {
+            admin.setNotificationPreference("site,email");
+            changed = true;
+        }
         if (changed) {
             updateById(admin);
         }
@@ -130,6 +143,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             guest.setUserRole(ROLE_USER);
             guest.setStatus(STATUS_NORMAL);
             guest.setAvatar(DefaultAvatars.GUEST_AVATAR);
+            guest.setNotificationPreference("site");
             save(guest);
             return;
         }
@@ -148,6 +162,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         if (!StringUtils.hasText(guest.getAvatar())) {
             guest.setAvatar(DefaultAvatars.GUEST_AVATAR);
+            changed = true;
+        }
+        if (!StringUtils.hasText(guest.getNotificationPreference())) {
+            guest.setNotificationPreference("site");
             changed = true;
         }
         if (changed) {
@@ -182,7 +200,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 .eq(StringUtils.hasText(dto.getStatus()), AppUser::getStatus, dto.getStatus())
                 .orderByDesc(AppUser::getCreateTime)
                 .page(page);
-        result.getRecords().forEach(this::maskPassword);
+        result.getRecords().forEach(user -> {
+            user.setRecentTodoCount(countRecentTodo(user.getId()));
+            maskPassword(user);
+        });
         return ApiResponse.success(result);
     }
 
@@ -215,6 +236,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         normalizeUser(entity);
         save(entity);
+        todoService.syncBirthdayTodo(entity);
         maskPassword(entity);
         return ApiResponse.success("保存成功", entity);
     }
@@ -271,6 +293,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             entity.setAvatar(existing.getAvatar());
         }
         updateById(entity);
+        todoService.syncBirthdayTodo(super.getById(entity.getId()));
         return ApiResponse.success("更新成功", null);
     }
 
@@ -294,6 +317,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         recipeViewRecordService.deleteByUserId(id);
         userWantedRecipeService.deleteByUserId(id);
         userPushSubscriptionService.deleteByUserId(id);
+        todoService.lambdaUpdate().eq(Todo::getOwnerId, id).remove();
         removeById(id);
         return ApiResponse.success("删除成功", null);
     }
@@ -352,6 +376,14 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         preview.setUsername(user.getUsername());
         preview.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername());
         preview.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getId()));
+        preview.setEmail(user.getEmail());
+        preview.setBirthday(user.getBirthday());
+        preview.setBirthdayCalendar(user.getBirthdayCalendar());
+        preview.setLunarBirthdayYear(user.getLunarBirthdayYear());
+        preview.setLunarBirthdayMonth(user.getLunarBirthdayMonth());
+        preview.setLunarBirthdayDay(user.getLunarBirthdayDay());
+        preview.setLunarBirthdayLeap(user.getLunarBirthdayLeap());
+        preview.setNotificationPreference(user.getNotificationPreference());
         return ApiResponse.success(preview);
     }
 
@@ -375,6 +407,14 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         preview.setUsername(user.getUsername());
         preview.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername());
         preview.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getId()));
+        preview.setEmail(user.getEmail());
+        preview.setBirthday(user.getBirthday());
+        preview.setBirthdayCalendar(user.getBirthdayCalendar());
+        preview.setLunarBirthdayYear(user.getLunarBirthdayYear());
+        preview.setLunarBirthdayMonth(user.getLunarBirthdayMonth());
+        preview.setLunarBirthdayDay(user.getLunarBirthdayDay());
+        preview.setLunarBirthdayLeap(user.getLunarBirthdayLeap());
+        preview.setNotificationPreference(user.getNotificationPreference());
         return preview;
     }
 
@@ -413,16 +453,23 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(user.getNickname())) {
             user.setNickname(user.getUsername());
         }
+        normalizeBirthday(user);
         if (ADMIN_USERNAME.equals(user.getUsername())) {
             user.setPassword(ADMIN_PASSWORD);
             user.setUserRole(ROLE_SUPER_ADMIN);
             user.setStatus(STATUS_NORMAL);
+            if (!StringUtils.hasText(user.getNotificationPreference())) {
+                user.setNotificationPreference("site,email");
+            }
             return;
         }
         if (GUEST_USERNAME.equals(user.getUsername()) || GUEST_ID.equals(user.getId())) {
             user.setUserRole(ROLE_USER);
             if (!StringUtils.hasText(user.getStatus())) {
                 user.setStatus(STATUS_NORMAL);
+            }
+            if (!StringUtils.hasText(user.getNotificationPreference())) {
+                user.setNotificationPreference("site");
             }
             return;
         }
@@ -431,6 +478,60 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             user.setStatus(STATUS_NORMAL);
         }
         user.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getUsername()));
+        if (!StringUtils.hasText(user.getNotificationPreference())) {
+            user.setNotificationPreference(StringUtils.hasText(user.getEmail()) ? "site,email" : "site");
+        }
+    }
+
+    private void normalizeBirthday(AppUser user) {
+        if (!StringUtils.hasText(user.getBirthdayCalendar())) {
+            user.setBirthdayCalendar("SOLAR");
+        }
+        if (!"LUNAR".equals(user.getBirthdayCalendar())) {
+            user.setBirthdayCalendar("SOLAR");
+            user.setLunarBirthdayMonth(null);
+            user.setLunarBirthdayDay(null);
+            user.setLunarBirthdayLeap(false);
+            return;
+        }
+        if (user.getLunarBirthdayLeap() == null) {
+            user.setLunarBirthdayLeap(false);
+        }
+        user.setBirthday(nextLunarBirthday(user, LocalDate.now()));
+    }
+
+    public static LocalDate nextLunarBirthday(AppUser user, LocalDate baseDate) {
+        if (user == null || user.getLunarBirthdayMonth() == null || user.getLunarBirthdayDay() == null) {
+            return null;
+        }
+        LocalDate next = lunarToSolar(baseDate.getYear(), user.getLunarBirthdayMonth(),
+                user.getLunarBirthdayDay(), Boolean.TRUE.equals(user.getLunarBirthdayLeap()));
+        if (next == null || next.isBefore(baseDate)) {
+            next = lunarToSolar(baseDate.getYear() + 1, user.getLunarBirthdayMonth(),
+                    user.getLunarBirthdayDay(), Boolean.TRUE.equals(user.getLunarBirthdayLeap()));
+        }
+        return next;
+    }
+
+    public static LocalDate lunarToSolar(int lunarYear, int month, int day, boolean leap) {
+        try {
+            ChineseDate chineseDate = new ChineseDate(lunarYear, month, day, leap);
+            return chineseDate.getGregorianDate().toInstant()
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private long countRecentTodo(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return 0L;
+        }
+        return todoService.lambdaQuery()
+                .eq(Todo::getOwnerId, userId)
+                .eq(Todo::getStatus, "TODO")
+                .count();
     }
 
     private void applyRole(AppUser user) {

@@ -7,6 +7,18 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:2326488943@qq.com}
+    password: ${MAIL_PASSWORD:zgzjffpidesmdidi}
+    protocol: smtps
+    properties:
+      mail:
+        smtp:
+          ssl:
+            enable: true
+          auth: true
 
 server:
   port: ${APP_PORT:9001}

@@ -131,6 +131,9 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         if (PUBLIC_USER_PATHS.contains(path)) {
             return true;
         }
+        if (path.startsWith("/todo/") || path.startsWith("/notification/")) {
+            return false;
+        }
         return path.endsWith("/page")
                 || path.endsWith("/getById")
                 || path.endsWith("/check");

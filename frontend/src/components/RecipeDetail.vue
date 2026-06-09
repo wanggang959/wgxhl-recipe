@@ -19,7 +19,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['back', 'favorite', 'edit', 'delete'])
+const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo'])
 
 const recipe = computed(() => props.detail.recipe || {})
 const cover = computed(() => getRecipeImage(recipe.value.coverImage))
@@ -50,11 +50,14 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
     <section class="summary">
       <div class="title-line">
         <h1>{{ recipe.recipeName }}</h1>
-        <div v-if="canEdit" class="title-actions">
-          <van-button round size="small" type="warning" icon="edit" @click="emit('edit')">
+        <div class="title-actions">
+          <van-button round size="small" type="warning" icon="todo-list-o" @click="emit('todo', recipe)">
+            加入待办
+          </van-button>
+          <van-button v-if="canEdit" round size="small" type="warning" icon="edit" @click="emit('edit')">
             编辑
           </van-button>
-          <van-button round size="small" plain type="danger" icon="delete-o" @click="emit('delete')">
+          <van-button v-if="canEdit" round size="small" plain type="danger" icon="delete-o" @click="emit('delete')">
             删除
           </van-button>
         </div>

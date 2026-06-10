@@ -36,6 +36,8 @@ const repeats = [
   ['DAILY', '每天'],
   ['WEEKLY', '每周'],
   ['MONTHLY', '每月'],
+  ['QUARTERLY', '每三个月'],
+  ['HALF_YEARLY', '每半年'],
   ['YEARLY', '每年'],
 ]
 

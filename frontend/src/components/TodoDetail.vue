@@ -13,6 +13,20 @@ defineProps({
 })
 
 const emit = defineEmits(['back', 'edit', 'complete', 'completeBlocked', 'delete'])
+
+const repeatLabels = {
+  NONE: '不重复',
+  DAILY: '每天',
+  WEEKLY: '每周',
+  MONTHLY: '每月',
+  QUARTERLY: '每三个月',
+  HALF_YEARLY: '每半年',
+  YEARLY: '每年',
+}
+
+function repeatText(type) {
+  return repeatLabels[type] || type || '不重复'
+}
 </script>
 
 <template>
@@ -33,7 +47,7 @@ const emit = defineEmits(['back', 'edit', 'complete', 'completeBlocked', 'delete
       @delete="emit('delete', todo)"
     />
     <div class="info-grid">
-      <div><span>重复</span><strong>{{ todo.repeatType || 'NONE' }}</strong></div>
+      <div><span>重复</span><strong>{{ repeatText(todo.repeatType) }}</strong></div>
       <div><span>站内</span><strong>{{ todo.notifySite ? '开启' : '关闭' }}</strong></div>
       <div><span>邮箱</span><strong>{{ todo.notifyEmail ? '开启' : '关闭' }}</strong></div>
       <div><span>App</span><strong>{{ todo.notifyPush ? '开启' : '关闭' }}</strong></div>

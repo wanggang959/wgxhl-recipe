@@ -935,6 +935,12 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if ("MONTHLY".equals(repeatType)) {
             return todo.getDueTime().minusMonths(1);
         }
+        if ("QUARTERLY".equals(repeatType)) {
+            return todo.getDueTime().minusMonths(3);
+        }
+        if ("HALF_YEARLY".equals(repeatType)) {
+            return todo.getDueTime().minusMonths(6);
+        }
         if ("YEARLY".equals(repeatType)) {
             return todo.getDueTime().minusYears(1);
         }
@@ -1011,6 +1017,12 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         }
         if ("MONTHLY".equals(repeatType)) {
             return base.plusMonths(1);
+        }
+        if ("QUARTERLY".equals(repeatType)) {
+            return base.plusMonths(3);
+        }
+        if ("HALF_YEARLY".equals(repeatType)) {
+            return base.plusMonths(6);
         }
         if ("YEARLY".equals(repeatType)) {
             if ("LUNAR".equals(todo.getDueCalendar())

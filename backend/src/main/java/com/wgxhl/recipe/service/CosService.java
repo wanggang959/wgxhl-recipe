@@ -38,6 +38,6 @@ public class CosService {
         );
         cosClient.putObject(request);
 
-        return cosProperties.getBaseUrl() + "/" + key;
+        return key;
     }
 }

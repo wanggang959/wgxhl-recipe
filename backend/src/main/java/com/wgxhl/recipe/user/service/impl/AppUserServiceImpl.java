@@ -10,6 +10,8 @@ import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.record.service.RecipeViewRecordService;
 import com.wgxhl.recipe.todo.entity.Todo;
+import com.wgxhl.recipe.todo.entity.TodoOwner;
+import com.wgxhl.recipe.todo.mapper.TodoOwnerMapper;
 import com.wgxhl.recipe.todo.service.TodoService;
 import com.wgxhl.recipe.user.dto.UserLoginDTO;
 import com.wgxhl.recipe.user.dto.UserPageDTO;
@@ -27,6 +29,7 @@ import javax.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -51,6 +54,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     private final UserWantedRecipeService userWantedRecipeService;
     private final UserPushSubscriptionService userPushSubscriptionService;
     private final TodoService todoService;
+    private final TodoOwnerMapper todoOwnerMapper;
     private final JwtAuthUtil jwtAuthUtil;
 
     public AppUserServiceImpl(UserFavoriteService userFavoriteService,
@@ -58,12 +62,14 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                               UserWantedRecipeService userWantedRecipeService,
                               UserPushSubscriptionService userPushSubscriptionService,
                               TodoService todoService,
+                              TodoOwnerMapper todoOwnerMapper,
                               JwtAuthUtil jwtAuthUtil) {
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
         this.userWantedRecipeService = userWantedRecipeService;
         this.userPushSubscriptionService = userPushSubscriptionService;
         this.todoService = todoService;
+        this.todoOwnerMapper = todoOwnerMapper;
         this.jwtAuthUtil = jwtAuthUtil;
     }
 
@@ -528,9 +534,25 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(userId)) {
             return 0L;
         }
+        List<String> todoIds = todoOwnerMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TodoOwner>()
+                        .eq(TodoOwner::getOwnerId, userId))
+                .stream()
+                .map(TodoOwner::getTodoId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime dueSoonEnd = now.plusDays(7);
         return todoService.lambdaQuery()
-                .eq(Todo::getOwnerId, userId)
                 .eq(Todo::getStatus, "TODO")
+                .ge(Todo::getDueTime, now)
+                .le(Todo::getDueTime, dueSoonEnd)
+                .and(wrapper -> {
+                    wrapper.eq(Todo::getOwnerId, userId);
+                    if (!todoIds.isEmpty()) {
+                        wrapper.or().in(Todo::getId, todoIds);
+                    }
+                })
                 .count();
     }
 

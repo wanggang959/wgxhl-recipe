@@ -34,6 +34,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.DateTimeException;
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -291,19 +292,16 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (StringUtils.hasText(disabledReason)) {
             return ApiResponse.fail(disabledReason);
         }
-        if ("BIRTHDAY".equals(todo.getCategory())) {
-            LocalDate next = resolveNextBirthdayDueDate(todo);
+        if (isRepeating(todo)) {
+            LocalDateTime next = resolveNextRepeatDueTime(todo);
             if (next == null) {
-                return ApiResponse.fail("无法计算下一次生日日期");
+                return ApiResponse.fail("无法计算下一次待办时间");
             }
-            LocalTime time = todo.getDueTime().toLocalTime();
-            if (time.equals(LocalTime.MIDNIGHT)) {
-                time = BIRTHDAY_ON_TIME;
-            }
-            todo.setDueTime(LocalDateTime.of(next, time));
+            todo.setDueTime(next);
             todo.setStatus(STATUS_TODO);
-            updateById(todo);
-            return ApiResponse.success("已进入下一年生日提醒", null);
+            todo.setUpdateTime(LocalDateTime.now());
+            super.updateById(todo);
+            return ApiResponse.success("已进入下一周期", null);
         }
         todo.setStatus(STATUS_DONE);
         updateById(todo);
@@ -357,7 +355,11 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         List<String> birthdayOwnerIds = birthdayReminderOwnerIds(user.getId());
         todo.setOwnerId(birthdayOwnerIds.isEmpty() ? null : birthdayOwnerIds.get(0));
         todo.setOwnerIds(birthdayOwnerIds);
-        todo.setDueTime(LocalDateTime.of(birthday, BIRTHDAY_ON_TIME));
+        LocalDateTime nextDueTime = LocalDateTime.of(birthday, BIRTHDAY_ON_TIME);
+        if (todo.getDueTime() != null && todo.getDueTime().toLocalDate().isAfter(birthday)) {
+            nextDueTime = todo.getDueTime();
+        }
+        todo.setDueTime(nextDueTime);
         todo.setDueCalendar("LUNAR".equals(user.getBirthdayCalendar()) ? "LUNAR" : "SOLAR");
         todo.setLunarDueMonth(user.getLunarBirthdayMonth());
         todo.setLunarDueDay(user.getLunarBirthdayDay());
@@ -371,7 +373,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         todo.setNotifyPush(false);
         todo.setStatus(STATUS_TODO);
         if (StringUtils.hasText(todo.getId())) {
-            updateById(todo);
+            todo.setUpdateTime(LocalDateTime.now());
+            super.updateById(todo);
             replaceOwners(todo.getId(), todo.getOwnerIds());
             replaceRules(todo.getId(), defaultMinutes("BIRTHDAY"));
         } else {
@@ -650,6 +653,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             return;
         }
         LocalDate next = nextLunarDueDate(todo, LocalDate.now());
+        if (todo.getDueTime() != null && next != null && todo.getDueTime().toLocalDate().isAfter(next)) {
+            todo.setRepeatType("YEARLY");
+            return;
+        }
         if (next != null) {
             LocalTime time = todo.getDueTime() == null ? defaultDueTime(todo) : todo.getDueTime().toLocalTime();
             todo.setDueTime(LocalDateTime.of(next, time));
@@ -665,6 +672,16 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         }
         if (todo.getBirthdayYear() == null) {
             todo.setBirthdayYear(todo.getDueTime().getYear());
+        }
+        LocalDate dueDate = todo.getDueTime().toLocalDate();
+        LocalDate today = LocalDate.now();
+        if (dueDate.isAfter(today) && dueDate.getYear() > today.getYear()) {
+            LocalTime time = todo.getDueTime().toLocalTime();
+            if (time.equals(LocalTime.MIDNIGHT)) {
+                todo.setDueTime(LocalDateTime.of(dueDate, BIRTHDAY_ON_TIME));
+            }
+            todo.setRepeatType("YEARLY");
+            return;
         }
         LocalDate next = nextBirthday(todo.getDueTime().toLocalDate());
         LocalTime time = todo.getDueTime().toLocalTime();
@@ -882,10 +899,131 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                     .map(TodoNoticeRule::getBeforeMinutes)
                     .collect(Collectors.toList()));
             todo.setNextNotifyLabel(resolveNextNotifyLabel(todo));
+            todo.setLastOccurrenceLabel(resolveLastOccurrenceLabel(todo));
             String completeReason = completeDisabledReason(todo);
             todo.setCanComplete(!StringUtils.hasText(completeReason));
             todo.setCompleteDisabledReason(completeReason);
         }
+    }
+
+    private String resolveLastOccurrenceLabel(Todo todo) {
+        LocalDateTime previous = previousOccurrenceTime(todo);
+        if (previous == null) {
+            return null;
+        }
+        if ("BIRTHDAY".equals(todo.getCategory())) {
+            return null;
+        }
+        return "上次进行：" + formatPastOccurrenceLabel(previous);
+    }
+
+    private LocalDateTime previousOccurrenceTime(Todo todo) {
+        if (todo == null || todo.getDueTime() == null) {
+            return null;
+        }
+        if ("BIRTHDAY".equals(todo.getCategory())) {
+            LocalDate previousDate = previousBirthdayDate(todo);
+            return previousDate == null ? null : LocalDateTime.of(previousDate, todo.getDueTime().toLocalTime());
+        }
+        String repeatType = todo.getRepeatType();
+        if ("DAILY".equals(repeatType)) {
+            return todo.getDueTime().minusDays(1);
+        }
+        if ("WEEKLY".equals(repeatType)) {
+            return todo.getDueTime().minusWeeks(1);
+        }
+        if ("MONTHLY".equals(repeatType)) {
+            return todo.getDueTime().minusMonths(1);
+        }
+        if ("YEARLY".equals(repeatType)) {
+            return todo.getDueTime().minusYears(1);
+        }
+        return null;
+    }
+
+    private LocalDate previousBirthdayDate(Todo todo) {
+        LocalDate dueDate = todo.getDueTime().toLocalDate();
+        if ("LUNAR".equals(todo.getDueCalendar())
+                && todo.getLunarDueMonth() != null
+                && todo.getLunarDueDay() != null) {
+            try {
+                int chineseYear = new ChineseDate(dueDate).getChineseYear();
+                LocalDate previous = AppUserServiceImpl.lunarToSolar(chineseYear - 1, todo.getLunarDueMonth(),
+                        todo.getLunarDueDay(), Boolean.TRUE.equals(todo.getLunarDueLeap()));
+                if (previous != null) {
+                    return previous;
+                }
+            } catch (Exception ex) {
+                // fall through to solar-style approximation
+            }
+        }
+        return birthdayInYear(dueDate, dueDate.getYear() - 1);
+    }
+
+    private String formatPastOccurrenceLabel(LocalDateTime time) {
+        return time.toLocalDate() + " " + time.toLocalTime().withSecond(0).withNano(0);
+    }
+
+    private boolean isRepeating(Todo todo) {
+        return todo != null && ("BIRTHDAY".equals(todo.getCategory())
+                || (StringUtils.hasText(todo.getRepeatType()) && !"NONE".equals(todo.getRepeatType())));
+    }
+
+    private LocalDateTime resolveNextRepeatDueTime(Todo todo) {
+        if (todo == null || todo.getDueTime() == null) {
+            return null;
+        }
+        LocalTime time = todo.getDueTime().toLocalTime();
+        if ("BIRTHDAY".equals(todo.getCategory())) {
+            LocalDate nextBirthday = resolveNextBirthdayDueDate(todo);
+            if (nextBirthday == null) {
+                return null;
+            }
+            if (time.equals(LocalTime.MIDNIGHT)) {
+                time = BIRTHDAY_ON_TIME;
+            }
+            return LocalDateTime.of(nextBirthday, time);
+        }
+        LocalDateTime next = incrementRepeatDueTime(todo, todo.getDueTime());
+        if (next == null) {
+            return null;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int guard = 0;
+        while (!next.isAfter(now) && guard < 5000) {
+            LocalDateTime advanced = incrementRepeatDueTime(todo, next);
+            if (advanced == null || !advanced.isAfter(next)) {
+                break;
+            }
+            next = advanced;
+            guard++;
+        }
+        return next;
+    }
+
+    private LocalDateTime incrementRepeatDueTime(Todo todo, LocalDateTime base) {
+        String repeatType = todo.getRepeatType();
+        if ("DAILY".equals(repeatType)) {
+            return base.plusDays(1);
+        }
+        if ("WEEKLY".equals(repeatType)) {
+            return base.plusWeeks(1);
+        }
+        if ("MONTHLY".equals(repeatType)) {
+            return base.plusMonths(1);
+        }
+        if ("YEARLY".equals(repeatType)) {
+            if ("LUNAR".equals(todo.getDueCalendar())
+                    && todo.getLunarDueMonth() != null
+                    && todo.getLunarDueDay() != null) {
+                LocalDate nextLunarDate = nextLunarDueDate(todo, base.toLocalDate().plusDays(1));
+                if (nextLunarDate != null) {
+                    return LocalDateTime.of(nextLunarDate, base.toLocalTime());
+                }
+            }
+            return base.plusYears(1);
+        }
+        return null;
     }
 
     private String resolveNextNotifyLabel(Todo todo) {
@@ -945,6 +1083,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private void enrichBirthdayDisplay(Todo todo) {
         todo.setBirthdayAge(calculateBirthdayAge(todo));
         todo.setBirthdayDisplayText(birthdayDisplayText(todo));
+        todo.setBirthdaySolarLabel(birthdaySolarLabel(todo));
         todo.setDueLabel(todo.getBirthdayDisplayText());
     }
 
@@ -955,10 +1094,85 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (age != null && age >= 0) {
             text.append("（").append(age).append("岁）");
         }
-        if (todo.getDueTime() != null) {
-            text.append(" · 公历").append(todo.getDueTime().toLocalDate());
-        }
         return text.toString();
+    }
+
+    private String birthdaySolarLabel(Todo todo) {
+        if (todo == null || todo.getDueTime() == null) {
+            return null;
+        }
+        LocalDate dueDate = todo.getDueTime().toLocalDate();
+        String lunar = birthdayLunarLabel(todo);
+        if (StringUtils.hasText(lunar) && lunar.startsWith("农历")) {
+            lunar = lunar.substring(2);
+        }
+        String suffix = StringUtils.hasText(lunar) ? " (" + lunar + ")" : "";
+        return dueDate + " " + weekdayLabel(dueDate) + suffix;
+    }
+
+    private String birthdayLunarLabel(Todo todo) {
+        if (todo == null) {
+            return null;
+        }
+        if (todo.getLunarDueMonth() != null && todo.getLunarDueDay() != null) {
+            return "农历" + (Boolean.TRUE.equals(todo.getLunarDueLeap()) ? "闰" : "")
+                    + lunarMonthName(todo.getLunarDueMonth()) + "月"
+                    + lunarDayName(todo.getLunarDueDay());
+        }
+        if (todo.getDueTime() == null) {
+            return null;
+        }
+        try {
+            ChineseDate chineseDate = new ChineseDate(todo.getDueTime().toLocalDate());
+            return "农历" + chineseDate.getChineseMonthName() + chineseDate.getChineseDay();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String lunarMonthName(int month) {
+        String[] names = {"正", "二", "三", "四", "五", "六", "七", "八", "九", "十", "冬", "腊"};
+        if (month >= 1 && month <= names.length) {
+            return names[month - 1];
+        }
+        return String.valueOf(month);
+    }
+
+    private String lunarDayName(int day) {
+        String[] names = {
+                "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
+                "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
+                "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"
+        };
+        if (day >= 1 && day <= names.length) {
+            return names[day - 1];
+        }
+        return String.valueOf(day);
+    }
+
+    private String weekdayLabel(LocalDate date) {
+        if (date == null) {
+            return "";
+        }
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        switch (dayOfWeek) {
+            case MONDAY:
+                return "星期一";
+            case TUESDAY:
+                return "星期二";
+            case WEDNESDAY:
+                return "星期三";
+            case THURSDAY:
+                return "星期四";
+            case FRIDAY:
+                return "星期五";
+            case SATURDAY:
+                return "星期六";
+            case SUNDAY:
+                return "星期日";
+            default:
+                return "";
+        }
     }
 
     private Integer calculateBirthdayAge(Todo todo) {

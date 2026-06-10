@@ -390,7 +390,7 @@ comment='待办提醒发送日志表';
 create table notification
 (
     id varchar(36) not null comment '主键id',
-
++
     user_id varchar(36) comment '用户id',
     title varchar(128) not null comment '标题',
     content varchar(500) comment '内容',

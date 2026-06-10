@@ -82,10 +82,16 @@ public class Todo {
     private String birthdayDisplayText;
 
     @TableField(exist = false)
+    private String birthdaySolarLabel;
+
+    @TableField(exist = false)
     private List<Integer> noticeMinutes;
 
     @TableField(exist = false)
     private String nextNotifyLabel;
+
+    @TableField(exist = false)
+    private String lastOccurrenceLabel;
 
     @TableField(exist = false)
     private Boolean canComplete;

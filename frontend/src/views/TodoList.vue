@@ -263,7 +263,11 @@ function formatDateLabel(dateText) {
   const tomorrow = addDays(1)
   if (dateText === today) return '今日'
   if (dateText === tomorrow) return '明日'
-  const [, month, day] = dateText.split('-')
+  const [year, month, day] = dateText.split('-')
+  const currentYear = String(new Date().getFullYear())
+  if (year && year !== currentYear) {
+    return `${Number(year)}年${Number(month)}月${Number(day)}日`
+  }
   return `${Number(month)}月${Number(day)}日`
 }
 
@@ -308,14 +312,17 @@ async function finish(item) {
       showFailToast(item.completeDisabledReason || '暂时不能完成')
       return
     }
-    if (item.category === 'BIRTHDAY') {
+    if (isRepeatingTodo(item)) {
       await showConfirmDialog({
-        title: '完成生日提醒',
-        message: `确认完成「${item.title}」吗？生日提醒只能当天完成。`,
+        title: item.category === 'BIRTHDAY' ? '完成生日提醒' : '进入下一周期',
+        message:
+          item.category === 'BIRTHDAY'
+            ? `确认完成「${item.title}」吗？生日提醒只能当天完成。`
+            : `确认完成「${item.title}」吗？系统会自动更新到下一个周期。`,
       })
       await completeTodo(item.id)
       closeToast()
-      showSuccessToast({ message: '已完成', duration: 1300 })
+      showSuccessToast({ message: '已进入下一周期', duration: 1300 })
       await loadTodo({ showLoading: false })
       return
     }
@@ -327,6 +334,10 @@ async function finish(item) {
   } catch (error) {
     if (error?.message) showFailToast(error.message || '操作失败')
   }
+}
+
+function isRepeatingTodo(item) {
+  return item?.category === 'BIRTHDAY' || (item?.repeatType && item.repeatType !== 'NONE')
 }
 
 function completeBlocked(item) {

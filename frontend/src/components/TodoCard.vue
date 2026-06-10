@@ -59,16 +59,42 @@ function handleComplete() {
         <h3>{{ todo.title }}</h3>
         <span>{{ categoryInfo(todo.category)[1] }}</span>
       </div>
-      <div class="todo-meta">
-        <span v-if="todo.ownerName"><van-icon name="contact-o" />{{ todo.ownerName }}</span>
-        <span v-if="todo.birthdayDisplayText"><van-icon name="birthday-cake-o" />{{ todo.birthdayDisplayText }}</span>
-        <span v-else-if="todo.dueLabel"><van-icon name="clock-o" />{{ todo.dueLabel }}</span>
-        <span v-if="todo.remainText">{{ todo.remainText }}</span>
-        <span v-if="todo.nextNotifyLabel"><van-icon name="bell" />提醒 {{ todo.nextNotifyLabel }}</span>
+
+      <div class="todo-details">
+        <div v-if="todo.ownerName" class="detail-row">
+          <van-icon name="contact-o" />
+          <span>负责人：{{ todo.ownerName }}</span>
+        </div>
+        <div v-if="todo.birthdayDisplayText" class="detail-row">
+          <van-icon name="birthday-cake-o" />
+          <span>{{ todo.birthdayDisplayText }}</span>
+        </div>
+        <div v-if="todo.birthdaySolarLabel" class="detail-row">
+          <van-icon name="calendar-o" />
+          <span>{{ todo.birthdaySolarLabel }}</span>
+        </div>
+        <div v-else-if="todo.dueLabel" class="detail-row">
+          <van-icon name="clock-o" />
+          <span>{{ todo.dueLabel }}</span>
+        </div>
+        <div v-if="todo.lastOccurrenceLabel" class="detail-row soft">
+          <van-icon :name="todo.category === 'BIRTHDAY' ? 'calendar-o' : 'underway-o'" />
+          <span>{{ todo.lastOccurrenceLabel }}</span>
+        </div>
+        <div v-if="todo.remainText || todo.nextNotifyLabel" class="detail-row soft">
+          <van-icon name="bell" />
+          <span>
+            <template v-if="todo.remainText">{{ todo.remainText }}</template>
+            <template v-if="todo.remainText && todo.nextNotifyLabel"> · </template>
+            <template v-if="todo.nextNotifyLabel">提醒 {{ todo.nextNotifyLabel }}</template>
+          </span>
+        </div>
       </div>
+
       <div v-if="todo.description && !compact" class="todo-description">
         <span v-for="line in descriptionLines(todo.description)" :key="line">{{ line }}</span>
       </div>
+
       <div v-if="!compact && !readonly" class="todo-actions" @click.stop>
         <button
           v-if="todo.status !== 'DONE'"
@@ -135,14 +161,14 @@ function handleComplete() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
 .todo-title-line h3 {
   margin: 0;
   color: var(--app-text);
   font-size: 17px;
-  line-height: 1.25;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
@@ -156,24 +182,36 @@ function handleComplete() {
   font-weight: 800;
 }
 
-.todo-meta {
-  margin-top: 8px;
+.todo-details {
+  margin-top: 9px;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 6px;
+  flex-direction: column;
+  gap: 5px;
   color: var(--app-muted);
   font-size: 12px;
   line-height: 1.45;
 }
 
-.todo-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  max-width: 100%;
-  padding: 2px 0;
+.detail-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr);
+  align-items: start;
+  gap: 5px;
+}
+
+.detail-row :deep(.van-icon) {
+  margin-top: 2px;
+  color: #b77955;
+}
+
+.detail-row span {
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.detail-row.soft {
+  color: #8f765f;
 }
 
 .todo-description {
@@ -196,7 +234,7 @@ function handleComplete() {
 }
 
 .todo-actions {
-  margin-top: 12px;
+  margin-top: 14px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

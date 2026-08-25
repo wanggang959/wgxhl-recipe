@@ -4,13 +4,14 @@ services:
     container_name: wgxhl-recipe-backend
     restart: unless-stopped
     working_dir: /app
-    command: java -jar /app/app.jar
+    command: java -Duser.timezone=Asia/Shanghai -jar /app/app.jar
     ports:
       - "${APP_PORT:-9001}:9001"
     volumes:
       - ./recipe-backend-1.0.0-SNAPSHOT.jar:/app/app.jar
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      TZ: ${TZ:-Asia/Shanghai}
       APP_PORT: ${APP_PORT:-9001}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}

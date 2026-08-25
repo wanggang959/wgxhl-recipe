@@ -221,17 +221,17 @@ comment='用户想吃菜谱表';
 
 create table user_push_subscription
 (
-    id varchar(36) not null comment 'primary id',
+    id varchar(36) not null comment '主键id',
 
-    user_id varchar(36) not null comment 'user id',
-    endpoint varchar(512) not null comment 'web push endpoint',
-    p256dh varchar(255) not null comment 'client public key',
-    auth varchar(255) not null comment 'client auth secret',
-    user_agent varchar(512) comment 'browser user agent',
-    enabled tinyint(1) not null default 1 comment 'enabled flag',
+    user_id varchar(36) not null comment '用户id',
+    endpoint varchar(512) not null comment 'Web Push 端点地址',
+    p256dh varchar(255) not null comment '客户端公钥',
+    auth varchar(255) not null comment '客户端认证密钥',
+    user_agent varchar(512) comment '浏览器 User-Agent',
+    enabled tinyint(1) not null default 1 comment '是否启用',
 
-    create_time datetime comment 'create time',
-    update_time datetime comment 'update time',
+    create_time datetime comment '创建时间',
+    update_time datetime comment '更新时间',
 
     primary key (id),
     unique key uk_user_push_endpoint (endpoint(191)),
@@ -239,7 +239,7 @@ create table user_push_subscription
 )
 engine=innodb
 default charset=utf8mb4
-comment='user web push subscription';
+comment='用户 Web Push 推送订阅表';
 
 
 create table recipe_view_record
@@ -390,7 +390,7 @@ comment='待办提醒发送日志表';
 create table notification
 (
     id varchar(36) not null comment '主键id',
-+
+
     user_id varchar(36) comment '用户id',
     title varchar(128) not null comment '标题',
     content varchar(500) comment '内容',

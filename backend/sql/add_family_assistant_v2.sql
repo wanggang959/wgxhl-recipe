@@ -1,4 +1,5 @@
 USE recipe;
+SET NAMES utf8mb4;
 
 alter table app_user
     add column email varchar(200) comment '邮箱' after avatar,

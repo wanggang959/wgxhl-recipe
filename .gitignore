@@ -20,6 +20,9 @@ logs/
 .DS_Store
 Thumbs.db
 
+# DB backups (may contain production data)
+backend/sql/backups/
+
 # Env & secrets
 backend/src/main/resources/application-dev.yml
 frontend/.env.local

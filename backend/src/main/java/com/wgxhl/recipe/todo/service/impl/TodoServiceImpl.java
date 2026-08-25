@@ -43,7 +43,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -878,8 +880,21 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (CollectionUtils.isEmpty(todos)) {
             return;
         }
+
+        List<String> todoIds = todos.stream()
+                .map(Todo::getId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+        Map<String, List<String>> ownerIdsByTodo = loadOwnerIdsByTodo(todoIds, todos);
+        Map<String, AppUser> ownersById = loadOwnersById(ownerIdsByTodo);
+        Map<String, List<TodoNoticeRule>> rulesByTodo = loadRulesByTodo(todoIds);
+        Map<String, LocalDateTime> latestSuccessByRule = loadLatestSuccessByRule(todoIds);
+
         for (Todo todo : todos) {
-            List<AppUser> owners = resolveOwners(todo);
+            List<AppUser> owners = ownerIdsByTodo.getOrDefault(todo.getId(), Collections.emptyList()).stream()
+                    .map(ownersById::get)
+                    .filter(user -> user != null)
+                    .collect(Collectors.toList());
             if (!owners.isEmpty()) {
                 todo.setOwnerIds(owners.stream().map(AppUser::getId).collect(Collectors.toList()));
                 todo.setOwnerNames(owners.stream().map(owner -> StringUtils.hasText(owner.getNickname()) ? owner.getNickname() : owner.getUsername()).collect(Collectors.toList()));
@@ -895,15 +910,75 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             if ("BIRTHDAY".equals(todo.getCategory())) {
                 enrichBirthdayDisplay(todo);
             }
-            todo.setNoticeMinutes(selectRules(todo.getId()).stream()
+            List<TodoNoticeRule> rules = rulesByTodo.getOrDefault(todo.getId(), Collections.emptyList());
+            todo.setNoticeMinutes(rules.stream()
                     .map(TodoNoticeRule::getBeforeMinutes)
                     .collect(Collectors.toList()));
-            todo.setNextNotifyLabel(resolveNextNotifyLabel(todo));
+            todo.setNextNotifyLabel(resolveNextNotifyLabel(todo, rules, latestSuccessByRule));
             todo.setLastOccurrenceLabel(resolveLastOccurrenceLabel(todo));
             String completeReason = completeDisabledReason(todo);
             todo.setCanComplete(!StringUtils.hasText(completeReason));
             todo.setCompleteDisabledReason(completeReason);
         }
+    }
+
+    private Map<String, List<String>> loadOwnerIdsByTodo(List<String> todoIds, List<Todo> todos) {
+        Map<String, List<String>> result = new HashMap<>();
+        if (!CollectionUtils.isEmpty(todoIds)) {
+            todoOwnerMapper.selectList(new LambdaQueryWrapper<TodoOwner>()
+                            .in(TodoOwner::getTodoId, todoIds))
+                    .forEach(owner -> result.computeIfAbsent(owner.getTodoId(), key -> new ArrayList<>())
+                            .add(owner.getOwnerId()));
+        }
+        for (Todo todo : todos) {
+            List<String> ownerIds = result.get(todo.getId());
+            if (CollectionUtils.isEmpty(ownerIds) && StringUtils.hasText(todo.getOwnerId())) {
+                result.put(todo.getId(), Collections.singletonList(todo.getOwnerId()));
+            }
+        }
+        return result;
+    }
+
+    private Map<String, AppUser> loadOwnersById(Map<String, List<String>> ownerIdsByTodo) {
+        Set<String> ownerIds = ownerIdsByTodo.values().stream()
+                .flatMap(List::stream)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        if (ownerIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return appUserMapper.selectBatchIds(ownerIds).stream()
+                .collect(Collectors.toMap(AppUser::getId, user -> user));
+    }
+
+    private Map<String, List<TodoNoticeRule>> loadRulesByTodo(List<String> todoIds) {
+        Map<String, List<TodoNoticeRule>> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(todoIds)) {
+            return result;
+        }
+        todoNoticeRuleMapper.selectList(new LambdaQueryWrapper<TodoNoticeRule>()
+                        .in(TodoNoticeRule::getTodoId, todoIds)
+                        .orderByDesc(TodoNoticeRule::getBeforeMinutes))
+                .forEach(rule -> result.computeIfAbsent(rule.getTodoId(), key -> new ArrayList<>()).add(rule));
+        return result;
+    }
+
+    private Map<String, LocalDateTime> loadLatestSuccessByRule(List<String> todoIds) {
+        Map<String, LocalDateTime> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(todoIds)) {
+            return result;
+        }
+        todoSendLogMapper.selectList(new LambdaQueryWrapper<TodoSendLog>()
+                        .in(TodoSendLog::getTodoId, todoIds)
+                        .eq(TodoSendLog::getSendStatus, "SUCCESS"))
+                .forEach(log -> {
+                    if (!StringUtils.hasText(log.getRuleId()) || log.getSendTime() == null) {
+                        return;
+                    }
+                    result.merge(log.getRuleId(), log.getSendTime(),
+                            (previous, current) -> current.isAfter(previous) ? current : previous);
+                });
+        return result;
     }
 
     private String resolveLastOccurrenceLabel(Todo todo) {
@@ -1039,6 +1114,11 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     private String resolveNextNotifyLabel(Todo todo) {
+        return resolveNextNotifyLabel(todo, selectRules(todo.getId()), null);
+    }
+
+    private String resolveNextNotifyLabel(Todo todo, List<TodoNoticeRule> rules,
+                                           Map<String, LocalDateTime> latestSuccessByRule) {
         if (!Boolean.TRUE.equals(todo.getNotifySite())
                 && !Boolean.TRUE.equals(todo.getNotifyEmail())
                 && !Boolean.TRUE.equals(todo.getNotifyPush())) {
@@ -1047,7 +1127,6 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (todo.getDueTime() == null) {
             return null;
         }
-        List<TodoNoticeRule> rules = selectRules(todo.getId());
         if (rules.isEmpty()) {
             return null;
         }
@@ -1056,7 +1135,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         for (TodoNoticeRule rule : rules) {
             int beforeMinutes = rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes();
             LocalDateTime targetTime = todo.getDueTime().minusMinutes(beforeMinutes);
-            if (hasSent(todo.getId(), rule.getId(), targetTime)) {
+            boolean sent = latestSuccessByRule == null
+                    ? hasSent(todo.getId(), rule.getId(), targetTime)
+                    : isSentAfter(latestSuccessByRule.get(rule.getId()), targetTime);
+            if (sent) {
                 continue;
             }
             if (targetTime.isBefore(now.minusMinutes(NOTIFY_SCAN_WINDOW_MINUTES))) {
@@ -1067,6 +1149,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             }
         }
         return next == null ? null : formatNextNotifyLabel(next);
+    }
+
+    private boolean isSentAfter(LocalDateTime latestSuccess, LocalDateTime targetTime) {
+        return latestSuccess != null && !latestSuccess.isBefore(targetTime);
     }
 
     private String formatNextNotifyLabel(LocalDateTime notifyTime) {

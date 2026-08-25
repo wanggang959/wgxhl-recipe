@@ -29,6 +29,7 @@ const route = useRoute()
 const userStore = useUserStore()
 const isGuest = computed(() => userStore.isGuest)
 const loading = ref(false)
+let loadingPromise = null
 const cacheMatchesUser = todoListCache.userId === userStore.userId
 const list = ref(cacheMatchesUser ? [...todoListCache.list] : [])
 const wantedList = ref(cacheMatchesUser ? [...todoListCache.wantedList] : [])
@@ -161,35 +162,43 @@ function refreshTodoOnEnter() {
   }
 }
 
-async function loadTodo(options = {}) {
-  if (!userStore.userId) return
+function loadTodo(options = {}) {
+  if (!userStore.userId) return Promise.resolve()
+  if (loadingPromise) return loadingPromise
+
   const showLoading = options.showLoading ?? (list.value.length === 0 && wantedList.value.length === 0)
   if (showLoading) loading.value = true
-  try {
-    const todoQuery = { current: 1, size: 200 }
-    if (userStore.isGuest) todoQuery.category = 'COOK'
-    const [pageRes, summaryRes, wantedRes] = await Promise.all([
-      pageTodo(todoQuery),
-      getTodoSummary(),
-      pageWantedRecipe({
-        current: 1,
-        size: 200,
-        plannedDateStart: formatDate(new Date()),
-      }),
-      loadFamilyMembers(),
-    ])
-    list.value = pageRes.data.records || []
-    summary.value = summaryRes.data || summary.value
-    wantedList.value = wantedRes.data.records || []
-    saveTodoCache()
-    rememberDataVersions(watchedDataScopes, seenDataVersions)
-  } catch (error) {
-    if (!options.silent || (list.value.length === 0 && wantedList.value.length === 0)) {
-      showFailToast(error.message || '待办加载失败')
+  loadingPromise = (async () => {
+    try {
+      const todoQuery = { current: 1, size: 200 }
+      if (userStore.isGuest) todoQuery.category = 'COOK'
+      const [pageRes, summaryRes, wantedRes] = await Promise.all([
+        pageTodo(todoQuery),
+        getTodoSummary(),
+        pageWantedRecipe({
+          current: 1,
+          size: 200,
+          plannedDateStart: formatDate(new Date()),
+        }),
+        loadFamilyMembers(),
+      ])
+      list.value = pageRes.data.records || []
+      summary.value = summaryRes.data || summary.value
+      wantedList.value = wantedRes.data.records || []
+      saveTodoCache()
+      rememberDataVersions(watchedDataScopes, seenDataVersions)
+    } catch (error) {
+      if (!options.silent || (list.value.length === 0 && wantedList.value.length === 0)) {
+        showFailToast(error.message || '待办加载失败')
+      }
+    } finally {
+      if (showLoading) loading.value = false
     }
-  } finally {
-    if (showLoading) loading.value = false
-  }
+  })()
+
+  return loadingPromise.finally(() => {
+    loadingPromise = null
+  })
 }
 
 function handleDataRefresh(event) {

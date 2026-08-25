@@ -64,6 +64,11 @@ const routes = [
         component: () => import('../views/ProfileView.vue'),
         meta: { keepAlive: true },
       },
+      {
+        path: '/expenses',
+        name: 'SpecialExpense',
+        component: () => import('../views/SpecialExpenseView.vue'),
+      },
     ],
   },
   {
@@ -130,6 +135,7 @@ router.beforeEach((to) => {
     const guestWriteBlocked = to.path === '/todo/create'
       || to.path === '/todo/summary'
       || to.path === '/recipe/create'
+      || to.path === '/expenses/create'
       || /^\/todo\/[^/]+\/edit$/.test(to.path)
       || /^\/recipe\/[^/]+\/edit$/.test(to.path)
       || to.path === '/manage/base'

@@ -34,6 +34,12 @@ class NotificationIntegrationTest {
     @Value("${spring.mail.username:}")
     private String mailUsername;
 
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
+    @Value("${test.smtp.enabled:false}")
+    private boolean smtpIntegrationEnabled;
+
     private String createdNoticeId;
 
     @AfterEach
@@ -46,8 +52,11 @@ class NotificationIntegrationTest {
 
     @Test
     void sendRealEmail_shouldDeliverToConfiguredMailbox() {
+        Assumptions.assumeTrue(smtpIntegrationEnabled,
+                "未启用真实 SMTP 测试；需要邮件验收时使用 -Dtest.smtp.enabled=true");
         Assumptions.assumeTrue(mailSender != null, "JavaMailSender 未配置");
         Assumptions.assumeTrue(StringUtils.hasText(mailUsername), "spring.mail.username 未配置");
+        Assumptions.assumeTrue(StringUtils.hasText(mailPassword), "spring.mail.password 未配置");
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(mailUsername);

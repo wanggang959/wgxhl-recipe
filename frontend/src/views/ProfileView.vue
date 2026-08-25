@@ -487,6 +487,18 @@ onMounted(() => {
         退出登录
       </van-button>
     </section>
+
+    <section v-if="userStore.isLogin" class="form-card">
+      <h2>家庭工具</h2>
+      <button type="button" class="tool-entry" @click="router.push('/expenses')">
+        <span class="tool-entry-icon"><van-icon name="balance-list-o" /></span>
+        <span>
+          <strong>专项开支</strong>
+          <small>婚礼、装修、搬家这类阶段性采购记录</small>
+        </span>
+        <van-icon name="arrow" />
+      </button>
+    </section>
     </div>
 
     <section v-if="userStore.isAdmin" class="member-panel">
@@ -843,6 +855,48 @@ h2 {
   margin-top: 3px;
   color: var(--app-muted);
   font-size: 12px;
+}
+
+.tool-entry {
+  width: 100%;
+  min-height: 62px;
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  background: #fffaf2;
+  color: var(--app-text);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.tool-entry-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+
+.tool-entry strong,
+.tool-entry small {
+  display: block;
+}
+
+.tool-entry strong {
+  font-size: 15px;
+}
+
+.tool-entry small {
+  margin-top: 3px;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 h2 {

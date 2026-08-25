@@ -3,6 +3,7 @@ export const DATA_SCOPE = {
   favorites: 'favorites',
   wanted: 'wanted',
   todos: 'todos',
+  expenses: 'expenses',
   base: 'base',
   users: 'users',
 }

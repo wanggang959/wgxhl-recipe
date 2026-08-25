@@ -475,10 +475,16 @@ function dateText(value) {
             <h2>{{ selectedProject.projectName }}</h2>
           </div>
           <div class="summary-actions">
-            <button v-if="canWrite" type="button" @click="openProjectForm(selectedProject)">
+            <button v-if="canWrite" type="button" title="编辑专项" aria-label="编辑专项" @click="openProjectForm(selectedProject)">
               <van-icon name="edit" />
             </button>
-            <button v-if="canWrite" type="button" @click="toggleArchiveProject(selectedProject)">
+            <button
+              v-if="canWrite"
+              type="button"
+              :title="selectedProject.archived ? '恢复专项' : '归档专项'"
+              :aria-label="selectedProject.archived ? '恢复专项' : '归档专项'"
+              @click="toggleArchiveProject(selectedProject)"
+            >
               <van-icon :name="selectedProject.archived ? 'replay' : 'completed-o'" />
             </button>
           </div>
@@ -810,7 +816,7 @@ function dateText(value) {
 
 .summary-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
@@ -823,15 +829,21 @@ function dateText(value) {
 .summary-actions {
   display: flex;
   gap: 8px;
+  padding-top: 16px;
 }
 
 .summary-actions button {
   width: 34px;
   height: 34px;
+  padding: 0;
   border-radius: 50%;
   border: 1px solid var(--app-border);
   background: #fffaf2;
   color: var(--app-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .money-grid {

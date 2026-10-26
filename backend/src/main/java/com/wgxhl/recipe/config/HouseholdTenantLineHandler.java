@@ -16,6 +16,7 @@ public class HouseholdTenantLineHandler implements TenantLineHandler {
             "household",
             "household_member",
             "household_invite",
+            "email_verification_code",
             "recipe",
             "recipe_image",
             "recipe_step",

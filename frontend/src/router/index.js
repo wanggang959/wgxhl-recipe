@@ -7,6 +7,11 @@ const routes = [
     component: () => import('../views/LoginView.vue'),
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/RegisterView.vue'),
+  },
+  {
     path: '/join',
     name: 'JoinHousehold',
     component: () => import('../views/JoinHouseholdView.vue'),
@@ -124,6 +129,11 @@ router.beforeEach((to) => {
   const isLogin = Boolean(user?.id && user?.token && user?.userRole)
 
   if (to.path === '/login') {
+    if (isLogin) return '/recipes'
+    return true
+  }
+
+  if (to.path === '/register') {
     if (isLogin) return '/recipes'
     return true
   }

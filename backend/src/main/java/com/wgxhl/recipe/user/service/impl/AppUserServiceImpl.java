@@ -25,6 +25,7 @@ import com.wgxhl.recipe.user.vo.UserPreviewVO;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.AppUserService;
 import com.wgxhl.recipe.user.util.DefaultAvatars;
+import com.wgxhl.recipe.user.util.PasswordUtil;
 import com.wgxhl.recipe.want.service.UserWantedRecipeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -141,7 +142,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             admin.setId(ADMIN_ID);
             admin.setUsername(ADMIN_USERNAME);
             admin.setNickname(ADMIN_USERNAME);
-            admin.setPassword(ADMIN_PASSWORD);
+            admin.setPassword(PasswordUtil.hash(ADMIN_PASSWORD));
             admin.setUserRole(ROLE_SUPER_ADMIN);
             admin.setStatus(STATUS_NORMAL);
             admin.setAvatar(DefaultAvatars.ADMIN_AVATAR);
@@ -154,8 +155,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             admin.setUsername(ADMIN_USERNAME);
             changed = true;
         }
-        if (!Objects.equals(admin.getPassword(), ADMIN_PASSWORD)) {
-            admin.setPassword(ADMIN_PASSWORD);
+        if (!PasswordUtil.matches(ADMIN_PASSWORD, admin.getPassword())
+                || !PasswordUtil.isHashed(admin.getPassword())) {
+            admin.setPassword(PasswordUtil.hash(ADMIN_PASSWORD));
             changed = true;
         }
         if (!ROLE_SUPER_ADMIN.equals(admin.getUserRole())) {
@@ -296,6 +298,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             return ApiResponse.fail("头像地址无效，请从默认头像中选择");
         }
         normalizeUser(entity);
+        if (StringUtils.hasText(entity.getPassword())) {
+            entity.setPassword(PasswordUtil.hash(entity.getPassword()));
+        }
         save(entity);
         HouseholdMember member = new HouseholdMember();
         member.setHouseholdId(TenantContext.require());
@@ -362,6 +367,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(entity.getAvatar())) {
             entity.setAvatar(existing.getAvatar());
         }
+        if (StringUtils.hasText(entity.getPassword())) {
+            entity.setPassword(PasswordUtil.hash(entity.getPassword()));
+        }
         updateById(entity);
         syncMemberRole(membership, entity.getUserRole());
         todoService.syncBirthdayTodo(super.getById(entity.getId()));
@@ -411,11 +419,17 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         AppUser user = lambdaQuery()
                 .eq(AppUser::getUsername, dto.getUsername())
                 .one();
-        if (user == null || !Objects.equals(dto.getPassword(), user.getPassword())) {
+        if (user == null || !PasswordUtil.matches(dto.getPassword(), user.getPassword())) {
             return ApiResponse.fail("用户名或密码错误");
         }
         if (!STATUS_NORMAL.equals(user.getStatus())) {
             return ApiResponse.fail(disabledLoginMessage(user));
+        }
+        if (!PasswordUtil.isHashed(user.getPassword())) {
+            AppUser passwordPatch = new AppUser();
+            passwordPatch.setId(user.getId());
+            passwordPatch.setPassword(PasswordUtil.hash(dto.getPassword()));
+            updateById(passwordPatch);
         }
         ApiResponse<AppUser> householdResult = applyLoginHousehold(user);
         if (householdResult != null) {

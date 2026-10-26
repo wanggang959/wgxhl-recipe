@@ -234,7 +234,9 @@ function showStatus(message, type = 'success') {
           </van-button>
 
           <div class="guest-row">
-            <span>暂无账号？</span>
+            <span>还没有账号？</span>
+            <button type="button" @click="router.push('/register')">注册账号</button>
+            <span>·</span>
             <button type="button" @click="guestLogin">游客登录</button>
           </div>
 

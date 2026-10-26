@@ -52,6 +52,18 @@ public class HouseholdMemberServiceImpl extends ServiceImpl<HouseholdMemberMappe
     }
 
     @Override
+    public List<HouseholdMember> listByUser(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return Collections.emptyList();
+        }
+        return lambdaQuery()
+                .eq(HouseholdMember::getUserId, userId)
+                .eq(HouseholdMember::getStatus, "normal")
+                .orderByAsc(HouseholdMember::getCreateTime)
+                .list();
+    }
+
+    @Override
     public HouseholdMember find(String householdId, String userId) {
         if (!StringUtils.hasText(householdId) || !StringUtils.hasText(userId)) {
             return null;

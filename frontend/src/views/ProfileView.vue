@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showLoadingToast } from 'vant'
+import { createHousehold, listMyHouseholds, switchHousehold } from '../api/household'
 import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
 import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
@@ -18,6 +19,11 @@ import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
 const router = useRouter()
 const userStore = useUserStore()
 const savingUser = ref(false)
+const householdPanelVisible = ref(false)
+const householdList = ref([])
+const householdNameInput = ref('')
+const householdLoading = ref(false)
+const householdCreating = ref(false)
 const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
@@ -408,6 +414,58 @@ const currentProfileUser = computed(() => {
   return fromList ? { ...userStore.user, ...fromList } : userStore.user
 })
 
+async function openHouseholdPanel() {
+  if (!userStore.isLogin || userStore.isGuest) return
+  householdPanelVisible.value = true
+  householdLoading.value = true
+  try {
+    const res = await listMyHouseholds()
+    householdList.value = res.data || []
+  } catch (error) {
+    showActionStatus(error.message || '家庭列表加载失败', 'error')
+  } finally {
+    householdLoading.value = false
+  }
+}
+
+async function switchToHousehold(item) {
+  if (!item) return
+  if (item.active) {
+    householdPanelVisible.value = false
+    return
+  }
+  try {
+    const res = await switchHousehold(item.id)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    showActionStatus(error.message || '切换家庭失败', 'error')
+  }
+}
+
+async function createNewHousehold() {
+  const name = householdNameInput.value.trim()
+  if (!name) {
+    showActionStatus('请输入家庭名称', 'error')
+    return
+  }
+  householdCreating.value = true
+  try {
+    const res = await createHousehold(name)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    householdNameInput.value = ''
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    showActionStatus(error.message || '创建家庭失败', 'error')
+  } finally {
+    householdCreating.value = false
+  }
+}
+
 if (userStore.isAdmin) {
   loadUsers()
 }
@@ -441,6 +499,16 @@ onMounted(() => {
       <van-icon :name="actionStatusType === 'success' ? 'success' : 'warning-o'" />
       <span>{{ actionStatus }}</span>
     </div>
+
+    <section v-if="userStore.isLogin && !userStore.isGuest" class="form-card">
+      <h2>家庭</h2>
+      <van-cell title="当前家庭" :value="userStore.user?.householdName || '未加入'" />
+      <div class="household-actions">
+        <van-button size="small" round plain type="warning" @click="openHouseholdPanel">
+          切换 / 创建家庭
+        </van-button>
+      </div>
+    </section>
 
     <div v-if="userStore.canMutate" class="action-grid">
       <button type="button" @click="router.push('/recipe/create')">
@@ -712,6 +780,36 @@ onMounted(() => {
         登录后可查看自己的权限，管理员可管理家庭成员。
       </div>
     </section>
+
+    <van-popup v-model:show="householdPanelVisible" position="bottom" round>
+      <div class="household-panel">
+        <div class="household-panel-head">
+          <h3>我的家庭</h3>
+          <button type="button" @click="householdPanelVisible = false">关闭</button>
+        </div>
+        <div v-if="householdLoading" class="household-loading">加载中...</div>
+        <button
+          v-for="item in householdList"
+          :key="item.id"
+          type="button"
+          class="household-item"
+          :class="{ active: item.active }"
+          @click="switchToHousehold(item)"
+        >
+          <div>
+            <strong>{{ item.householdName }}</strong>
+            <span>{{ item.memberRole }} · {{ item.memberCount }} 人</span>
+          </div>
+          <van-icon :name="item.active ? 'success' : 'arrow'" />
+        </button>
+        <div class="household-create">
+          <van-field v-model="householdNameInput" label="新家庭" placeholder="输入家庭名称" maxlength="64" />
+          <van-button block round type="warning" :loading="householdCreating" @click="createNewHousehold">
+            创建并切换
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
   </section>
 </template>
 
@@ -1375,5 +1473,78 @@ h2 {
   color: #9a6b4f;
   font-size: 12px;
   line-height: 1.5;
+}
+.household-actions {
+  padding: 0 16px 14px;
+}
+
+.household-panel {
+  padding: 16px 16px calc(18px + var(--safe-area-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.household-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.household-panel-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.household-panel-head button {
+  border: 0;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.household-loading {
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.household-item {
+  width: 100%;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  color: var(--app-text);
+}
+
+.household-item.active {
+  border-color: var(--app-primary);
+  background: #fff7ed;
+}
+
+.household-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.household-item span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.household-create {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 </style>

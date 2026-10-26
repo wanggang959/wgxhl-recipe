@@ -9,6 +9,8 @@ public interface HouseholdMemberService extends IService<HouseholdMember> {
 
     List<HouseholdMember> listByHousehold(String householdId);
 
+    List<HouseholdMember> listByUser(String userId);
+
     HouseholdMember find(String householdId, String userId);
 
     HouseholdMember findFirstByUser(String userId);

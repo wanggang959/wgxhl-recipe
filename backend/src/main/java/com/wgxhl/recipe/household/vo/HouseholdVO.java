@@ -14,4 +14,6 @@ public class HouseholdVO {
     private String memberRole;
 
     private Long memberCount;
+
+    private Boolean active;
 }

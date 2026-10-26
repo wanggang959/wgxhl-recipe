@@ -9,7 +9,7 @@ import com.wgxhl.recipe.category.service.RecipeCategoryService;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.config.TenantContext;
 import com.wgxhl.recipe.config.UserContext;
-import com.wgxhl.recipe.favorite.service.UserFavoriteService;
+import com.wgxhl.recipe.favorite.mapper.UserFavoriteMapper;
 import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.image.dto.RecipeImageBatchDTO;
 import com.wgxhl.recipe.image.service.RecipeImageService;
@@ -22,7 +22,7 @@ import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.recipe.util.RecipeVersionUtil;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
-import com.wgxhl.recipe.record.service.RecipeViewRecordService;
+import com.wgxhl.recipe.record.mapper.RecipeViewRecordMapper;
 import com.wgxhl.recipe.relation.dto.RecipeIngredientRelBatchDTO;
 import com.wgxhl.recipe.relation.entity.RecipeIngredientRel;
 import com.wgxhl.recipe.relation.service.RecipeIngredientRelService;
@@ -36,7 +36,7 @@ import com.wgxhl.recipe.step.entity.RecipeStep;
 import com.wgxhl.recipe.step.service.RecipeStepService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
-import com.wgxhl.recipe.want.service.UserWantedRecipeService;
+import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -59,9 +59,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private final RecipeImageService recipeImageService;
     private final RecipeIngredientRelService recipeIngredientRelService;
     private final RecipeSeasoningRelService recipeSeasoningRelService;
-    private final UserFavoriteService userFavoriteService;
-    private final RecipeViewRecordService recipeViewRecordService;
-    private final UserWantedRecipeService userWantedRecipeService;
+    private final UserFavoriteMapper userFavoriteMapper;
+    private final RecipeViewRecordMapper recipeViewRecordMapper;
+    private final UserWantedRecipeMapper userWantedRecipeMapper;
     private final AppUserMapper appUserMapper;
     private final HouseholdMemberService householdMemberService;
     private final IngredientMapper ingredientMapper;
@@ -72,9 +72,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                              RecipeImageService recipeImageService,
                              RecipeIngredientRelService recipeIngredientRelService,
                              RecipeSeasoningRelService recipeSeasoningRelService,
-                             UserFavoriteService userFavoriteService,
-                             RecipeViewRecordService recipeViewRecordService,
-                             UserWantedRecipeService userWantedRecipeService,
+                             UserFavoriteMapper userFavoriteMapper,
+                             RecipeViewRecordMapper recipeViewRecordMapper,
+                             UserWantedRecipeMapper userWantedRecipeMapper,
                              AppUserMapper appUserMapper,
                              HouseholdMemberService householdMemberService,
                              IngredientMapper ingredientMapper,
@@ -84,9 +84,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         this.recipeImageService = recipeImageService;
         this.recipeIngredientRelService = recipeIngredientRelService;
         this.recipeSeasoningRelService = recipeSeasoningRelService;
-        this.userFavoriteService = userFavoriteService;
-        this.recipeViewRecordService = recipeViewRecordService;
-        this.userWantedRecipeService = userWantedRecipeService;
+        this.userFavoriteMapper = userFavoriteMapper;
+        this.recipeViewRecordMapper = recipeViewRecordMapper;
+        this.userWantedRecipeMapper = userWantedRecipeMapper;
         this.appUserMapper = appUserMapper;
         this.householdMemberService = householdMemberService;
         this.ingredientMapper = ingredientMapper;
@@ -244,9 +244,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             return ApiResponse.fail(403, "只能删除自己的菜谱");
         }
         clearChildrenByRecipeId(id);
-        userFavoriteService.deleteByRecipeId(id);
-        recipeViewRecordService.deleteByRecipeId(id);
-        userWantedRecipeService.deleteByRecipeId(id);
+        userFavoriteMapper.deleteByRecipeIdAcrossHouseholds(id);
+        recipeViewRecordMapper.deleteByRecipeIdAcrossHouseholds(id);
+        userWantedRecipeMapper.deleteByRecipeIdAcrossHouseholds(id);
         removeById(id);
         return ApiResponse.success("删除成功", null);
     }

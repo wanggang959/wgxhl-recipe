@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.TenantContext;
+import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.notification.service.NotificationService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.todo.dto.TodoPageDTO;
@@ -72,6 +74,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private final AppUserMapper appUserMapper;
     private final NotificationService notificationService;
     private final UserPushSubscriptionService userPushSubscriptionService;
+    private final HouseholdMemberService householdMemberService;
     private final JavaMailSender mailSender;
 
     @Value("${spring.mail.username:}")
@@ -83,6 +86,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                            AppUserMapper appUserMapper,
                            NotificationService notificationService,
                            UserPushSubscriptionService userPushSubscriptionService,
+                           HouseholdMemberService householdMemberService,
                            ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.todoNoticeRuleMapper = todoNoticeRuleMapper;
         this.todoOwnerMapper = todoOwnerMapper;
@@ -90,6 +94,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         this.appUserMapper = appUserMapper;
         this.notificationService = notificationService;
         this.userPushSubscriptionService = userPushSubscriptionService;
+        this.householdMemberService = householdMemberService;
         this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
@@ -387,11 +392,15 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     private List<String> birthdayReminderOwnerIds(String birthdayUserId) {
-        return appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
-                        .eq(AppUser::getStatus, "normal")
-                        .ne(AppUser::getId, "guest")
-                        .ne(StringUtils.hasText(birthdayUserId), AppUser::getId, birthdayUserId))
-                .stream()
+        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        if (memberIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return appUserMapper.selectBatchIds(memberIds).stream()
+                .filter(user -> user != null
+                        && "normal".equals(user.getStatus())
+                        && !"guest".equals(user.getId())
+                        && (!StringUtils.hasText(birthdayUserId) || !birthdayUserId.equals(user.getId())))
                 .map(AppUser::getId)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toList());
@@ -428,7 +437,11 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     private void syncAllBirthdayTodos() {
-        List<AppUser> users = appUserMapper.selectList(null);
+        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        if (memberIds.isEmpty()) {
+            return;
+        }
+        List<AppUser> users = appUserMapper.selectBatchIds(memberIds);
         for (AppUser user : users) {
             if (user == null || "guest".equals(user.getId()) || !"normal".equals(user.getStatus())) {
                 continue;

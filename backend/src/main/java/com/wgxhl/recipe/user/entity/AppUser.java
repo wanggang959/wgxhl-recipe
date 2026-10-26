@@ -112,4 +112,22 @@ public class AppUser {
      */
     @TableField(exist = false)
     private Long recentTodoCount;
+
+    /*
+     * 当前家庭id（非数据库字段）
+     */
+    @TableField(exist = false)
+    private String householdId;
+
+    /*
+     * 当前家庭名称（非数据库字段）
+     */
+    @TableField(exist = false)
+    private String householdName;
+
+    /*
+     * 当前家庭角色（非数据库字段）
+     */
+    @TableField(exist = false)
+    private String memberRole;
 }

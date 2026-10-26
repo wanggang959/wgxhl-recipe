@@ -17,6 +17,7 @@ public class JwtAuthUtil {
     private static final String CLAIM_USERNAME = "username";
     private static final String CLAIM_USER_ROLE = "userRole";
     private static final String CLAIM_STATUS = "status";
+    private static final String CLAIM_HOUSEHOLD_ID = "householdId";
     private static final String CLAIM_EXPIRE_AT = "expireAt";
 
     @Value("${auth.jwt.secret:wgxhl-recipe-secret-key}")
@@ -25,12 +26,13 @@ public class JwtAuthUtil {
     @Value("${auth.jwt.expire-hours:168}")
     private int expireHours;
 
-    public String createToken(AppUser user) {
+    public String createToken(AppUser user, String householdId) {
         Map<String, Object> payload = new HashMap<>();
         payload.put(CLAIM_USER_ID, user.getId());
         payload.put(CLAIM_USERNAME, user.getUsername());
         payload.put(CLAIM_USER_ROLE, user.getUserRole());
         payload.put(CLAIM_STATUS, user.getStatus());
+        payload.put(CLAIM_HOUSEHOLD_ID, householdId);
         long expireAt = System.currentTimeMillis() + expireHours * 3600L * 1000L;
         payload.put(CLAIM_EXPIRE_AT, expireAt);
         return JWTUtil.createToken(payload, secret.getBytes(StandardCharsets.UTF_8));
@@ -73,6 +75,14 @@ public class JwtAuthUtil {
             return null;
         }
         Object value = jwt.getPayload(CLAIM_USER_ID);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    public String getHouseholdId(JWT jwt) {
+        if (jwt == null) {
+            return null;
+        }
+        Object value = jwt.getPayload(CLAIM_HOUSEHOLD_ID);
         return value == null ? null : String.valueOf(value);
     }
 }

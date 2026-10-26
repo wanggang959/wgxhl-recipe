@@ -3,6 +3,10 @@ package com.wgxhl.recipe.config;
 import cn.hutool.jwt.JWT;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.household.entity.Household;
+import com.wgxhl.recipe.household.entity.HouseholdMember;
+import com.wgxhl.recipe.household.service.HouseholdMemberService;
+import com.wgxhl.recipe.household.service.HouseholdService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import org.springframework.http.MediaType;
@@ -36,13 +40,19 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
     private final ObjectMapper objectMapper;
     private final JwtAuthUtil jwtAuthUtil;
     private final AppUserMapper appUserMapper;
+    private final HouseholdMemberService householdMemberService;
+    private final HouseholdService householdService;
 
     public AdminPermissionInterceptor(ObjectMapper objectMapper,
                                       JwtAuthUtil jwtAuthUtil,
-                                      AppUserMapper appUserMapper) {
+                                      AppUserMapper appUserMapper,
+                                      HouseholdMemberService householdMemberService,
+                                      HouseholdService householdService) {
         this.objectMapper = objectMapper;
         this.jwtAuthUtil = jwtAuthUtil;
         this.appUserMapper = appUserMapper;
+        this.householdMemberService = householdMemberService;
+        this.householdService = householdService;
     }
 
     @Override
@@ -73,27 +83,57 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         request.setAttribute(AuthRequestAttributes.CURRENT_USER, currentUser);
 
         String path = normalizePath(request.getRequestURI());
-        if (isGuestUser(currentUser) && !isGuestReadOnlyPath(path)) {
+        if (isGuestUser(currentUser) && !isReadOnlyPath(path)) {
             writeJson(response, ApiResponse.fail(403, "游客仅可查看，无法执行此操作"));
+            return false;
+        }
+
+        String householdId = jwtAuthUtil.getHouseholdId(jwt);
+        HouseholdMember membership = householdMemberService.find(householdId, userId);
+        if (membership == null) {
+            membership = householdMemberService.findFirstByUser(userId);
+        }
+        if (membership == null || !STATUS_NORMAL.equals(membership.getStatus())) {
+            writeJson(response, ApiResponse.fail(403, "该账号尚未加入任何家庭，请联系管理员"));
+            return false;
+        }
+        Household household = householdService.getById(membership.getHouseholdId());
+        if (household == null || !STATUS_NORMAL.equals(household.getStatus())) {
+            writeJson(response, ApiResponse.fail(403, "所在家庭已停用，请联系管理员"));
             return false;
         }
 
         String userRole = jwtAuthUtil.getUserRole(jwt);
         if (requiresSuperAdmin(path)) {
             if (ROLE_SUPER_ADMIN.equals(userRole)) {
-                return true;
+                return allow(request, household, membership);
             }
             writeJson(response, ApiResponse.fail(403, "仅超级管理员王师傅可以禁用或启用账户"));
             return false;
         }
         if (!requiresAdmin(request.getRequestURI())) {
-            return true;
+            return allow(request, household, membership);
         }
         if (isAdminRole(userRole)) {
-            return true;
+            return allow(request, household, membership);
         }
         writeJson(response, ApiResponse.fail(403, "需要管理员权限"));
         return false;
+    }
+
+    private boolean allow(HttpServletRequest request, Household household, HouseholdMember membership) {
+        TenantContext.set(household.getId());
+        request.setAttribute(AuthRequestAttributes.CURRENT_HOUSEHOLD, household);
+        request.setAttribute(AuthRequestAttributes.CURRENT_MEMBERSHIP, membership);
+        return true;
+    }
+
+    @Override
+    public void afterCompletion(@NonNull HttpServletRequest request,
+                                @NonNull HttpServletResponse response,
+                                @NonNull Object handler,
+                                Exception ex) {
+        TenantContext.clear();
     }
 
     private boolean isAdminRole(String userRole) {
@@ -108,14 +148,14 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         return user != null && (GUEST_ID.equals(user.getId()) || GUEST_USERNAME.equals(user.getUsername()));
     }
 
-    private boolean isGuestReadOnlyPath(String path) {
+    private boolean isReadOnlyPath(String path) {
         if ("/health".equals(path)) {
             return true;
         }
         if (PUBLIC_USER_PATHS.contains(path)) {
             return true;
         }
-        if ("/user/members".equals(path) || "/push/status".equals(path)) {
+        if ("/user/members".equals(path) || "/push/status".equals(path) || "/household/me".equals(path)) {
             return true;
         }
         return path.endsWith("/page")
@@ -154,18 +194,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
 
     private boolean isPublicPath(String uri) {
         String path = normalizePath(uri);
-        if (path.equals("/health")) {
-            return true;
-        }
-        if (PUBLIC_USER_PATHS.contains(path)) {
-            return true;
-        }
-        if (path.startsWith("/todo/") || path.startsWith("/notification/") || path.startsWith("/expense/")) {
-            return false;
-        }
-        return path.endsWith("/page")
-                || path.endsWith("/getById")
-                || path.endsWith("/check");
+        return "/health".equals(path) || PUBLIC_USER_PATHS.contains(path);
     }
 
     private boolean requiresAdmin(String uri) {
@@ -173,15 +202,18 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         if ("/user/members".equals(path)) {
             return false;
         }
-        return path.startsWith("/category/")
+        if (path.startsWith("/user/")) {
+            return true;
+        }
+        boolean contentModule = path.startsWith("/category/")
                 || path.startsWith("/ingredient/")
                 || path.startsWith("/seasoning/")
                 || path.startsWith("/recipe/")
                 || path.startsWith("/image/")
                 || path.startsWith("/step/")
                 || path.startsWith("/relation/")
-                || path.startsWith("/seasoningrelation/")
-                || path.startsWith("/user/");
+                || path.startsWith("/seasoningrelation/");
+        return contentModule && !isReadOnlyPath(path);
     }
 
     private String normalizePath(String uri) {

@@ -52,10 +52,11 @@ node scripts/pack-deploy.mjs
 
 ### 1. 初始化数据库
 
-在 MySQL 中执行 `backend/sql/init.sql`：
+在 MySQL 中执行 `backend/sql/init.sql`，再执行 `backend/sql/add_household.sql`（多租户表结构与默认家庭）：
 
 ```bash
 mysql -h wgxhl.space -u recipe -p123456 < backend/sql/init.sql
+mysql -h wgxhl.space -u recipe -p123456 < backend/sql/add_household.sql
 ```
 
 ### 2. 后端配置

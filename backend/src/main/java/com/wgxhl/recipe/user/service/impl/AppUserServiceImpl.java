@@ -6,7 +6,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.config.JwtAuthUtil;
+import com.wgxhl.recipe.config.TenantContext;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
+import com.wgxhl.recipe.household.entity.Household;
+import com.wgxhl.recipe.household.entity.HouseholdMember;
+import com.wgxhl.recipe.household.service.HouseholdMemberService;
+import com.wgxhl.recipe.household.service.HouseholdService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.record.service.RecipeViewRecordService;
 import com.wgxhl.recipe.todo.entity.Todo;
@@ -56,6 +61,8 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     private final TodoService todoService;
     private final TodoOwnerMapper todoOwnerMapper;
     private final JwtAuthUtil jwtAuthUtil;
+    private final HouseholdMemberService householdMemberService;
+    private final HouseholdService householdService;
 
     public AppUserServiceImpl(UserFavoriteService userFavoriteService,
                               RecipeViewRecordService recipeViewRecordService,
@@ -63,7 +70,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                               UserPushSubscriptionService userPushSubscriptionService,
                               TodoService todoService,
                               TodoOwnerMapper todoOwnerMapper,
-                              JwtAuthUtil jwtAuthUtil) {
+                              JwtAuthUtil jwtAuthUtil,
+                              HouseholdMemberService householdMemberService,
+                              HouseholdService householdService) {
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
         this.userWantedRecipeService = userWantedRecipeService;
@@ -71,12 +80,40 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         this.todoService = todoService;
         this.todoOwnerMapper = todoOwnerMapper;
         this.jwtAuthUtil = jwtAuthUtil;
+        this.householdMemberService = householdMemberService;
+        this.householdService = householdService;
     }
 
     @PostConstruct
     public void ensureBuiltinAccounts() {
         ensureAdminAccount();
         ensureGuestAccount();
+        ensureBuiltinMemberships();
+    }
+
+    private void ensureBuiltinMemberships() {
+        Household household = householdService.lambdaQuery()
+                .eq(Household::getOwnerUserId, ADMIN_ID)
+                .eq(Household::getStatus, STATUS_NORMAL)
+                .orderByAsc(Household::getCreateTime)
+                .last("limit 1")
+                .one();
+        if (household == null) {
+            return;
+        }
+        ensureMembership(household.getId(), ADMIN_ID, "owner");
+        ensureMembership(household.getId(), GUEST_ID, "guest");
+    }
+
+    private void ensureMembership(String householdId, String userId, String memberRole) {
+        if (householdMemberService.find(householdId, userId) != null) {
+            return;
+        }
+        HouseholdMember member = new HouseholdMember();
+        member.setHouseholdId(householdId);
+        member.setUserId(userId);
+        member.setMemberRole(memberRole);
+        householdMemberService.save(member);
     }
 
     private void ensureAdminAccount() {
@@ -199,7 +236,12 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     @Override
     public ApiResponse<Page<AppUser>> page(UserPageDTO dto) {
         Page<AppUser> page = new Page<>(dto.getCurrent(), dto.getSize());
+        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        if (memberIds.isEmpty()) {
+            return ApiResponse.success(page);
+        }
         Page<AppUser> result = lambdaQuery()
+                .in(AppUser::getId, memberIds)
                 .like(StringUtils.hasText(dto.getUsername()), AppUser::getUsername, dto.getUsername())
                 .like(StringUtils.hasText(dto.getNickname()), AppUser::getNickname, dto.getNickname())
                 .eq(StringUtils.hasText(dto.getUserRole()), AppUser::getUserRole, dto.getUserRole())
@@ -242,6 +284,11 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         normalizeUser(entity);
         save(entity);
+        HouseholdMember member = new HouseholdMember();
+        member.setHouseholdId(TenantContext.require());
+        member.setUserId(entity.getId());
+        member.setMemberRole(resolveMemberRole(entity.getUserRole()));
+        householdMemberService.save(member);
         todoService.syncBirthdayTodo(entity);
         maskPassword(entity);
         return ApiResponse.success("保存成功", entity);
@@ -255,6 +302,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         AppUser existing = super.getById(entity.getId());
         if (existing == null) {
             return ApiResponse.fail("用户不存在");
+        }
+        HouseholdMember membership = householdMemberService.find(TenantContext.require(), entity.getId());
+        if (membership == null) {
+            return ApiResponse.fail("该成员不属于当前家庭");
         }
         if (isBuiltinAdmin(existing)) {
             if (!ADMIN_USERNAME.equals(entity.getUsername())) {
@@ -299,6 +350,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             entity.setAvatar(existing.getAvatar());
         }
         updateById(entity);
+        syncMemberRole(membership, entity.getUserRole());
         todoService.syncBirthdayTodo(super.getById(entity.getId()));
         return ApiResponse.success("更新成功", null);
     }
@@ -319,12 +371,22 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (isGuestUser(user)) {
             return ApiResponse.fail("游客账号不能删除");
         }
+        HouseholdMember membership = householdMemberService.find(TenantContext.require(), id);
+        if (membership == null) {
+            return ApiResponse.fail("该成员不属于当前家庭");
+        }
         userFavoriteService.deleteByUserId(id);
         recipeViewRecordService.deleteByUserId(id);
         userWantedRecipeService.deleteByUserId(id);
         userPushSubscriptionService.deleteByUserId(id);
         todoService.lambdaUpdate().eq(Todo::getOwnerId, id).remove();
-        removeById(id);
+        householdMemberService.removeById(membership.getId());
+        boolean hasOtherHousehold = householdMemberService.lambdaQuery()
+                .eq(HouseholdMember::getUserId, id)
+                .exists();
+        if (!hasOtherHousehold) {
+            removeById(id);
+        }
         return ApiResponse.success("删除成功", null);
     }
 
@@ -342,7 +404,11 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!STATUS_NORMAL.equals(user.getStatus())) {
             return ApiResponse.fail(disabledLoginMessage(user));
         }
-        user.setToken(jwtAuthUtil.createToken(user));
+        ApiResponse<AppUser> householdResult = applyLoginHousehold(user);
+        if (householdResult != null) {
+            return householdResult;
+        }
+        user.setToken(jwtAuthUtil.createToken(user, user.getHouseholdId()));
         maskPassword(user);
         return ApiResponse.success(user);
     }
@@ -361,9 +427,28 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!STATUS_NORMAL.equals(guest.getStatus())) {
             return ApiResponse.fail("当前系统已禁止游客登录，请联系管理员处理");
         }
-        guest.setToken(jwtAuthUtil.createToken(guest));
+        ApiResponse<AppUser> householdResult = applyLoginHousehold(guest);
+        if (householdResult != null) {
+            return householdResult;
+        }
+        guest.setToken(jwtAuthUtil.createToken(guest, guest.getHouseholdId()));
         maskPassword(guest);
         return ApiResponse.success(guest);
+    }
+
+    private ApiResponse<AppUser> applyLoginHousehold(AppUser user) {
+        HouseholdMember membership = householdMemberService.findFirstByUser(user.getId());
+        if (membership == null) {
+            return ApiResponse.fail("该账号尚未加入任何家庭，请联系管理员");
+        }
+        Household household = householdService.getById(membership.getHouseholdId());
+        if (household == null || !STATUS_NORMAL.equals(household.getStatus())) {
+            return ApiResponse.fail("所在家庭已停用，请联系管理员");
+        }
+        user.setHouseholdId(household.getId());
+        user.setHouseholdName(household.getHouseholdName());
+        user.setMemberRole(membership.getMemberRole());
+        return null;
     }
 
     @Override
@@ -395,7 +480,12 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
 
     @Override
     public ApiResponse<List<UserPreviewVO>> listMembers() {
+        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        if (memberIds.isEmpty()) {
+            return ApiResponse.success(new ArrayList<>());
+        }
         List<UserPreviewVO> members = lambdaQuery()
+                .in(AppUser::getId, memberIds)
                 .eq(AppUser::getStatus, STATUS_NORMAL)
                 .ne(AppUser::getId, GUEST_ID)
                 .orderByDesc(AppUser::getUserRole)
@@ -438,6 +528,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         if (isBuiltinAdmin(user)) {
             return ApiResponse.fail("内置管理员不能禁用");
+        }
+        if (householdMemberService.find(TenantContext.require(), id) == null) {
+            return ApiResponse.fail("该用户不属于当前家庭");
         }
         if (status.equals(user.getStatus())) {
             return ApiResponse.success(STATUS_DISABLED.equals(status) ? "该用户已是禁用状态" : "该用户已是正常状态", null);
@@ -554,6 +647,24 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                     }
                 })
                 .count();
+    }
+
+    private String resolveMemberRole(String userRole) {
+        return ROLE_ADMIN.equals(userRole) || ROLE_SUPER_ADMIN.equals(userRole) ? "admin" : "member";
+    }
+
+    private void syncMemberRole(HouseholdMember membership, String userRole) {
+        if (membership == null || "owner".equals(membership.getMemberRole())) {
+            return;
+        }
+        String memberRole = resolveMemberRole(userRole);
+        if (memberRole.equals(membership.getMemberRole())) {
+            return;
+        }
+        HouseholdMember patch = new HouseholdMember();
+        patch.setId(membership.getId());
+        patch.setMemberRole(memberRole);
+        householdMemberService.updateById(patch);
     }
 
     private void applyRole(AppUser user) {

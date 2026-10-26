@@ -10,6 +10,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const isShowcase = computed(() => route.query.mode === 'showcase')
 const isTodayMode = computed(() => route.query.pick === 'today')
+const familyName = computed(() => userStore.user?.householdName || '王师傅家')
 </script>
 
 <template>
@@ -17,7 +18,7 @@ const isTodayMode = computed(() => route.query.pick === 'today')
     <header v-if="!isShowcase" class="top-bar">
       <div class="top-bar-row">
         <button class="brand" type="button" @click="router.push('/recipes')">
-          <span>王师傅家</span>
+          <span>{{ familyName }}</span>
           <strong>家庭生活助手</strong>
         </button>
         <div class="top-actions">

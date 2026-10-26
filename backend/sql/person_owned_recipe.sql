@@ -78,3 +78,11 @@ alter table seasoning drop index uk_seasoning_name;
 alter table seasoning add unique key uk_seasoning_name (owner_user_id, seasoning_name);
 
 alter table seasoning drop index idx_seasoning_household, drop column household_id;
+
+-- ------------------------------------------------------------
+-- 6. 数据修正：历史菜谱可能仍挂着旧的内置管理员 id
+-- ------------------------------------------------------------
+update recipe
+set owner_user_id = (select id from app_user where user_role = 'super_admin' order by create_time limit 1)
+where owner_user_id = 'admin-wangshifu'
+  and exists (select 1 from app_user where user_role = 'super_admin');

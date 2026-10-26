@@ -455,7 +455,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     private int sendByRule(Todo todo, TodoNoticeRule rule, LocalDateTime targetTime) {
         int sent = 0;
-        String title = "【王师傅家提醒】" + todo.getTitle();
+        String title = "【王师傅生活助手】" + todo.getTitle();
         String content = buildNoticeContent(todo, rule);
         List<AppUser> owners = resolveOwners(todo);
         if (owners.isEmpty()) {

@@ -36,10 +36,10 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('push', (event) => {
   const payload = readPushPayload(event)
-  const title = payload.title || '王师傅私房菜'
+  const title = payload.title || '王师傅生活助手'
   const notifyUrl = payload.url || payload.data?.url || '/#/todo'
   const options = {
-    body: payload.body || '有人更新了待办，点击前往备菜',
+    body: payload.body || '有人更新了待办，点击前往查看',
     icon: payload.icon || '/pwa-icon-192.png',
     badge: payload.badge || '/pwa-icon-192.png',
     tag: payload.tag || 'wgxhl-recipe',

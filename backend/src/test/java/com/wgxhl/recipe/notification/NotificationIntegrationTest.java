@@ -61,7 +61,7 @@ class NotificationIntegrationTest {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(mailUsername);
         message.setTo(mailUsername);
-        message.setSubject("【王师傅家常菜谱】邮件通知联调测试");
+        message.setSubject("【王师傅生活助手】邮件通知联调测试");
         message.setText("这是一封自动测试邮件，用于验证待办邮箱通知配置是否可用。");
 
         mailSender.send(message);

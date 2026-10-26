@@ -90,7 +90,7 @@ async function submit() {
     })
     userStore.setUser(res.data)
     saveRememberedUsername()
-    showStatus('登录成功，正在进入家常菜单...')
+    showStatus('登录成功，正在进入生活助手...')
     setTimeout(() => {
       router.replace(getRedirectTarget())
     }, 260)
@@ -137,7 +137,7 @@ function showStatus(message, type = 'success') {
 
 <template>
   <div class="login-page">
-    <section class="login-hero" aria-label="王师傅家常菜谱">
+    <section class="login-hero" aria-label="王师傅生活助手">
       <div class="brand-lockup">
         <div class="chef-mark" aria-hidden="true">
           <img src="/login-chef.webp" alt="" />
@@ -145,7 +145,7 @@ function showStatus(message, type = 'success') {
         <div class="brand-main">王师傅家</div>
         <div class="brand-sub">
           <span></span>
-          家常菜谱
+          生活助手
           <span></span>
         </div>
       </div>
@@ -230,7 +230,7 @@ function showStatus(message, type = 'success') {
           </div>
 
           <van-button class="login-button" round block :loading="loading" loading-text="正在进家门..." @click="submit">
-            进入家常菜单
+            进入生活助手
           </van-button>
 
           <div class="guest-row">
@@ -243,7 +243,7 @@ function showStatus(message, type = 'success') {
 
         <footer class="footer-note">
           <van-icon name="like" />
-          <span>记录家里的味道，今天也要好好吃饭</span>
+          <span>记录一家人的吃穿用度，把日子过明白</span>
           <van-icon name="like" />
         </footer>
       </div>

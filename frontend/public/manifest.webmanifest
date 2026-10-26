@@ -1,7 +1,7 @@
 {
-  "name": "王师傅私房菜",
-  "short_name": "王师傅私房菜",
-  "description": "记录家里的味道，像点菜一样浏览自己的家常菜谱。",
+  "name": "王师傅生活助手",
+  "short_name": "王师傅助手",
+  "description": "记录一家人的吃穿用度、待办和重要日子。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff7ed",

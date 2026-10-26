@@ -79,6 +79,7 @@ const filter = reactive({
 
 const hasData = computed(() => list.value.length > 0)
 const todayCover = computed(() => getRecipeImage(suggestRecipe.value?.coverImage))
+const familyName = computed(() => userStore.user?.householdName || '王师傅家')
 const isTodayMode = computed(() => route.query.pick === 'today')
 const isShowcaseMode = computed(() => route.query.mode === 'showcase')
 const showcasePage = ref(0)
@@ -470,7 +471,7 @@ function submitCustomWantDate() {
   <div v-if="isShowcaseMode" class="showcase-page">
     <header class="showcase-header">
       <div>
-        <p>王刚家的大菜单</p>
+        <p>{{ familyName }}的大菜单</p>
         <h1>今晚想吃哪一道？</h1>
         <span>一页一页慢慢翻，只看菜名、口味、作者和版本。</span>
       </div>
@@ -530,8 +531,8 @@ function submitCustomWantDate() {
     <section v-if="!isTodayMode" class="hero">
       <div>
         <p>欢迎回家</p>
-        <h1>王刚家的家常菜谱</h1>
-        <span>记录家里的味道，今天想吃什么？</span>
+        <h1>{{ familyName }}的生活日常</h1>
+        <span>记录家里的味道，也照管家里的小事。</span>
       </div>
       <button type="button" class="today-button" @click="chooseRandomRecipe({ showMessage: true })">
         <van-icon name="fire-o" size="18" />

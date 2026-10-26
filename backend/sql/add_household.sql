@@ -79,6 +79,12 @@ on duplicate key update
     owner_user_id = values(owner_user_id),
     update_time = now();
 
+-- 存量库里超级管理员的 id 不一定是 admin-wangshifu，按角色回填真实所有者
+update household
+set owner_user_id = (select id from app_user where user_role = 'super_admin' order by create_time limit 1)
+where id = '00000000-0000-0000-0000-000000000001'
+  and exists (select 1 from app_user where user_role = 'super_admin');
+
 update recipe_category set household_id = '00000000-0000-0000-0000-000000000001' where household_id is null;
 update recipe set household_id = '00000000-0000-0000-0000-000000000001' where household_id is null;
 update recipe_image set household_id = '00000000-0000-0000-0000-000000000001' where household_id is null;
@@ -104,8 +110,9 @@ select replace(uuid(), '-', ''),
        '00000000-0000-0000-0000-000000000001',
        u.id,
        case
-           when u.id = 'admin-wangshifu' then 'owner'
-           when u.id = 'guest' then 'guest'
+           when u.user_role = 'super_admin' then 'owner'
+           when u.user_role = 'admin' then 'admin'
+           when u.id = 'guest' or u.username = 'guest' then 'guest'
            else 'member'
        end,
        'normal',

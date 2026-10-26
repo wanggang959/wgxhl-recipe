@@ -92,8 +92,14 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     }
 
     private void ensureBuiltinMemberships() {
+        AppUser admin = lambdaQuery()
+                .eq(AppUser::getUsername, ADMIN_USERNAME)
+                .one();
+        if (admin == null) {
+            return;
+        }
         Household household = householdService.lambdaQuery()
-                .eq(Household::getOwnerUserId, ADMIN_ID)
+                .eq(Household::getOwnerUserId, admin.getId())
                 .eq(Household::getStatus, STATUS_NORMAL)
                 .orderByAsc(Household::getCreateTime)
                 .last("limit 1")
@@ -101,19 +107,26 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (household == null) {
             return;
         }
-        ensureMembership(household.getId(), ADMIN_ID, "owner");
+        ensureMembership(household.getId(), admin.getId(), "owner");
         ensureMembership(household.getId(), GUEST_ID, "guest");
     }
 
     private void ensureMembership(String householdId, String userId, String memberRole) {
-        if (householdMemberService.find(householdId, userId) != null) {
+        HouseholdMember existing = householdMemberService.find(householdId, userId);
+        if (existing == null) {
+            HouseholdMember member = new HouseholdMember();
+            member.setHouseholdId(householdId);
+            member.setUserId(userId);
+            member.setMemberRole(memberRole);
+            householdMemberService.save(member);
             return;
         }
-        HouseholdMember member = new HouseholdMember();
-        member.setHouseholdId(householdId);
-        member.setUserId(userId);
-        member.setMemberRole(memberRole);
-        householdMemberService.save(member);
+        if (!memberRole.equals(existing.getMemberRole())) {
+            HouseholdMember patch = new HouseholdMember();
+            patch.setId(existing.getId());
+            patch.setMemberRole(memberRole);
+            householdMemberService.updateById(patch);
+        }
     }
 
     private void ensureAdminAccount() {

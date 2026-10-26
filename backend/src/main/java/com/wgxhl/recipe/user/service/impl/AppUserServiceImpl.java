@@ -480,14 +480,6 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         preview.setUsername(user.getUsername());
         preview.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername());
         preview.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getId()));
-        preview.setEmail(user.getEmail());
-        preview.setBirthday(user.getBirthday());
-        preview.setBirthdayCalendar(user.getBirthdayCalendar());
-        preview.setLunarBirthdayYear(user.getLunarBirthdayYear());
-        preview.setLunarBirthdayMonth(user.getLunarBirthdayMonth());
-        preview.setLunarBirthdayDay(user.getLunarBirthdayDay());
-        preview.setLunarBirthdayLeap(user.getLunarBirthdayLeap());
-        preview.setNotificationPreference(user.getNotificationPreference());
         return ApiResponse.success(preview);
     }
 

@@ -7,9 +7,14 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.category.entity.RecipeCategory;
 import com.wgxhl.recipe.category.service.RecipeCategoryService;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.TenantContext;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
+import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.image.dto.RecipeImageBatchDTO;
 import com.wgxhl.recipe.image.service.RecipeImageService;
+import com.wgxhl.recipe.ingredient.entity.Ingredient;
+import com.wgxhl.recipe.ingredient.mapper.IngredientMapper;
 import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
 import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
@@ -19,8 +24,12 @@ import com.wgxhl.recipe.recipe.util.RecipeVersionUtil;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
 import com.wgxhl.recipe.record.service.RecipeViewRecordService;
 import com.wgxhl.recipe.relation.dto.RecipeIngredientRelBatchDTO;
+import com.wgxhl.recipe.relation.entity.RecipeIngredientRel;
 import com.wgxhl.recipe.relation.service.RecipeIngredientRelService;
+import com.wgxhl.recipe.seasoning.entity.Seasoning;
+import com.wgxhl.recipe.seasoning.mapper.SeasoningMapper;
 import com.wgxhl.recipe.seasoningrelation.dto.RecipeSeasoningRelBatchDTO;
+import com.wgxhl.recipe.seasoningrelation.entity.RecipeSeasoningRel;
 import com.wgxhl.recipe.seasoningrelation.service.RecipeSeasoningRelService;
 import com.wgxhl.recipe.step.dto.RecipeStepBatchDTO;
 import com.wgxhl.recipe.step.entity.RecipeStep;
@@ -34,8 +43,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,6 +63,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private final RecipeViewRecordService recipeViewRecordService;
     private final UserWantedRecipeService userWantedRecipeService;
     private final AppUserMapper appUserMapper;
+    private final HouseholdMemberService householdMemberService;
+    private final IngredientMapper ingredientMapper;
+    private final SeasoningMapper seasoningMapper;
 
     public RecipeServiceImpl(RecipeCategoryService recipeCategoryService,
                              RecipeStepService recipeStepService,
@@ -61,7 +75,10 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                              UserFavoriteService userFavoriteService,
                              RecipeViewRecordService recipeViewRecordService,
                              UserWantedRecipeService userWantedRecipeService,
-                             AppUserMapper appUserMapper) {
+                             AppUserMapper appUserMapper,
+                             HouseholdMemberService householdMemberService,
+                             IngredientMapper ingredientMapper,
+                             SeasoningMapper seasoningMapper) {
         this.recipeCategoryService = recipeCategoryService;
         this.recipeStepService = recipeStepService;
         this.recipeImageService = recipeImageService;
@@ -71,6 +88,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         this.recipeViewRecordService = recipeViewRecordService;
         this.userWantedRecipeService = userWantedRecipeService;
         this.appUserMapper = appUserMapper;
+        this.householdMemberService = householdMemberService;
+        this.ingredientMapper = ingredientMapper;
+        this.seasoningMapper = seasoningMapper;
     }
 
     @Override
@@ -93,9 +113,19 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     @Override
     public ApiResponse<Page<Recipe>> page(RecipePageDTO dto) {
         Page<Recipe> page = new Page<>(dto.getCurrent(), dto.getSize());
+        String currentUserId = UserContext.requireUserId();
+        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        if (memberIds.isEmpty()) {
+            return ApiResponse.success(page);
+        }
         String keyword = StringUtils.hasText(dto.getRecipeName()) ? dto.getRecipeName().trim() : "";
-        List<String> ownerUserIds = findOwnerUserIds(keyword);
+        List<String> ownerUserIds = findOwnerUserIds(keyword, memberIds);
         Page<Recipe> result = lambdaQuery()
+                .in(Recipe::getOwnerUserId, memberIds)
+                .and(wrapper -> wrapper
+                        .eq(Recipe::getVisibility, "family")
+                        .or()
+                        .eq(Recipe::getOwnerUserId, currentUserId))
                 .and(StringUtils.hasText(keyword), wrapper -> {
                     wrapper.like(Recipe::getRecipeName, keyword)
                             .or()
@@ -114,14 +144,16 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         return ApiResponse.success(result);
     }
 
-    private List<String> findOwnerUserIds(String keyword) {
-        if (!StringUtils.hasText(keyword)) {
+    private List<String> findOwnerUserIds(String keyword, List<String> memberIds) {
+        if (!StringUtils.hasText(keyword) || memberIds.isEmpty()) {
             return Collections.emptyList();
         }
         return appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
-                        .like(AppUser::getUsername, keyword)
-                        .or()
-                        .like(AppUser::getNickname, keyword))
+                        .in(AppUser::getId, memberIds)
+                        .and(wrapper -> wrapper
+                                .like(AppUser::getUsername, keyword)
+                                .or()
+                                .like(AppUser::getNickname, keyword)))
                 .stream()
                 .map(AppUser::getId)
                 .filter(StringUtils::hasText)
@@ -134,7 +166,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             return ApiResponse.fail("菜谱id不能为空");
         }
         Recipe recipe = super.getById(id);
-        if (recipe == null) {
+        if (recipe == null || !canView(recipe)) {
             return ApiResponse.fail("菜谱不存在");
         }
         return ApiResponse.success(buildDetailVO(recipe));
@@ -149,6 +181,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         Recipe recipe = dto.getRecipe();
         applyOwner(recipe, creator);
         normalizeVersion(recipe);
+        normalizeVisibility(recipe);
         ApiResponse<Void> validateResult = validateRecipe(recipe, null, dto.getRecipeStepList());
         if (validateResult != null) {
             return ApiResponse.fail(validateResult.getMessage());
@@ -175,9 +208,16 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (existing == null) {
             return ApiResponse.fail("菜谱不存在");
         }
+        if (!UserContext.requireUserId().equals(existing.getOwnerUserId())) {
+            return ApiResponse.fail(403, "只能编辑自己的菜谱");
+        }
         recipe.setOwnerUserId(existing.getOwnerUserId());
         recipe.setOwnerName(existing.getOwnerName());
+        if (!StringUtils.hasText(recipe.getVisibility())) {
+            recipe.setVisibility(existing.getVisibility());
+        }
         normalizeVersion(recipe);
+        normalizeVisibility(recipe);
         ApiResponse<Void> validateResult = validateRecipe(recipe, recipe.getId(), dto.getRecipeStepList());
         if (validateResult != null) {
             return ApiResponse.fail(validateResult.getMessage());
@@ -196,8 +236,12 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("菜谱id不能为空");
         }
-        if (super.getById(id) == null) {
+        Recipe existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("菜谱不存在");
+        }
+        if (!UserContext.requireUserId().equals(existing.getOwnerUserId())) {
+            return ApiResponse.fail(403, "只能删除自己的菜谱");
         }
         clearChildrenByRecipeId(id);
         userFavoriteService.deleteByRecipeId(id);
@@ -226,6 +270,27 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         recipe.setRecipeVersion(RecipeVersionUtil.normalize(recipe.getRecipeVersion()));
     }
 
+    private void normalizeVisibility(Recipe recipe) {
+        if (recipe == null) {
+            return;
+        }
+        if (!"private".equals(recipe.getVisibility())) {
+            recipe.setVisibility("family");
+        }
+    }
+
+    private boolean canView(Recipe recipe) {
+        String currentUserId = UserContext.requireUserId();
+        if (currentUserId.equals(recipe.getOwnerUserId())) {
+            return true;
+        }
+        if (!"family".equals(recipe.getVisibility())) {
+            return false;
+        }
+        return householdMemberService.listUserIds(TenantContext.require())
+                .contains(recipe.getOwnerUserId());
+    }
+
     private ApiResponse<Void> validateRecipe(Recipe recipe, String excludeId, List<RecipeStep> stepList) {
         if (!StringUtils.hasText(recipe.getRecipeName())) {
             return ApiResponse.fail("菜谱名称不能为空");
@@ -252,6 +317,11 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                     .one();
             if (category == null) {
                 return ApiResponse.fail("分类不存在");
+            }
+            boolean allowed = "platform".equals(category.getScope())
+                    || UserContext.requireUserId().equals(category.getOwnerUserId());
+            if (!allowed) {
+                return ApiResponse.fail("分类不可用");
             }
             recipe.setCategoryName(category.getCategoryName());
         }
@@ -331,9 +401,49 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         RecipeDetailVO vo = new RecipeDetailVO();
         vo.setRecipe(recipe);
         vo.setRecipeStepList(recipeStepService.listByRecipeId(recipe.getId()).getData());
-        vo.setIngredientList(recipeIngredientRelService.listByRecipeId(recipe.getId()).getData());
-        vo.setSeasoningList(recipeSeasoningRelService.listByRecipeId(recipe.getId()).getData());
+        List<RecipeIngredientRel> ingredientList = recipeIngredientRelService.listByRecipeId(recipe.getId()).getData();
+        List<RecipeSeasoningRel> seasoningList = recipeSeasoningRelService.listByRecipeId(recipe.getId()).getData();
+        enrichIngredientImages(ingredientList);
+        enrichSeasoningImages(seasoningList);
+        vo.setIngredientList(ingredientList);
+        vo.setSeasoningList(seasoningList);
         vo.setImageList(recipeImageService.listByRecipeId(recipe.getId()).getData());
         return vo;
+    }
+
+    private void enrichIngredientImages(List<RecipeIngredientRel> ingredientList) {
+        if (ingredientList == null || ingredientList.isEmpty()) {
+            return;
+        }
+        Set<String> ingredientIds = ingredientList.stream()
+                .map(RecipeIngredientRel::getIngredientId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        if (ingredientIds.isEmpty()) {
+            return;
+        }
+        Map<String, String> imageMap = new HashMap<>();
+        for (Ingredient ingredient : ingredientMapper.selectBatchIds(ingredientIds)) {
+            imageMap.put(ingredient.getId(), ingredient.getIngredientImage());
+        }
+        ingredientList.forEach(item -> item.setIngredientImage(imageMap.get(item.getIngredientId())));
+    }
+
+    private void enrichSeasoningImages(List<RecipeSeasoningRel> seasoningList) {
+        if (seasoningList == null || seasoningList.isEmpty()) {
+            return;
+        }
+        Set<String> seasoningIds = seasoningList.stream()
+                .map(RecipeSeasoningRel::getSeasoningId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        if (seasoningIds.isEmpty()) {
+            return;
+        }
+        Map<String, String> imageMap = new HashMap<>();
+        for (Seasoning seasoning : seasoningMapper.selectBatchIds(seasoningIds)) {
+            imageMap.put(seasoning.getId(), seasoning.getSeasoningImage());
+        }
+        seasoningList.forEach(item -> item.setSeasoningImage(imageMap.get(item.getSeasoningId())));
     }
 }

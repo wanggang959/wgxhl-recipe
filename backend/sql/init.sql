@@ -1,7 +1,7 @@
 USE recipe;
 
--- 多租户改造后，新库初始化顺序：先执行本文件，再执行 add_household.sql
--- （add_household.sql 会创建 household / household_member 并为所有业务表补充 household_id）
+-- 多租户改造后，新库初始化顺序：先执行本文件，再依次执行 add_household.sql、person_owned_recipe.sql
+-- （add_household.sql 创建家庭表并补充 household_id；person_owned_recipe.sql 再把菜谱/基础数据改为按人归属）
 
 create table recipe_category
 (

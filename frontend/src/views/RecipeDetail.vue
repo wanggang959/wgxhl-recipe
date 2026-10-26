@@ -1,11 +1,9 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
-import { pageIngredient } from '../api/ingredient'
 import { deleteRecipe, getRecipeDetail } from '../api/recipe'
-import { pageSeasoning } from '../api/seasoning'
 import RecipeDetail from '../components/RecipeDetail.vue'
 import { useUserStore } from '../stores/user'
 import { DATA_SCOPE, markDataChanged, markDataStale } from '../utils/dataRefresh'
@@ -25,6 +23,7 @@ const detail = ref({
 const isFavorite = ref(false)
 const favoritePending = ref(false)
 const errorText = ref('')
+const isOwner = computed(() => Boolean(userStore.userId && detail.value.recipe?.ownerUserId === userStore.userId))
 
 onMounted(async () => {
   await loadDetail()
@@ -36,8 +35,6 @@ async function loadDetail() {
   try {
     const res = await getRecipeDetail(route.params.id)
     detail.value = res.data
-    await mergeIngredientImages()
-    await mergeSeasoningImages()
     if (userStore.userId) {
       const fav = await checkFavorite(userStore.userId, route.params.id)
       isFavorite.value = Boolean(fav.data)
@@ -47,40 +44,6 @@ async function loadDetail() {
     showFailToast(errorText.value)
   } finally {
     loading.value = false
-  }
-}
-
-async function mergeSeasoningImages() {
-  const seasoningList = detail.value.seasoningList || []
-  const needsImage = seasoningList.some((item) => item.seasoningId && !item.seasoningImage)
-  if (!needsImage) {
-    return
-  }
-  const res = await pageSeasoning({ current: 1, size: 1000 })
-  const imageMap = new Map((res.data.records || []).map((item) => [item.id, item.seasoningImage]))
-  detail.value = {
-    ...detail.value,
-    seasoningList: seasoningList.map((item) => ({
-      ...item,
-      seasoningImage: item.seasoningImage || imageMap.get(item.seasoningId) || '',
-    })),
-  }
-}
-
-async function mergeIngredientImages() {
-  const ingredientList = detail.value.ingredientList || []
-  const needsImage = ingredientList.some((item) => item.ingredientId && !item.ingredientImage)
-  if (!needsImage) {
-    return
-  }
-  const res = await pageIngredient({ current: 1, size: 1000 })
-  const imageMap = new Map((res.data.records || []).map((item) => [item.id, item.ingredientImage]))
-  detail.value = {
-    ...detail.value,
-    ingredientList: ingredientList.map((item) => ({
-      ...item,
-      ingredientImage: item.ingredientImage || imageMap.get(item.ingredientId) || '',
-    })),
   }
 }
 
@@ -165,7 +128,7 @@ async function removeRecipe() {
         v-else
         :detail="detail"
         :favorite="isFavorite"
-        :can-edit="userStore.isAdmin"
+        :can-edit="isOwner"
         :show-favorite="userStore.canMutate"
         :show-todo-action="userStore.canMutate"
         @back="router.back()"

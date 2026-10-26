@@ -14,7 +14,15 @@ public class HouseholdTenantLineHandler implements TenantLineHandler {
     private static final Set<String> GLOBAL_TABLES = new HashSet<>(Arrays.asList(
             "app_user",
             "household",
-            "household_member"
+            "household_member",
+            "recipe",
+            "recipe_image",
+            "recipe_step",
+            "recipe_ingredient_rel",
+            "recipe_seasoning_rel",
+            "recipe_category",
+            "ingredient",
+            "seasoning"
     ));
 
     @Override

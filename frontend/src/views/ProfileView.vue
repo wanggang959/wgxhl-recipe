@@ -442,14 +442,14 @@ onMounted(() => {
       <span>{{ actionStatus }}</span>
     </div>
 
-    <div v-if="userStore.isAdmin" class="action-grid">
+    <div v-if="userStore.canMutate" class="action-grid">
       <button type="button" @click="router.push('/recipe/create')">
         <van-icon name="plus" />
         添加菜谱
       </button>
       <button type="button" @click="router.push('/manage/base')">
         <van-icon name="apps-o" />
-        分类食材
+        基础数据
       </button>
     </div>
 

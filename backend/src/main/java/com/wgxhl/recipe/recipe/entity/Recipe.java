@@ -60,6 +60,11 @@ public class Recipe {
     private String status;
 
     /*
+     * 可见范围：family-家庭成员可见，private-仅自己可见
+     */
+    private String visibility;
+
+    /*
      * 分类id
      */
     private String categoryId;

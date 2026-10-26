@@ -9,6 +9,7 @@ import com.wgxhl.recipe.category.entity.RecipeCategory;
 import com.wgxhl.recipe.category.mapper.RecipeCategoryMapper;
 import com.wgxhl.recipe.category.service.RecipeCategoryService;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
 import org.springframework.stereotype.Service;
@@ -46,7 +47,13 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
     @Override
     public ApiResponse<Page<RecipeCategory>> page(RecipeCategoryPageDTO dto) {
         Page<RecipeCategory> page = new Page<>(dto.getCurrent(), dto.getSize());
+        String userId = UserContext.requireUserId();
         Page<RecipeCategory> result = lambdaQuery()
+                .and(wrapper -> wrapper
+                        .eq(RecipeCategory::getScope, "platform")
+                        .or(personal -> personal
+                                .eq(RecipeCategory::getScope, "personal")
+                                .eq(RecipeCategory::getOwnerUserId, userId)))
                 .like(StringUtils.hasText(dto.getCategoryName()), RecipeCategory::getCategoryName, dto.getCategoryName())
                 .eq(StringUtils.hasText(dto.getCategoryCode()), RecipeCategory::getCategoryCode, dto.getCategoryCode())
                 .orderByAsc(RecipeCategory::getSortNo)
@@ -61,7 +68,7 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
             return ApiResponse.fail("分类id不能为空");
         }
         RecipeCategory category = super.getById(id);
-        if (category == null) {
+        if (category == null || !canView(category)) {
             return ApiResponse.fail("分类不存在");
         }
         return ApiResponse.success(category);
@@ -75,10 +82,17 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
         if (!StringUtils.hasText(entity.getCategoryName())) {
             return ApiResponse.fail("分类名称不能为空");
         }
-        if (lambdaQuery().eq(RecipeCategory::getCategoryCode, entity.getCategoryCode()).exists()) {
+        applyScope(entity);
+        if (lambdaQuery()
+                .eq(RecipeCategory::getOwnerUserId, entity.getOwnerUserId())
+                .eq(RecipeCategory::getCategoryCode, entity.getCategoryCode())
+                .exists()) {
             return ApiResponse.fail("分类编码已存在");
         }
-        if (lambdaQuery().eq(RecipeCategory::getCategoryName, entity.getCategoryName()).exists()) {
+        if (lambdaQuery()
+                .eq(RecipeCategory::getOwnerUserId, entity.getOwnerUserId())
+                .eq(RecipeCategory::getCategoryName, entity.getCategoryName())
+                .exists()) {
             return ApiResponse.fail("分类名称已存在");
         }
         save(entity);
@@ -90,12 +104,19 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
         if (!StringUtils.hasText(entity.getId())) {
             return ApiResponse.fail("分类id不能为空");
         }
-        if (super.getById(entity.getId()) == null) {
+        RecipeCategory existing = super.getById(entity.getId());
+        if (existing == null) {
             return ApiResponse.fail("分类不存在");
         }
+        if (!canManage(existing)) {
+            return ApiResponse.fail(403, "只能编辑自己的分类");
+        }
+        entity.setScope(existing.getScope());
+        entity.setOwnerUserId(existing.getOwnerUserId());
         if (StringUtils.hasText(entity.getCategoryCode())
                 && lambdaQuery()
                 .ne(RecipeCategory::getId, entity.getId())
+                .eq(RecipeCategory::getOwnerUserId, existing.getOwnerUserId())
                 .eq(RecipeCategory::getCategoryCode, entity.getCategoryCode())
                 .exists()) {
             return ApiResponse.fail("分类编码已存在");
@@ -103,6 +124,7 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
         if (StringUtils.hasText(entity.getCategoryName())
                 && lambdaQuery()
                 .ne(RecipeCategory::getId, entity.getId())
+                .eq(RecipeCategory::getOwnerUserId, existing.getOwnerUserId())
                 .eq(RecipeCategory::getCategoryName, entity.getCategoryName())
                 .exists()) {
             return ApiResponse.fail("分类名称已存在");
@@ -116,8 +138,12 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("分类id不能为空");
         }
-        if (super.getById(id) == null) {
+        RecipeCategory existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("分类不存在");
+        }
+        if (!canManage(existing)) {
+            return ApiResponse.fail(403, "只能删除自己的分类");
         }
         Long recipeCount = recipeMapper.selectCount(
                 new LambdaQueryWrapper<Recipe>().eq(Recipe::getCategoryId, id));
@@ -126,5 +152,27 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
         }
         removeById(id);
         return ApiResponse.success("删除成功", null);
+    }
+
+    private void applyScope(RecipeCategory entity) {
+        if (UserContext.isSuperAdmin()) {
+            entity.setScope("platform");
+            entity.setOwnerUserId("platform");
+        } else {
+            entity.setScope("personal");
+            entity.setOwnerUserId(UserContext.requireUserId());
+        }
+    }
+
+    private boolean canView(RecipeCategory category) {
+        return "platform".equals(category.getScope())
+                || UserContext.requireUserId().equals(category.getOwnerUserId());
+    }
+
+    private boolean canManage(RecipeCategory category) {
+        if ("platform".equals(category.getScope())) {
+            return UserContext.isSuperAdmin();
+        }
+        return UserContext.requireUserId().equals(category.getOwnerUserId());
     }
 }

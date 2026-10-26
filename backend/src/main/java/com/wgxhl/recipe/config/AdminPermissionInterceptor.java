@@ -123,6 +123,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
 
     private boolean allow(HttpServletRequest request, Household household, HouseholdMember membership) {
         TenantContext.set(household.getId());
+        UserContext.set((AppUser) request.getAttribute(AuthRequestAttributes.CURRENT_USER));
         request.setAttribute(AuthRequestAttributes.CURRENT_HOUSEHOLD, household);
         request.setAttribute(AuthRequestAttributes.CURRENT_MEMBERSHIP, membership);
         return true;
@@ -134,6 +135,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
                                 @NonNull Object handler,
                                 Exception ex) {
         TenantContext.clear();
+        UserContext.clear();
     }
 
     private boolean isAdminRole(String userRole) {
@@ -205,15 +207,11 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         if (path.startsWith("/user/")) {
             return true;
         }
-        boolean contentModule = path.startsWith("/category/")
-                || path.startsWith("/ingredient/")
-                || path.startsWith("/seasoning/")
-                || path.startsWith("/recipe/")
-                || path.startsWith("/image/")
+        // 菜谱与基础数据写入对所有成员开放，具体归属校验在 Service 层
+        return path.startsWith("/image/")
                 || path.startsWith("/step/")
                 || path.startsWith("/relation/")
                 || path.startsWith("/seasoningrelation/");
-        return contentModule && !isReadOnlyPath(path);
     }
 
     private String normalizePath(String uri) {

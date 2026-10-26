@@ -485,7 +485,7 @@ function submitCustomWantDate() {
     <EmptyState
       v-else-if="list.length === 0"
       text="还没有菜谱，先添加一道拿手菜吧"
-      :show-button="userStore.isAdmin"
+      :show-button="canMutate"
       @action="router.push('/recipe/create')"
     />
     <section v-else class="showcase-board">
@@ -582,7 +582,7 @@ function submitCustomWantDate() {
       <EmptyState
         v-else-if="!loading"
         text="还没有菜谱，先添加一道拿手菜吧"
-        :show-button="userStore.isAdmin"
+        :show-button="canMutate"
         @action="router.push('/recipe/create')"
       />
     </section>
@@ -652,7 +652,7 @@ function submitCustomWantDate() {
           @want="openWantAction"
         />
       </div>
-      <EmptyState v-else-if="!loading" :show-button="userStore.isAdmin" @action="router.push('/recipe/create')" />
+      <EmptyState v-else-if="!loading" :show-button="canMutate" @action="router.push('/recipe/create')" />
     </van-list>
   </div>
 

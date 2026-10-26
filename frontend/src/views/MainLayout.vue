@@ -24,7 +24,7 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
         <div class="top-actions">
           <NotificationBell />
           <button
-            v-if="!isTodayMode && userStore.isAdmin"
+            v-if="!isTodayMode && userStore.canMutate"
             class="top-icon-button"
             type="button"
             aria-label="添加菜谱"

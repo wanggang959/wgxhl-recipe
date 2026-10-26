@@ -389,7 +389,15 @@ async function removeSeasoning(item) {
   }
 }
 
-if (userStore.isAdmin) {
+function scopeLabel(item) {
+  return item.scope === 'platform' ? '公共' : '我的'
+}
+
+function canManageBase(item) {
+  return item.scope !== 'platform' || userStore.isSuperAdmin
+}
+
+if (userStore.isLogin && !userStore.isGuest) {
   loadCategory().catch((e) => showFailToast(e.message || '分类加载失败'))
   loadIngredient().catch((e) => showFailToast(e.message || '食材加载失败'))
   loadSeasoning().catch((e) => showFailToast(e.message || '调料加载失败'))
@@ -402,13 +410,7 @@ if (userStore.isAdmin) {
     <main class="page-wrap">
     <section class="page">
       <van-nav-bar title="基础数据管理" left-arrow @click-left="router.back()" />
-      <div v-if="!userStore.isAdmin" class="permission-card">
-        <van-icon name="warning-o" size="24" />
-        <strong>需要管理员权限</strong>
-        <p>分类、食材、调料管理只能由管理员操作。</p>
-        <van-button round type="warning" size="small" @click="router.push('/profile')">去登录</van-button>
-      </div>
-      <template v-else>
+      <p class="scope-hint">公共数据所有人可用；你创建的分类、食材、调料仅自己可见，可跨家庭使用。</p>
       <div v-if="actionStatus" class="action-status">
         <van-icon name="success" />
         <span>{{ actionStatus }}</span>
@@ -430,10 +432,10 @@ if (userStore.isAdmin) {
               v-for="item in categoryList"
               :key="item.id"
               :title="item.categoryName"
-              :label="`${item.categoryCode} / 排序:${item.sortNo ?? '-'}`"
+              :label="`${scopeLabel(item)} · ${item.categoryCode} / 排序:${item.sortNo ?? '-'}`"
             >
               <template #right-icon>
-                <div class="cell-actions">
+                <div v-if="canManageBase(item)" class="cell-actions">
                   <van-button size="mini" plain type="primary" @click="editCategory(item)">编辑</van-button>
                   <van-button size="mini" plain type="danger" @click="removeCategory(item)">删除</van-button>
                 </div>
@@ -480,9 +482,9 @@ if (userStore.isAdmin) {
               </div>
               <div class="ingredient-info">
                 <div class="ingredient-name">{{ item.ingredientName }}</div>
-                <div class="ingredient-desc">{{ item.ingredientDesc || '暂无描述' }}</div>
+                <div class="ingredient-desc">{{ scopeLabel(item) }} · {{ item.ingredientDesc || '暂无描述' }}</div>
               </div>
-              <div class="cell-actions">
+              <div v-if="canManageBase(item)" class="cell-actions">
                 <van-button size="mini" plain type="primary" @click="editIngredient(item)">编辑</van-button>
                 <van-button size="mini" plain type="danger" @click="removeIngredient(item)">删除</van-button>
               </div>
@@ -544,9 +546,9 @@ if (userStore.isAdmin) {
               </div>
               <div class="ingredient-info">
                 <div class="ingredient-name">{{ item.seasoningName }}</div>
-                <div class="ingredient-desc">{{ item.seasoningDesc || '暂无描述' }}</div>
+                <div class="ingredient-desc">{{ scopeLabel(item) }} · {{ item.seasoningDesc || '暂无描述' }}</div>
               </div>
-              <div class="cell-actions">
+              <div v-if="canManageBase(item)" class="cell-actions">
                 <van-button size="mini" plain type="primary" @click="editSeasoning(item)">编辑</van-button>
                 <van-button size="mini" plain type="danger" @click="removeSeasoning(item)">删除</van-button>
               </div>
@@ -570,7 +572,6 @@ if (userStore.isAdmin) {
           </div>
         </van-tab>
       </van-tabs>
-      </template>
     </section>
     </main>
     <BottomNav />
@@ -588,6 +589,13 @@ if (userStore.isAdmin) {
 
 .form-panel {
   padding: 12px;
+}
+
+.scope-hint {
+  margin: 10px 16px 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .permission-card {

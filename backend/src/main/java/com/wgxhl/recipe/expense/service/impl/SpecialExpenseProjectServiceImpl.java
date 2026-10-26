@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.expense.dto.SpecialExpenseProjectPageDTO;
 import com.wgxhl.recipe.expense.dto.SpecialExpenseSummaryDTO;
 import com.wgxhl.recipe.expense.entity.SpecialExpenseItem;
@@ -121,12 +122,17 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
         if (existing == null) {
             return ApiResponse.fail("专项不存在");
         }
+        String editDenied = manageDeniedReason(existing, actor);
+        if (editDenied != null) {
+            return ApiResponse.fail(403, editDenied);
+        }
         if (!StringUtils.hasText(entity.getProjectName())) {
             return ApiResponse.fail("专项名称不能为空");
         }
         if (entity.getTotalBudget() == null) {
             entity.setTotalBudget(BigDecimal.ZERO);
         }
+        entity.setCreateUserId(existing.getCreateUserId());
         updateById(entity);
         return ApiResponse.success("已更新专项", null);
     }
@@ -153,6 +159,10 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
         SpecialExpenseProject project = super.getById(id);
         if (project == null) {
             return ApiResponse.fail("专项不存在");
+        }
+        String deleteDenied = manageDeniedReason(project, actor);
+        if (deleteDenied != null) {
+            return ApiResponse.fail(403, deleteDenied);
         }
         Long count = itemMapper.selectCount(new LambdaQueryWrapper<SpecialExpenseItem>()
                 .eq(SpecialExpenseItem::getProjectId, id));
@@ -185,6 +195,10 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
         SpecialExpenseProject project = super.getById(id);
         if (project == null) {
             return ApiResponse.fail("专项不存在");
+        }
+        String archiveDenied = manageDeniedReason(project, actor);
+        if (archiveDenied != null) {
+            return ApiResponse.fail(403, archiveDenied);
         }
         project.setArchived(archived);
         project.setStatus(archived ? STATUS_ARCHIVED : STATUS_ACTIVE);
@@ -254,5 +268,21 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
 
     private boolean isGuest(AppUser actor) {
         return actor != null && ("guest".equals(actor.getId()) || "guest".equals(actor.getUsername()));
+    }
+
+    /**
+     * 专项归家庭所有：创建人可以操作，家庭管理员（owner/admin）可代管。
+     *
+     * @return 允许操作返回 null，否则返回提示语
+     */
+    private String manageDeniedReason(SpecialExpenseProject project, AppUser actor) {
+        if (UserContext.isHouseholdManager()) {
+            return null;
+        }
+        if (actor != null && StringUtils.hasText(actor.getId())
+                && actor.getId().equals(project.getCreateUserId())) {
+            return null;
+        }
+        return "只有专项创建人或家庭管理员可以操作";
     }
 }

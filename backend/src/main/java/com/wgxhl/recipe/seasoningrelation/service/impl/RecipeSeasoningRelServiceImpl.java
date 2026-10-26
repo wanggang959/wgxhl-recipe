@@ -10,6 +10,7 @@ import com.wgxhl.recipe.seasoningrelation.dto.RecipeSeasoningRelBatchDTO;
 import com.wgxhl.recipe.seasoningrelation.entity.RecipeSeasoningRel;
 import com.wgxhl.recipe.seasoningrelation.mapper.RecipeSeasoningRelMapper;
 import com.wgxhl.recipe.seasoningrelation.service.RecipeSeasoningRelService;
+import com.wgxhl.recipe.recipe.service.RecipeOwnershipGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,9 +25,12 @@ public class RecipeSeasoningRelServiceImpl extends ServiceImpl<RecipeSeasoningRe
         implements RecipeSeasoningRelService {
 
     private final SeasoningService seasoningService;
+    private final RecipeOwnershipGuard ownershipGuard;
 
-    public RecipeSeasoningRelServiceImpl(SeasoningService seasoningService) {
+    public RecipeSeasoningRelServiceImpl(SeasoningService seasoningService,
+                                         RecipeOwnershipGuard ownershipGuard) {
         this.seasoningService = seasoningService;
+        this.ownershipGuard = ownershipGuard;
     }
 
     @Override
@@ -65,6 +69,10 @@ public class RecipeSeasoningRelServiceImpl extends ServiceImpl<RecipeSeasoningRe
         if (!StringUtils.hasText(entity.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkEditable(entity.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
+        }
         if (!StringUtils.hasText(entity.getSeasoningId())) {
             return ApiResponse.fail("调料id不能为空");
         }
@@ -91,6 +99,10 @@ public class RecipeSeasoningRelServiceImpl extends ServiceImpl<RecipeSeasoningRe
         if (existing == null) {
             return ApiResponse.fail("关系不存在");
         }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
+        }
         if (StringUtils.hasText(entity.getSeasoningId())
                 && !entity.getSeasoningId().equals(existing.getSeasoningId())) {
             ApiResponse<Void> fillResult = fillSeasoningName(entity);
@@ -114,8 +126,13 @@ public class RecipeSeasoningRelServiceImpl extends ServiceImpl<RecipeSeasoningRe
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("关系id不能为空");
         }
-        if (super.getById(id) == null) {
+        RecipeSeasoningRel existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("关系不存在");
+        }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         removeById(id);
         return ApiResponse.success("删除成功", null);
@@ -126,6 +143,10 @@ public class RecipeSeasoningRelServiceImpl extends ServiceImpl<RecipeSeasoningRe
     public ApiResponse<Void> saveBatchByRecipeId(RecipeSeasoningRelBatchDTO dto) {
         if (dto == null || !StringUtils.hasText(dto.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
+        }
+        String denied = ownershipGuard.checkEditable(dto.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         ApiResponse<Void> validateResult = validateRelList(dto.getRelList());
         if (validateResult != null) {

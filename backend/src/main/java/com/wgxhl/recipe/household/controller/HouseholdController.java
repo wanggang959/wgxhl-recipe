@@ -163,9 +163,13 @@ public class HouseholdController {
         if (!canManage(membership)) {
             return ApiResponse.fail(403, "只有家庭管理员可以邀请成员");
         }
+        String requestedRole = dto == null ? null : dto.getMemberRole();
+        if ("admin".equals(requestedRole) && !"owner".equals(membership.getMemberRole())) {
+            return ApiResponse.fail(403, "只有家庭所有者可以邀请管理员");
+        }
         HouseholdInvite invite = householdInviteService.createInvite(
                 household.getId(),
-                dto == null ? null : dto.getMemberRole(),
+                requestedRole,
                 dto == null ? null : dto.getMaxUses(),
                 dto == null ? null : dto.getExpiresInHours(),
                 user.getId()

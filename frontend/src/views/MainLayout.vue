@@ -39,7 +39,7 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
 
     <main
       class="page-wrap content"
-      :class="{ 'showcase-content': isShowcase, 'profile-shell': route.path === '/profile' && userStore.isAdmin }"
+      :class="{ 'showcase-content': isShowcase, 'profile-shell': route.path === '/profile' && userStore.canViewMembers }"
     >
       <router-view v-slot="{ Component, route: viewRoute }">
         <keep-alive>

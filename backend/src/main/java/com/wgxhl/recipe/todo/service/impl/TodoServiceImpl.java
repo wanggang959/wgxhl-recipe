@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.config.TenantContext;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.notification.service.NotificationService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
@@ -277,6 +278,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (isGuest(actor)) {
             return ApiResponse.fail("游客不能编辑待办");
         }
+        String editDenied = manageDeniedReason(existing, actor);
+        if (editDenied != null) {
+            return ApiResponse.fail(403, editDenied);
+        }
         if (!CollectionUtils.isEmpty(entity.getOwnerIds())) {
             entity.setOwnerId(firstOwnerId(entity.getOwnerIds()));
         }
@@ -297,6 +302,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         }
         if (isGuest(actor)) {
             return ApiResponse.fail("游客不能操作待办");
+        }
+        String completeDenied = manageDeniedReason(todo, actor);
+        if (completeDenied != null) {
+            return ApiResponse.fail(403, completeDenied);
         }
         String disabledReason = completeDisabledReason(todo);
         if (StringUtils.hasText(disabledReason)) {
@@ -330,6 +339,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         }
         if (isGuest(actor)) {
             return ApiResponse.fail("游客不能删除待办");
+        }
+        String deleteDenied = manageDeniedReason(todo, actor);
+        if (deleteDenied != null) {
+            return ApiResponse.fail(403, deleteDenied);
         }
         removeById(id);
         todoNoticeRuleMapper.delete(new LambdaQueryWrapper<TodoNoticeRule>().eq(TodoNoticeRule::getTodoId, id));
@@ -1356,6 +1369,30 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     private boolean isGuest(AppUser actor) {
         return actor != null && GUEST_ID.equals(actor.getId());
+    }
+
+    /**
+     * 待办归家庭所有：创建人、负责人可以操作，家庭管理员（owner/admin）可代管全家庭的待办。
+     *
+     * @return 允许操作返回 null，否则返回提示语
+     */
+    private String manageDeniedReason(Todo todo, AppUser actor) {
+        if (todo == null || actor == null || !StringUtils.hasText(actor.getId())) {
+            return "只有待办负责人、创建人或家庭管理员可以操作";
+        }
+        if (UserContext.isHouseholdManager()) {
+            return null;
+        }
+        if (actor.getId().equals(todo.getCreateUserId()) || actor.getId().equals(todo.getOwnerId())) {
+            return null;
+        }
+        Long ownerCount = todoOwnerMapper.selectCount(new LambdaQueryWrapper<TodoOwner>()
+                .eq(TodoOwner::getTodoId, todo.getId())
+                .eq(TodoOwner::getOwnerId, actor.getId()));
+        if (ownerCount != null && ownerCount > 0) {
+            return null;
+        }
+        return "只有待办负责人、创建人或家庭管理员可以操作";
     }
 
     private boolean isCookTodo(Todo todo) {

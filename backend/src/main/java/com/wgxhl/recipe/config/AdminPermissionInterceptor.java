@@ -25,8 +25,6 @@ import java.util.Set;
 @Component
 public class AdminPermissionInterceptor implements HandlerInterceptor {
 
-    private static final String ROLE_SUPER_ADMIN = "super_admin";
-    private static final String ROLE_ADMIN = "admin";
     private static final String STATUS_NORMAL = "normal";
     private static final String GUEST_ID = "guest";
     private static final String GUEST_USERNAME = "guest";
@@ -107,27 +105,22 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        String userRole = jwtAuthUtil.getUserRole(jwt);
-        if (requiresSuperAdmin(path)) {
-            if (ROLE_SUPER_ADMIN.equals(userRole)) {
-                return allow(request, household, membership);
-            }
+        if (requiresSuperAdmin(path) && !UserContext.isSuperAdmin()) {
             writeJson(response, ApiResponse.fail(403, "仅超级管理员王师傅可以禁用或启用账户"));
             return false;
         }
-        if (!requiresAdmin(request.getRequestURI())) {
-            return allow(request, household, membership);
-        }
-        if (isAdminRole(userRole)) {
-            return allow(request, household, membership);
-        }
-        writeJson(response, ApiResponse.fail(403, "需要管理员权限"));
-        return false;
+        return allow(request, currentUser, household, membership);
     }
 
-    private boolean allow(HttpServletRequest request, Household household, HouseholdMember membership) {
+    private boolean allow(HttpServletRequest request,
+                          AppUser currentUser,
+                          Household household,
+                          HouseholdMember membership) {
         TenantContext.set(household.getId());
-        UserContext.set((AppUser) request.getAttribute(AuthRequestAttributes.CURRENT_USER));
+        UserContext.set(currentUser, membership.getMemberRole());
+        currentUser.setHouseholdId(household.getId());
+        currentUser.setHouseholdName(household.getHouseholdName());
+        currentUser.setMemberRole(membership.getMemberRole());
         request.setAttribute(AuthRequestAttributes.CURRENT_HOUSEHOLD, household);
         request.setAttribute(AuthRequestAttributes.CURRENT_MEMBERSHIP, membership);
         return true;
@@ -140,10 +133,6 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
                                 Exception ex) {
         TenantContext.clear();
         UserContext.clear();
-    }
-
-    private boolean isAdminRole(String userRole) {
-        return ROLE_ADMIN.equals(userRole) || ROLE_SUPER_ADMIN.equals(userRole);
     }
 
     private boolean requiresSuperAdmin(String path) {
@@ -202,21 +191,6 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
     private boolean isPublicPath(String uri) {
         String path = normalizePath(uri);
         return "/health".equals(path) || PUBLIC_USER_PATHS.contains(path);
-    }
-
-    private boolean requiresAdmin(String uri) {
-        String path = normalizePath(uri);
-        if ("/user/members".equals(path)) {
-            return false;
-        }
-        if (path.startsWith("/user/")) {
-            return true;
-        }
-        // 菜谱与基础数据写入对所有成员开放，具体归属校验在 Service 层
-        return path.startsWith("/image/")
-                || path.startsWith("/step/")
-                || path.startsWith("/relation/")
-                || path.startsWith("/seasoningrelation/");
     }
 
     private String normalizePath(String uri) {

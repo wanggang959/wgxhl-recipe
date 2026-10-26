@@ -8,6 +8,7 @@ import com.wgxhl.recipe.image.dto.RecipeImageBatchDTO;
 import com.wgxhl.recipe.image.entity.RecipeImage;
 import com.wgxhl.recipe.image.mapper.RecipeImageMapper;
 import com.wgxhl.recipe.image.service.RecipeImageService;
+import com.wgxhl.recipe.recipe.service.RecipeOwnershipGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -18,6 +19,12 @@ import java.util.List;
 @Service
 public class RecipeImageServiceImpl extends ServiceImpl<RecipeImageMapper, RecipeImage>
         implements RecipeImageService {
+
+    private final RecipeOwnershipGuard ownershipGuard;
+
+    public RecipeImageServiceImpl(RecipeOwnershipGuard ownershipGuard) {
+        this.ownershipGuard = ownershipGuard;
+    }
 
     @Override
     public boolean save(RecipeImage entity) {
@@ -54,6 +61,10 @@ public class RecipeImageServiceImpl extends ServiceImpl<RecipeImageMapper, Recip
         if (!StringUtils.hasText(entity.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkEditable(entity.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
+        }
         if (!StringUtils.hasText(entity.getImageUrl())) {
             return ApiResponse.fail("图片地址不能为空");
         }
@@ -69,8 +80,13 @@ public class RecipeImageServiceImpl extends ServiceImpl<RecipeImageMapper, Recip
         if (!StringUtils.hasText(entity.getId())) {
             return ApiResponse.fail("图片id不能为空");
         }
-        if (super.getById(entity.getId()) == null) {
+        RecipeImage existing = super.getById(entity.getId());
+        if (existing == null) {
             return ApiResponse.fail("图片不存在");
+        }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         updateById(entity);
         return ApiResponse.success("更新成功", null);
@@ -81,8 +97,13 @@ public class RecipeImageServiceImpl extends ServiceImpl<RecipeImageMapper, Recip
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("图片id不能为空");
         }
-        if (super.getById(id) == null) {
+        RecipeImage existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("图片不存在");
+        }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         removeById(id);
         return ApiResponse.success("删除成功", null);
@@ -93,6 +114,10 @@ public class RecipeImageServiceImpl extends ServiceImpl<RecipeImageMapper, Recip
     public ApiResponse<Void> saveBatchByRecipeId(RecipeImageBatchDTO dto) {
         if (dto == null || !StringUtils.hasText(dto.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
+        }
+        String denied = ownershipGuard.checkEditable(dto.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         ApiResponse<Void> validateResult = validateImageList(dto.getImageList());
         if (validateResult != null) {

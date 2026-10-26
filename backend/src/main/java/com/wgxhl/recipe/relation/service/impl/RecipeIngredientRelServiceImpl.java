@@ -10,6 +10,7 @@ import com.wgxhl.recipe.relation.dto.RecipeIngredientRelBatchDTO;
 import com.wgxhl.recipe.relation.entity.RecipeIngredientRel;
 import com.wgxhl.recipe.relation.mapper.RecipeIngredientRelMapper;
 import com.wgxhl.recipe.relation.service.RecipeIngredientRelService;
+import com.wgxhl.recipe.recipe.service.RecipeOwnershipGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,9 +25,12 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
         implements RecipeIngredientRelService {
 
     private final IngredientService ingredientService;
+    private final RecipeOwnershipGuard ownershipGuard;
 
-    public RecipeIngredientRelServiceImpl(IngredientService ingredientService) {
+    public RecipeIngredientRelServiceImpl(IngredientService ingredientService,
+                                          RecipeOwnershipGuard ownershipGuard) {
         this.ingredientService = ingredientService;
+        this.ownershipGuard = ownershipGuard;
     }
 
     @Override
@@ -65,6 +69,10 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
         if (!StringUtils.hasText(entity.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkEditable(entity.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
+        }
         if (!StringUtils.hasText(entity.getIngredientId())) {
             return ApiResponse.fail("食材id不能为空");
         }
@@ -91,6 +99,10 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
         if (existing == null) {
             return ApiResponse.fail("关系不存在");
         }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
+        }
         if (StringUtils.hasText(entity.getIngredientId())
                 && !entity.getIngredientId().equals(existing.getIngredientId())) {
             ApiResponse<Void> fillResult = fillIngredientName(entity);
@@ -114,8 +126,13 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("关系id不能为空");
         }
-        if (super.getById(id) == null) {
+        RecipeIngredientRel existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("关系不存在");
+        }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         removeById(id);
         return ApiResponse.success("删除成功", null);
@@ -126,6 +143,10 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
     public ApiResponse<Void> saveBatchByRecipeId(RecipeIngredientRelBatchDTO dto) {
         if (dto == null || !StringUtils.hasText(dto.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
+        }
+        String denied = ownershipGuard.checkEditable(dto.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         ApiResponse<Void> validateResult = validateRelList(dto.getRelList());
         if (validateResult != null) {

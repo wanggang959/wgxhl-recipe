@@ -68,7 +68,7 @@ const userForm = reactive({
   username: '',
   nickname: '',
   password: '',
-  userRole: 'user',
+  memberRole: 'member',
   avatar: '',
   email: '',
   birthday: '',
@@ -85,10 +85,13 @@ const BUILTIN_ADMIN_ID = 'admin-wangshifu'
 const BUILTIN_ADMIN_USERNAME = '王师傅'
 
 const isEditingUser = computed(() => Boolean(userForm.id))
-const canManageHousehold = computed(() => ['owner', 'admin'].includes(userStore.user?.memberRole || ''))
-const isHouseholdOwner = computed(() => userStore.user?.memberRole === 'owner')
+const canManageHousehold = computed(() => userStore.isHouseholdAdmin)
+const isHouseholdOwner = computed(() => userStore.isHouseholdOwner)
 const transferableMembers = computed(() => householdMembers.value.filter((member) => member.id !== userStore.userId))
 const editingBuiltinAdmin = ref(false)
+const editingMemberIsOwner = computed(() => (
+  users.value.find((item) => item.id === userForm.id)?.memberRole === 'owner'
+))
 
 const GUEST_ID = 'guest'
 
@@ -124,12 +127,13 @@ function syncStoreFromUsersList() {
     nickname: fromList.nickname,
     username: fromList.username,
     userRole: fromList.userRole,
+    memberRole: fromList.memberRole || userStore.user.memberRole,
     avatar: fromList.avatar,
   })
 }
 
 async function loadUsers() {
-  if (!userStore.isAdmin) {
+  if (!userStore.canViewMembers) {
     users.value = []
     return
   }
@@ -200,7 +204,7 @@ function resetUserForm() {
   userForm.username = ''
   userForm.nickname = ''
   userForm.password = ''
-  userForm.userRole = 'user'
+  userForm.memberRole = 'member'
   userForm.avatar = ''
   userForm.email = ''
   userForm.birthday = ''
@@ -226,7 +230,7 @@ function beginAddUser() {
   userForm.username = ''
   userForm.nickname = ''
   userForm.password = ''
-  userForm.userRole = 'user'
+  userForm.memberRole = 'member'
   userForm.avatar = DEFAULT_AVATARS[0]
   userForm.email = ''
   userForm.birthday = ''
@@ -247,7 +251,7 @@ function editUser(item) {
   userForm.username = item.username
   userForm.nickname = item.nickname || ''
   userForm.password = ''
-  userForm.userRole = item.userRole || 'user'
+  userForm.memberRole = item.memberRole === 'admin' ? 'admin' : 'member'
   userForm.avatar = item.avatar || pickDefaultAvatar(item.id)
   userForm.email = item.email || ''
   userForm.birthday = item.birthday || ''
@@ -273,14 +277,15 @@ function syncCurrentUserAfterSave(payload) {
     ...userStore.user,
     nickname: payload.nickname,
     username: payload.username,
-    userRole: payload.userRole,
+    userRole: payload.userRole || userStore.user.userRole,
+    memberRole: payload.memberRole || userStore.user.memberRole,
     avatar: payload.avatar,
   })
 }
 
 async function saveUser() {
-  if (!userStore.isAdmin) {
-    showActionStatus('只有管理员可以管理家庭成员', 'error')
+  if (userForm.id !== userStore.userId && !userStore.canManageMembers) {
+    showActionStatus('只有家庭管理员可以管理家人', 'error')
     return
   }
   if (!userForm.username.trim()) {
@@ -335,8 +340,8 @@ async function saveUser() {
 }
 
 async function removeUser(item) {
-  if (!userStore.isAdmin) {
-    showActionStatus('只有管理员可以删除家庭成员', 'error')
+  if (!userStore.canManageMembers) {
+    showActionStatus('只有家庭管理员可以移出家人', 'error')
     return
   }
   try {
@@ -353,9 +358,12 @@ async function removeUser(item) {
   }
 }
 
-function roleText(role) {
-  if (role === 'super_admin') return '超级管理员'
-  return role === 'admin' ? '管理员' : '普通用户'
+function roleText(item) {
+  if (isBuiltinAdminUser(item) || item?.userRole === 'super_admin') return '超级管理员'
+  if (isGuestUser(item)) return '游客'
+  if (item?.memberRole === 'owner') return '家庭所有者'
+  if (item?.memberRole === 'admin') return '家庭管理员'
+  return '家人'
 }
 
 function statusText(status) {
@@ -401,33 +409,42 @@ function showActionStatus(message, type = 'success') {
   }, 2200)
 }
 
-function roleIcon(role, item) {
-  if (isBuiltinAdminUser(item) || role === 'super_admin') return 'award-o'
-  if (role === 'admin') return 'manager-o'
+function roleIcon(item) {
+  if (isBuiltinAdminUser(item) || item?.userRole === 'super_admin') return 'award-o'
+  if (item?.memberRole === 'owner' || item?.memberRole === 'admin') return 'manager-o'
   return 'friends-o'
 }
 
 function avatarTone(item) {
   if (isGuestUser(item)) return 'guest'
   if (isBuiltinAdminUser(item) || item.userRole === 'super_admin') return 'super'
-  if (item.userRole === 'admin') return 'admin'
+  if (item.memberRole === 'owner' || item.memberRole === 'admin') return 'admin'
   return 'user'
 }
 
 function canEditUser(item) {
-  return userStore.isAdmin && !isGuestUser(item)
+  if (!item || isGuestUser(item) || !userStore.canViewMembers) return false
+  if (item.id === userStore.userId) return true
+  if (!userStore.canManageMembers) return false
+  if (item.memberRole === 'owner') {
+    return userStore.isHouseholdOwner || userStore.isSuperAdmin
+  }
+  return true
 }
 
 function canDeleteUser(item) {
-  return userStore.isAdmin && !isBuiltinAdminUser(item) && !isGuestUser(item)
+  if (!userStore.canManageMembers) return false
+  if (isBuiltinAdminUser(item) || isGuestUser(item)) return false
+  if (item.memberRole === 'owner' || item.id === userStore.userId) return false
+  return true
 }
 
 const sortedUsers = computed(() => {
   const rank = (item) => {
     if (isGuestUser(item)) return 0
-    if (item.userRole === 'super_admin' || isBuiltinAdminUser(item)) return 3
-    if (item.userRole === 'admin') return 2
-    return 1
+    if (item.memberRole === 'member') return 1
+    if (item.memberRole === 'admin') return 2
+    return 3
   }
   return [...users.value].sort((a, b) => rank(a) - rank(b))
 })
@@ -655,7 +672,7 @@ async function createNewHousehold() {
   }
 }
 
-if (userStore.isAdmin) {
+if (userStore.canViewMembers) {
   loadUsers()
 }
 
@@ -665,7 +682,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="profile-page" :class="{ 'profile-page--fill': userStore.isAdmin }">
+  <section class="profile-page" :class="{ 'profile-page--fill': userStore.canViewMembers }">
     <div class="profile-page-top">
     <div class="profile-card">
       <div class="avatar">
@@ -758,7 +775,7 @@ onMounted(() => {
     </section>
     </div>
 
-    <section v-if="userStore.isAdmin" class="member-panel">
+    <section v-if="userStore.canViewMembers" class="member-panel">
       <header class="member-panel-head">
         <div class="member-panel-title">
           <div class="title-icon">
@@ -766,10 +783,15 @@ onMounted(() => {
           </div>
           <div>
             <h2>家庭成员</h2>
-            <p>管理家人账号，设置不同的权限</p>
+            <p>{{ userStore.canManageMembers ? '管理家人账号，设置家庭角色' : '查看家人，维护自己的资料' }}</p>
           </div>
         </div>
-        <button v-if="!showMemberForm" type="button" class="add-member-btn" @click="beginAddUser">
+        <button
+          v-if="!showMemberForm && userStore.canManageMembers"
+          type="button"
+          class="add-member-btn"
+          @click="beginAddUser"
+        >
           <van-icon name="plus" size="14" />
           添加成员
         </button>
@@ -827,12 +849,18 @@ onMounted(() => {
             :placeholder="isEditingUser ? '不填则不修改密码' : '请输入密码'"
           />
           <label class="role-field">
-            <span>权限</span>
-            <select v-model="userForm.userRole" :disabled="editingBuiltinAdmin">
-              <option value="user">普通用户（查看、收藏）</option>
-              <option value="admin">管理员（完全控制）</option>
+            <span>家庭角色</span>
+            <select
+              v-model="userForm.memberRole"
+              :disabled="editingBuiltinAdmin || editingMemberIsOwner || !isHouseholdOwner"
+            >
+              <option value="member">家人（记录菜谱、收藏、待办）</option>
+              <option value="admin">家庭管理员（可管理家人与邀请）</option>
             </select>
           </label>
+          <p v-if="!isHouseholdOwner && !editingMemberIsOwner" class="builtin-hint">
+            家庭角色由家庭所有者调整，你可以管理家人资料与邀请。
+          </p>
           <label class="role-field">
             <span>通知偏好</span>
             <select v-model="userForm.notificationPreference">
@@ -886,9 +914,9 @@ onMounted(() => {
                     <h3>{{ u.nickname || u.username }}</h3>
                     <p>用户名：{{ u.username }}</p>
                   </div>
-                  <span class="role-badge" :class="`role-${u.userRole || 'user'}`">
-                    <van-icon :name="roleIcon(u.userRole, u)" size="12" />
-                    {{ roleText(u.userRole) }}
+                  <span class="role-badge" :class="`role-${u.memberRole || 'member'}`">
+                    <van-icon :name="roleIcon(u)" size="12" />
+                    {{ roleText(u) }}
                   </span>
                 </div>
                 <div class="member-bottom">
@@ -963,10 +991,10 @@ onMounted(() => {
     <section v-else class="form-card">
       <h2>家庭成员</h2>
       <div v-if="userStore.isLogin" class="permission-note">
-        普通用户可以查看菜谱和收藏菜谱；管理员可管理成员，仅超级管理员王师傅可禁用账户。
+        家人可以记录菜谱、收藏和管理自己的待办与开支；家庭所有者和管理员可以管理家人与邀请；菜谱只有作者本人能改，平台公共的分类、食材、调料只有超级管理员王师傅能维护。
       </div>
       <div v-else class="permission-note">
-        登录后可查看自己的权限，管理员可管理家庭成员。
+        登录后可以看到自己在家庭里的角色，家庭所有者和管理员可以管理家人。
       </div>
     </section>
 
@@ -1521,6 +1549,7 @@ h2 {
   gap: 4px;
 }
 
+.role-badge.role-owner,
 .role-badge.role-admin,
 .role-badge.role-super_admin {
   background: #fff7ed;

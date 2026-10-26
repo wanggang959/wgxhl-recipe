@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.config.JwtAuthUtil;
 import com.wgxhl.recipe.config.TenantContext;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import com.wgxhl.recipe.household.entity.Household;
 import com.wgxhl.recipe.household.entity.HouseholdMember;
@@ -36,7 +37,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -50,8 +53,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     private static final String ADMIN_USERNAME = "王师傅";
     private static final String ADMIN_PASSWORD = "123456";
     private static final String ROLE_SUPER_ADMIN = "super_admin";
-    private static final String ROLE_ADMIN = "admin";
     private static final String ROLE_USER = "user";
+    private static final String MEMBER_OWNER = UserContext.MEMBER_OWNER;
+    private static final String MEMBER_ADMIN = UserContext.MEMBER_ADMIN;
+    private static final String MEMBER_MEMBER = UserContext.MEMBER_MEMBER;
     private static final String STATUS_NORMAL = "normal";
     private static final String STATUS_DISABLED = "disabled";
 
@@ -155,9 +160,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             admin.setUsername(ADMIN_USERNAME);
             changed = true;
         }
-        if (!PasswordUtil.matches(ADMIN_PASSWORD, admin.getPassword())
-                || !PasswordUtil.isHashed(admin.getPassword())) {
-            admin.setPassword(PasswordUtil.hash(ADMIN_PASSWORD));
+        // 只在历史明文密码时升级为哈希，保留用户自己改过的密码，不回退成默认密码
+        if (StringUtils.hasText(admin.getPassword()) && !PasswordUtil.isHashed(admin.getPassword())) {
+            admin.setPassword(PasswordUtil.hash(admin.getPassword()));
             changed = true;
         }
         if (!ROLE_SUPER_ADMIN.equals(admin.getUserRole())) {
@@ -251,7 +256,8 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     @Override
     public ApiResponse<Page<AppUser>> page(UserPageDTO dto) {
         Page<AppUser> page = new Page<>(dto.getCurrent(), dto.getSize());
-        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        String householdId = TenantContext.require();
+        List<String> memberIds = householdMemberService.listUserIds(householdId);
         if (memberIds.isEmpty()) {
             return ApiResponse.success(page);
         }
@@ -263,11 +269,32 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 .eq(StringUtils.hasText(dto.getStatus()), AppUser::getStatus, dto.getStatus())
                 .orderByDesc(AppUser::getCreateTime)
                 .page(page);
+        Map<String, String> roleByUser = householdMemberService.listByHousehold(householdId).stream()
+                .filter(member -> StringUtils.hasText(member.getUserId()))
+                .collect(Collectors.toMap(HouseholdMember::getUserId,
+                        member -> StringUtils.hasText(member.getMemberRole()) ? member.getMemberRole() : MEMBER_MEMBER,
+                        (first, second) -> first));
         result.getRecords().forEach(user -> {
             user.setRecentTodoCount(countRecentTodo(user.getId()));
+            user.setMemberRole(roleByUser.get(user.getId()));
             maskPassword(user);
         });
+        result.getRecords().sort(Comparator.comparingInt(this::memberRoleRank));
         return ApiResponse.success(result);
+    }
+
+    private int memberRoleRank(AppUser user) {
+        String role = user.getMemberRole();
+        if (MEMBER_OWNER.equals(role)) {
+            return 0;
+        }
+        if (MEMBER_ADMIN.equals(role)) {
+            return 1;
+        }
+        if (MEMBER_MEMBER.equals(role)) {
+            return 2;
+        }
+        return 3;
     }
 
     @Override
@@ -285,6 +312,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
 
     @Override
     public ApiResponse<AppUser> create(AppUser entity) {
+        if (!UserContext.isHouseholdManager()) {
+            return ApiResponse.fail(403, "只有家庭管理员可以添加家人");
+        }
         if (!StringUtils.hasText(entity.getUsername())) {
             return ApiResponse.fail("用户名不能为空");
         }
@@ -297,6 +327,14 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (StringUtils.hasText(entity.getAvatar()) && !DefaultAvatars.isAllowed(entity.getAvatar())) {
             return ApiResponse.fail("头像地址无效，请从默认头像中选择");
         }
+        String memberRole = normalizeMemberRole(entity.getMemberRole());
+        if (memberRole == null) {
+            return ApiResponse.fail("家庭角色无效");
+        }
+        if (MEMBER_ADMIN.equals(memberRole) && !UserContext.isHouseholdOwner()) {
+            return ApiResponse.fail(403, "只有家庭所有者可以设置管理员");
+        }
+        entity.setUserRole(ROLE_USER);
         normalizeUser(entity);
         if (StringUtils.hasText(entity.getPassword())) {
             entity.setPassword(PasswordUtil.hash(entity.getPassword()));
@@ -305,9 +343,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         HouseholdMember member = new HouseholdMember();
         member.setHouseholdId(TenantContext.require());
         member.setUserId(entity.getId());
-        member.setMemberRole(resolveMemberRole(entity.getUserRole()));
+        member.setMemberRole(memberRole);
         householdMemberService.save(member);
         todoService.syncBirthdayTodo(entity);
+        entity.setMemberRole(memberRole);
         maskPassword(entity);
         return ApiResponse.success("保存成功", entity);
     }
@@ -325,7 +364,23 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (membership == null) {
             return ApiResponse.fail("该成员不属于当前家庭");
         }
+        boolean self = UserContext.requireUserId().equals(entity.getId());
+        boolean manager = UserContext.isHouseholdManager();
+        if (!self && !manager) {
+            return ApiResponse.fail(403, "只有家庭管理员可以修改其他家人的资料");
+        }
+        ApiResponse<Void> roleResult = applyMemberRoleChange(entity, membership, manager);
+        if (roleResult != null) {
+            return roleResult;
+        }
+        if (!UserContext.isSuperAdmin()) {
+            entity.setUserRole(existing.getUserRole());
+            entity.setStatus(existing.getStatus());
+        }
         if (isBuiltinAdmin(existing)) {
+            if (!UserContext.isSuperAdmin()) {
+                return ApiResponse.fail(403, "内置管理员「王师傅」的资料只有本人可以修改");
+            }
             if (!ADMIN_USERNAME.equals(entity.getUsername())) {
                 return ApiResponse.fail("内置管理员「王师傅」的用户名不能修改，请只改昵称");
             }
@@ -333,11 +388,12 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             entity.setUserRole(ROLE_SUPER_ADMIN);
             entity.setStatus(STATUS_NORMAL);
         } else if (isGuestUser(existing)) {
+            if (!UserContext.isSuperAdmin()) {
+                return ApiResponse.fail(403, "游客账号由系统维护，不能修改");
+            }
             entity.setUsername(GUEST_USERNAME);
             entity.setUserRole(ROLE_USER);
-            if (!StringUtils.hasText(entity.getStatus())) {
-                entity.setStatus(existing.getStatus());
-            } else if (!STATUS_NORMAL.equals(entity.getStatus()) && !STATUS_DISABLED.equals(entity.getStatus())) {
+            if (!STATUS_NORMAL.equals(entity.getStatus()) && !STATUS_DISABLED.equals(entity.getStatus())) {
                 entity.setStatus(existing.getStatus());
             }
         } else {
@@ -348,9 +404,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 return ApiResponse.fail("只有王师傅可以是超级管理员");
             }
             applyRole(entity);
-            if (!StringUtils.hasText(entity.getStatus())) {
-                entity.setStatus(existing.getStatus());
-            } else if (!STATUS_NORMAL.equals(entity.getStatus()) && !STATUS_DISABLED.equals(entity.getStatus())) {
+            if (!STATUS_NORMAL.equals(entity.getStatus()) && !STATUS_DISABLED.equals(entity.getStatus())) {
                 entity.setStatus(existing.getStatus());
             }
         }
@@ -371,9 +425,33 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
             entity.setPassword(PasswordUtil.hash(entity.getPassword()));
         }
         updateById(entity);
-        syncMemberRole(membership, entity.getUserRole());
         todoService.syncBirthdayTodo(super.getById(entity.getId()));
         return ApiResponse.success("更新成功", null);
+    }
+
+    /**
+     * 家庭角色只由家庭所有者调整；非管理员提交的 memberRole 一律忽略（个人资料表单会回显该字段）。
+     */
+    private ApiResponse<Void> applyMemberRoleChange(AppUser entity, HouseholdMember membership, boolean manager) {
+        String requested = normalizeMemberRole(entity.getMemberRole());
+        entity.setMemberRole(null);
+        if (requested == null || !manager || requested.equals(membership.getMemberRole())) {
+            return null;
+        }
+        if (!UserContext.isHouseholdOwner()) {
+            return ApiResponse.fail(403, "只有家庭所有者可以调整家庭角色");
+        }
+        if (MEMBER_OWNER.equals(membership.getMemberRole())) {
+            return ApiResponse.fail("家庭所有者的角色请通过转让家庭调整");
+        }
+        if (UserContext.requireUserId().equals(membership.getUserId())) {
+            return ApiResponse.fail("不能调整自己的家庭角色");
+        }
+        HouseholdMember patch = new HouseholdMember();
+        patch.setId(membership.getId());
+        patch.setMemberRole(requested);
+        householdMemberService.updateById(patch);
+        return null;
     }
 
     @Override
@@ -395,6 +473,18 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         HouseholdMember membership = householdMemberService.find(TenantContext.require(), id);
         if (membership == null) {
             return ApiResponse.fail("该成员不属于当前家庭");
+        }
+        if (!UserContext.isHouseholdManager()) {
+            return ApiResponse.fail(403, "只有家庭管理员可以移出家人");
+        }
+        if (UserContext.requireUserId().equals(id)) {
+            return ApiResponse.fail("不能移出自己，请使用退出家庭");
+        }
+        if (MEMBER_OWNER.equals(membership.getMemberRole())) {
+            return ApiResponse.fail("家庭所有者不能移出，请先转让家庭");
+        }
+        if (ROLE_SUPER_ADMIN.equals(user.getUserRole())) {
+            return ApiResponse.fail("超级管理员不能被移出家庭");
         }
         userFavoriteService.deleteByUserId(id);
         recipeViewRecordService.deleteByUserId(id);
@@ -507,7 +597,6 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 .in(AppUser::getId, memberIds)
                 .eq(AppUser::getStatus, STATUS_NORMAL)
                 .ne(AppUser::getId, GUEST_ID)
-                .orderByDesc(AppUser::getUserRole)
                 .orderByAsc(AppUser::getNickname)
                 .list()
                 .stream()
@@ -573,7 +662,6 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         normalizeBirthday(user);
         if (ADMIN_USERNAME.equals(user.getUsername())) {
-            user.setPassword(ADMIN_PASSWORD);
             user.setUserRole(ROLE_SUPER_ADMIN);
             user.setStatus(STATUS_NORMAL);
             if (!StringUtils.hasText(user.getNotificationPreference())) {
@@ -668,34 +756,26 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 .count();
     }
 
-    private String resolveMemberRole(String userRole) {
-        return ROLE_ADMIN.equals(userRole) || ROLE_SUPER_ADMIN.equals(userRole) ? "admin" : "member";
+    /**
+     * 家庭角色只允许 admin / member；owner 只能通过转让产生，guest 为系统内置。
+     *
+     * @return 合法角色，非法时返回 null
+     */
+    private String normalizeMemberRole(String memberRole) {
+        if (!StringUtils.hasText(memberRole)) {
+            return MEMBER_MEMBER;
+        }
+        if (MEMBER_ADMIN.equals(memberRole) || MEMBER_MEMBER.equals(memberRole)) {
+            return memberRole;
+        }
+        return null;
     }
 
-    private void syncMemberRole(HouseholdMember membership, String userRole) {
-        if (membership == null || "owner".equals(membership.getMemberRole())) {
-            return;
-        }
-        String memberRole = resolveMemberRole(userRole);
-        if (memberRole.equals(membership.getMemberRole())) {
-            return;
-        }
-        HouseholdMember patch = new HouseholdMember();
-        patch.setId(membership.getId());
-        patch.setMemberRole(memberRole);
-        householdMemberService.updateById(patch);
-    }
-
+    /**
+     * 全局角色只保留 super_admin（内置王师傅）与 user，家庭内权限一律由 member_role 决定。
+     */
     private void applyRole(AppUser user) {
-        if (ROLE_SUPER_ADMIN.equals(user.getUserRole())) {
-            user.setUserRole(ROLE_USER);
-            return;
-        }
-        if (ROLE_ADMIN.equals(user.getUserRole())) {
-            user.setUserRole(ROLE_ADMIN);
-        } else {
-            user.setUserRole(ROLE_USER);
-        }
+        user.setUserRole(ROLE_USER);
     }
 
     private boolean isBuiltinAdmin(AppUser user) {

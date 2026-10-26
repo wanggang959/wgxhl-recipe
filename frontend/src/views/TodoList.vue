@@ -28,6 +28,16 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const isGuest = computed(() => userStore.isGuest)
+
+/** 与后端一致：创建人、负责人可操作，家庭管理员可代管 */
+function canManageTodo(todo) {
+  if (isGuest.value || !todo) return false
+  if (userStore.isHouseholdAdmin) return true
+  const userId = userStore.userId
+  if (!userId) return false
+  if (todo.createUserId === userId || todo.ownerId === userId) return true
+  return Array.isArray(todo.ownerIds) && todo.ownerIds.includes(userId)
+}
 const loading = ref(false)
 let loadingPromise = null
 const cacheMatchesUser = todoListCache.userId === userStore.userId
@@ -436,7 +446,7 @@ async function remove(item) {
           <TodoCard
             v-if="item.type === 'todo'"
             :todo="item.data"
-            :readonly="isGuest"
+            :readonly="!canManageTodo(item.data)"
             @open="router.push(`/todo/${item.data.id}`)"
             @complete="finish"
             @complete-blocked="completeBlocked"

@@ -52,12 +52,13 @@ node scripts/pack-deploy.mjs
 
 ### 1. 初始化数据库
 
-在 MySQL 中依次执行 `init.sql`、`add_household.sql`、`person_owned_recipe.sql`：
+在 MySQL 中依次执行 `init.sql`、`add_household.sql`、`person_owned_recipe.sql`、`add_household_invite.sql`：
 
 ```bash
 mysql -h wgxhl.space -u recipe -p123456 < backend/sql/init.sql
 mysql -h wgxhl.space -u recipe -p123456 < backend/sql/add_household.sql
 mysql -h wgxhl.space -u recipe -p123456 < backend/sql/person_owned_recipe.sql
+mysql -h wgxhl.space -u recipe -p123456 < backend/sql/add_household_invite.sql
 ```
 
 > `person_owned_recipe.sql` 会把菜谱和基础数据从“家庭所有”改为“人所有”，并删除相关表的

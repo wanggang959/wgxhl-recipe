@@ -2,7 +2,16 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showLoadingToast } from 'vant'
-import { createHousehold, listMyHouseholds, switchHousehold } from '../api/household'
+import {
+  createHousehold,
+  createHouseholdInvite,
+  joinHousehold,
+  listHouseholdInvites,
+  listMyHouseholds,
+  previewHouseholdInvite,
+  revokeHouseholdInvite,
+  switchHousehold,
+} from '../api/household'
 import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
 import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
@@ -24,6 +33,11 @@ const householdList = ref([])
 const householdNameInput = ref('')
 const householdLoading = ref(false)
 const householdCreating = ref(false)
+const invites = ref([])
+const inviteRole = ref('member')
+const inviteCreating = ref(false)
+const joinCode = ref('')
+const joining = ref(false)
 const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
@@ -63,6 +77,7 @@ const BUILTIN_ADMIN_ID = 'admin-wangshifu'
 const BUILTIN_ADMIN_USERNAME = '王师傅'
 
 const isEditingUser = computed(() => Boolean(userForm.id))
+const canManageHousehold = computed(() => ['owner', 'admin'].includes(userStore.user?.memberRole || ''))
 const editingBuiltinAdmin = ref(false)
 
 const GUEST_ID = 'guest'
@@ -421,11 +436,89 @@ async function openHouseholdPanel() {
   try {
     const res = await listMyHouseholds()
     householdList.value = res.data || []
+    await loadInvites()
   } catch (error) {
     showActionStatus(error.message || '家庭列表加载失败', 'error')
   } finally {
     householdLoading.value = false
   }
+}
+
+async function loadInvites() {
+  if (!canManageHousehold.value) {
+    invites.value = []
+    return
+  }
+  try {
+    const res = await listHouseholdInvites()
+    invites.value = res.data || []
+  } catch (error) {
+    invites.value = []
+  }
+}
+
+async function generateInvite() {
+  if (inviteCreating.value) return
+  inviteCreating.value = true
+  try {
+    await createHouseholdInvite({ memberRole: inviteRole.value, maxUses: 1, expiresInHours: 72 })
+    await loadInvites()
+    showActionStatus('邀请码已生成')
+  } catch (error) {
+    showActionStatus(error.message || '生成邀请码失败', 'error')
+  } finally {
+    inviteCreating.value = false
+  }
+}
+
+async function revokeInvite(invite) {
+  try {
+    await revokeHouseholdInvite(invite.id)
+    await loadInvites()
+    showActionStatus('邀请已撤销')
+  } catch (error) {
+    showActionStatus(error.message || '撤销失败', 'error')
+  }
+}
+
+async function copyInvite(invite) {
+  try {
+    await navigator.clipboard.writeText(invite.inviteCode)
+    showActionStatus('邀请码已复制')
+  } catch (error) {
+    showActionStatus(`邀请码：${invite.inviteCode}`)
+  }
+}
+
+async function joinByCode() {
+  const code = joinCode.value.trim().toUpperCase()
+  if (!code) {
+    showActionStatus('请输入邀请码', 'error')
+    return
+  }
+  joining.value = true
+  try {
+    const preview = await previewHouseholdInvite(code)
+    await showConfirmDialog({
+      title: '加入家庭',
+      message: `确认加入「${preview.data.householdName}」吗？`,
+    })
+    const res = await joinHousehold(code)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    joinCode.value = ''
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    joining.value = false
+  }
+}
+
+function formatInviteExpire(value) {
+  if (!value) return '长期有效'
+  return String(value).slice(0, 16).replace('T', ' ')
 }
 
 async function switchToHousehold(item) {
@@ -807,6 +900,37 @@ onMounted(() => {
           <van-button block round type="warning" :loading="householdCreating" @click="createNewHousehold">
             创建并切换
           </van-button>
+        </div>
+
+        <div v-if="canManageHousehold" class="invite-box">
+          <h4>邀请成员</h4>
+          <div class="invite-row">
+            <select v-model="inviteRole" class="invite-select">
+              <option value="member">成员</option>
+              <option value="admin">管理员</option>
+            </select>
+            <van-button size="small" type="warning" :loading="inviteCreating" @click="generateInvite">
+              生成邀请码
+            </van-button>
+          </div>
+          <div v-for="invite in invites" :key="invite.id" class="invite-item">
+            <div>
+              <strong>{{ invite.inviteCode }}</strong>
+              <span>{{ invite.memberRole }} · {{ invite.usedCount }}/{{ invite.maxUses }} · {{ formatInviteExpire(invite.expiresAt) }}</span>
+            </div>
+            <div class="invite-item-actions">
+              <button type="button" @click="copyInvite(invite)">复制</button>
+              <button type="button" @click="revokeInvite(invite)">撤销</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="invite-box">
+          <h4>加入家庭</h4>
+          <div class="invite-row">
+            <input v-model="joinCode" class="invite-input" placeholder="输入邀请码" maxlength="16" />
+            <van-button size="small" type="warning" :loading="joining" @click="joinByCode">加入</van-button>
+          </div>
         </div>
       </div>
     </van-popup>
@@ -1546,5 +1670,76 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.invite-box {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--app-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invite-box h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.invite-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invite-select,
+.invite-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--app-text);
+  font-size: 14px;
+}
+
+.invite-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+
+.invite-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.invite-item strong {
+  letter-spacing: 1px;
+}
+
+.invite-item span {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.invite-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-item-actions button {
+  border: 0;
+  background: transparent;
+  color: var(--app-primary);
+  font-size: 12px;
+  padding: 0;
 }
 </style>

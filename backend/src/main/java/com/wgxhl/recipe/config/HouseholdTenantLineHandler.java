@@ -15,6 +15,7 @@ public class HouseholdTenantLineHandler implements TenantLineHandler {
             "app_user",
             "household",
             "household_member",
+            "household_invite",
             "recipe",
             "recipe_image",
             "recipe_step",

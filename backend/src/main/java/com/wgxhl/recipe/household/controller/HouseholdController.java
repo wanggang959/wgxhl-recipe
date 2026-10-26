@@ -5,12 +5,19 @@ import com.wgxhl.recipe.common.dto.IdDTO;
 import com.wgxhl.recipe.config.AuthRequestAttributes;
 import com.wgxhl.recipe.config.JwtAuthUtil;
 import com.wgxhl.recipe.household.dto.HouseholdCreateDTO;
+import com.wgxhl.recipe.household.dto.HouseholdInviteCreateDTO;
+import com.wgxhl.recipe.household.dto.HouseholdJoinDTO;
 import com.wgxhl.recipe.household.entity.Household;
+import com.wgxhl.recipe.household.entity.HouseholdInvite;
 import com.wgxhl.recipe.household.entity.HouseholdMember;
+import com.wgxhl.recipe.household.service.HouseholdInviteService;
 import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.household.service.HouseholdService;
+import com.wgxhl.recipe.household.vo.HouseholdInvitePreviewVO;
 import com.wgxhl.recipe.household.vo.HouseholdVO;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.user.mapper.AppUserMapper;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,14 +38,20 @@ public class HouseholdController {
 
     private final HouseholdService householdService;
     private final HouseholdMemberService householdMemberService;
+    private final HouseholdInviteService householdInviteService;
     private final JwtAuthUtil jwtAuthUtil;
+    private final AppUserMapper appUserMapper;
 
     public HouseholdController(HouseholdService householdService,
                                HouseholdMemberService householdMemberService,
-                               JwtAuthUtil jwtAuthUtil) {
+                               HouseholdInviteService householdInviteService,
+                               JwtAuthUtil jwtAuthUtil,
+                               AppUserMapper appUserMapper) {
         this.householdService = householdService;
         this.householdMemberService = householdMemberService;
+        this.householdInviteService = householdInviteService;
         this.jwtAuthUtil = jwtAuthUtil;
+        this.appUserMapper = appUserMapper;
     }
 
     @PostMapping("/me")
@@ -131,6 +144,133 @@ public class HouseholdController {
         householdMemberService.save(membership);
 
         return ApiResponse.success("家庭已创建", applyHousehold(user, household, membership));
+    }
+
+    @PostMapping("/invite/create")
+    public ApiResponse<HouseholdInvite> createInvite(@RequestBody HouseholdInviteCreateDTO dto,
+                                                     HttpServletRequest request) {
+        AppUser user = currentUser(request);
+        Household household = currentHousehold(request);
+        HouseholdMember membership = currentMembership(request);
+        if (user == null || household == null || membership == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        if (!canManage(membership)) {
+            return ApiResponse.fail(403, "只有家庭管理员可以邀请成员");
+        }
+        HouseholdInvite invite = householdInviteService.createInvite(
+                household.getId(),
+                dto == null ? null : dto.getMemberRole(),
+                dto == null ? null : dto.getMaxUses(),
+                dto == null ? null : dto.getExpiresInHours(),
+                user.getId()
+        );
+        return ApiResponse.success("邀请已创建", invite);
+    }
+
+    @PostMapping("/invite/list")
+    public ApiResponse<List<HouseholdInvite>> listInvites(HttpServletRequest request) {
+        Household household = currentHousehold(request);
+        HouseholdMember membership = currentMembership(request);
+        if (household == null || membership == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        if (!canManage(membership)) {
+            return ApiResponse.fail(403, "只有家庭管理员可以查看邀请");
+        }
+        return ApiResponse.success(householdInviteService.listActive(household.getId()));
+    }
+
+    @PostMapping("/invite/revoke")
+    public ApiResponse<Void> revokeInvite(@RequestBody IdDTO dto, HttpServletRequest request) {
+        Household household = currentHousehold(request);
+        HouseholdMember membership = currentMembership(request);
+        if (household == null || membership == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        if (!canManage(membership)) {
+            return ApiResponse.fail(403, "只有家庭管理员可以撤销邀请");
+        }
+        if (dto == null || !StringUtils.hasText(dto.getId())) {
+            return ApiResponse.fail("邀请id不能为空");
+        }
+        if (!householdInviteService.revoke(dto.getId(), household.getId())) {
+            return ApiResponse.fail("邀请不存在或已失效");
+        }
+        return ApiResponse.success("邀请已撤销", null);
+    }
+
+    @PostMapping("/invite/preview")
+    public ApiResponse<HouseholdInvitePreviewVO> previewInvite(@RequestBody HouseholdJoinDTO dto,
+                                                               HttpServletRequest request) {
+        AppUser user = currentUser(request);
+        if (user == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        HouseholdInvite invite = householdInviteService.findUsable(dto == null ? null : dto.getInviteCode());
+        if (invite == null) {
+            return ApiResponse.fail("邀请码无效或已过期");
+        }
+        Household household = householdService.getById(invite.getHouseholdId());
+        if (household == null || !"normal".equals(household.getStatus())) {
+            return ApiResponse.fail("家庭不存在或已停用");
+        }
+        if (householdMemberService.find(household.getId(), user.getId()) != null) {
+            return ApiResponse.fail("你已经是该家庭的成员");
+        }
+        HouseholdInvitePreviewVO vo = new HouseholdInvitePreviewVO();
+        vo.setHouseholdName(household.getHouseholdName());
+        vo.setMemberRole(invite.getMemberRole());
+        vo.setInviterName(displayName(appUserMapper.selectById(invite.getCreatedBy())));
+        vo.setExpiresAt(invite.getExpiresAt());
+        vo.setMaxUses(invite.getMaxUses());
+        vo.setUsedCount(invite.getUsedCount());
+        return ApiResponse.success(vo);
+    }
+
+    @PostMapping("/join")
+    @Transactional(rollbackFor = Exception.class)
+    public ApiResponse<AppUser> join(@RequestBody HouseholdJoinDTO dto, HttpServletRequest request) {
+        AppUser user = currentUser(request);
+        if (user == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        if (isGuest(user)) {
+            return ApiResponse.fail(403, "游客不能加入家庭");
+        }
+        HouseholdInvite invite = householdInviteService.findUsable(dto == null ? null : dto.getInviteCode());
+        if (invite == null) {
+            return ApiResponse.fail("邀请码无效或已过期");
+        }
+        Household household = householdService.getById(invite.getHouseholdId());
+        if (household == null || !"normal".equals(household.getStatus())) {
+            return ApiResponse.fail("家庭不存在或已停用");
+        }
+        if (householdMemberService.find(household.getId(), user.getId()) != null) {
+            return ApiResponse.fail("你已经是该家庭的成员");
+        }
+        if (!householdInviteService.consume(invite)) {
+            return ApiResponse.fail("邀请码已被使用完");
+        }
+        HouseholdMember membership = new HouseholdMember();
+        membership.setHouseholdId(household.getId());
+        membership.setUserId(user.getId());
+        membership.setMemberRole(invite.getMemberRole());
+        householdMemberService.save(membership);
+
+        return ApiResponse.success("已加入家庭", applyHousehold(user, household, membership));
+    }
+
+    private boolean canManage(HouseholdMember membership) {
+        return membership != null
+                && ("owner".equals(membership.getMemberRole()) || "admin".equals(membership.getMemberRole()));
+    }
+
+    private String displayName(AppUser user) {
+        if (user == null) {
+            return "家人";
+        }
+        return StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
     }
 
     private HouseholdVO toVO(Household household, HouseholdMember membership, boolean active) {

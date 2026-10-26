@@ -7,6 +7,11 @@ const routes = [
     component: () => import('../views/LoginView.vue'),
   },
   {
+    path: '/join',
+    name: 'JoinHousehold',
+    component: () => import('../views/JoinHouseholdView.vue'),
+  },
+  {
     path: '/',
     component: () => import('../views/MainLayout.vue'),
     children: [

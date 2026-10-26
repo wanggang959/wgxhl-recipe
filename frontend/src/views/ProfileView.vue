@@ -503,6 +503,20 @@ async function copyInvite(invite) {
   }
 }
 
+function inviteLink(inviteCode) {
+  return `${window.location.origin}${window.location.pathname}#/join?code=${encodeURIComponent(inviteCode)}`
+}
+
+async function copyInviteLink(invite) {
+  const link = inviteLink(invite.inviteCode)
+  try {
+    await navigator.clipboard.writeText(link)
+    showActionStatus('邀请链接已复制')
+  } catch (error) {
+    showActionStatus(link)
+  }
+}
+
 async function joinByCode() {
   const code = joinCode.value.trim().toUpperCase()
   if (!code) {
@@ -995,13 +1009,15 @@ onMounted(() => {
               生成邀请码
             </van-button>
           </div>
+          <p class="invite-hint">把链接发给家人，登录后即可预览并加入。</p>
           <div v-for="invite in invites" :key="invite.id" class="invite-item">
             <div>
               <strong>{{ invite.inviteCode }}</strong>
               <span>{{ invite.memberRole }} · {{ invite.usedCount }}/{{ invite.maxUses }} · {{ formatInviteExpire(invite.expiresAt) }}</span>
             </div>
             <div class="invite-item-actions">
-              <button type="button" @click="copyInvite(invite)">复制</button>
+              <button type="button" @click="copyInvite(invite)">复制码</button>
+              <button type="button" @click="copyInviteLink(invite)">复制链接</button>
               <button type="button" @click="revokeInvite(invite)">撤销</button>
             </div>
           </div>
@@ -1826,6 +1842,12 @@ h2 {
 
 .invite-item strong {
   letter-spacing: 1px;
+}
+
+.invite-hint {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
 }
 
 .invite-item span {

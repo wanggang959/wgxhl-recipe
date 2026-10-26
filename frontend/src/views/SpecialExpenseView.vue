@@ -108,6 +108,7 @@ const selectedProject = computed(() => projects.value.find((item) => item.id ===
 const isEditingProject = computed(() => Boolean(projectForm.id))
 const isEditingItem = computed(() => Boolean(itemForm.id))
 const canWrite = computed(() => userStore.isLogin && !userStore.isGuest)
+const hasActiveItemFilter = computed(() => Boolean(itemCategoryFilter.value || itemStatusFilter.value))
 const displayItems = computed(() => [...items.value].sort((left, right) => {
   const leftDone = left.status === 'DONE' ? 1 : 0
   const rightDone = right.status === 'DONE' ? 1 : 0
@@ -156,6 +157,11 @@ async function loadProjects() {
   }
 }
 
+async function toggleShowArchived() {
+  showArchived.value = !showArchived.value
+  await loadProjects()
+}
+
 async function loadProjectData() {
   if (!selectedProjectId.value) {
     items.value = []
@@ -178,7 +184,10 @@ async function loadProjectData() {
       category: itemCategoryFilter.value,
       status: itemStatusFilter.value,
     }),
-    getExpenseSummary(selectedProjectId.value),
+    getExpenseSummary(selectedProjectId.value, {
+      category: itemCategoryFilter.value,
+      status: itemStatusFilter.value,
+    }),
   ])
   items.value = itemRes.data.records || []
   summary.value = summaryRes.data || summary.value
@@ -256,7 +265,7 @@ async function toggleArchiveProject(project) {
     } else {
       await archiveExpenseProject(project.id)
     }
-    showSuccessToast(project.archived ? '已恢复专项' : '已归档专项')
+    showSuccessToast(project.archived ? '已恢复专项' : '已归档专项，可在「显示已归档」中查看')
     await loadProjects()
   } catch (error) {
     if (error?.message) showFailToast(error.message)
@@ -442,16 +451,30 @@ function dateText(value) {
       </button>
     </header>
 
+    <div class="strip-head">
+      <span>我的专项</span>
+      <button
+        type="button"
+        class="archive-switch"
+        :class="{ active: showArchived }"
+        @click="toggleShowArchived"
+      >
+        <van-icon name="records" />
+        {{ showArchived ? '隐藏已归档' : '显示已归档' }}
+      </button>
+    </div>
+
     <div class="project-strip">
       <button
         v-for="project in activeProjects"
         :key="project.id"
         type="button"
-        :class="{ active: selectedProjectId === project.id }"
+        :class="{ active: selectedProjectId === project.id, archived: project.archived }"
         @click="selectedProjectId = project.id"
       >
         <strong>{{ project.projectName }}</strong>
         <span>{{ typeLabel(project.projectType) }} · 已花 {{ formatMoney(project.actualAmount) }}</span>
+        <em v-if="project.archived" class="archived-tag">已归档</em>
       </button>
       <button v-if="canWrite" type="button" class="ghost-project" @click="openProjectForm()">
         <van-icon name="plus" />
@@ -461,7 +484,7 @@ function dateText(value) {
 
     <EmptyState
       v-if="!loading && projects.length === 0"
-      text="还没有专项，先建一个婚礼采购，慢慢把要买的东西放进来。"
+      :text="showArchived ? '没有已归档的专项，归档后的专项会出现在这里。' : '还没有进行中的专项，归档后的项目可通过上方「显示已归档」查看。'"
       button-text="新增专项"
       :show-button="canWrite"
       @action="openProjectForm()"
@@ -471,7 +494,7 @@ function dateText(value) {
       <section class="summary-card">
         <div class="summary-head">
           <div>
-            <p>{{ typeLabel(selectedProject.projectType) }}</p>
+            <p>{{ typeLabel(selectedProject.projectType) }}{{ selectedProject.archived ? ' · 已归档' : '' }}{{ hasActiveItemFilter ? ' · 筛选统计' : '' }}</p>
             <h2>{{ selectedProject.projectName }}</h2>
           </div>
           <div class="summary-actions">
@@ -491,7 +514,7 @@ function dateText(value) {
         </div>
         <div class="money-grid">
           <div>
-            <span>总预算</span>
+            <span>{{ hasActiveItemFilter ? '筛选预算' : '总预算' }}</span>
             <strong>¥{{ formatMoney(summary.totalBudget) }}</strong>
           </div>
           <div>
@@ -757,6 +780,40 @@ function dateText(value) {
   font-weight: 800;
 }
 
+.strip-head {
+  margin: 2px 2px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.strip-head > span {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--app-muted);
+}
+
+.archive-switch {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--app-muted);
+  height: 30px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.archive-switch.active {
+  border-color: var(--app-primary);
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+}
+
 .project-strip {
   display: flex;
   gap: 10px;
@@ -799,6 +856,37 @@ function dateText(value) {
   margin-top: 5px;
   color: var(--app-muted);
   font-size: 12px;
+}
+
+.project-strip button {
+  position: relative;
+}
+
+.project-strip button.archived {
+  background: #fbf7f2;
+}
+
+.project-strip button.archived strong {
+  padding-right: 42px;
+}
+
+.project-strip button.archived.active {
+  background: #fff7ed;
+  border-color: var(--app-primary);
+}
+
+.project-strip .archived-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #efe7de;
+  color: var(--app-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 .project-strip .ghost-project {

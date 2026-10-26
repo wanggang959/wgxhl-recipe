@@ -164,14 +164,15 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
     }
 
     @Override
-    public ApiResponse<SpecialExpenseSummaryDTO> summary(String projectId, AppUser actor) {
+    public ApiResponse<SpecialExpenseSummaryDTO> summary(String projectId, String category, String status, AppUser actor) {
         if (!StringUtils.hasText(projectId)) {
             return ApiResponse.fail("专项id不能为空");
         }
-        if (super.getById(projectId) == null) {
+        SpecialExpenseProject project = super.getById(projectId);
+        if (project == null) {
             return ApiResponse.fail("专项不存在");
         }
-        return ApiResponse.success(buildSummary(projectId, super.getById(projectId).getTotalBudget()));
+        return ApiResponse.success(buildSummary(projectId, project.getTotalBudget(), category, status));
     }
 
     private ApiResponse<Void> setArchived(String id, boolean archived, AppUser actor) {
@@ -204,7 +205,7 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
         if (project == null || !StringUtils.hasText(project.getId())) {
             return;
         }
-        SpecialExpenseSummaryDTO summary = buildSummary(project.getId(), project.getTotalBudget());
+        SpecialExpenseSummaryDTO summary = buildSummary(project.getId(), project.getTotalBudget(), null, null);
         project.setActualAmount(summary.getActualAmount());
         project.setRemainingBudget(summary.getRemainingBudget());
         project.setItemCount(summary.getItemCount());
@@ -212,12 +213,14 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
         project.setDoneCount(summary.getDoneCount());
     }
 
-    private SpecialExpenseSummaryDTO buildSummary(String projectId, BigDecimal totalBudget) {
+    private SpecialExpenseSummaryDTO buildSummary(String projectId, BigDecimal totalBudget, String category, String status) {
         SpecialExpenseSummaryDTO summary = new SpecialExpenseSummaryDTO();
-        summary.setTotalBudget(totalBudget == null ? BigDecimal.ZERO : totalBudget);
         List<SpecialExpenseItem> items = itemMapper.selectList(new LambdaQueryWrapper<SpecialExpenseItem>()
-                .eq(SpecialExpenseItem::getProjectId, projectId));
+                .eq(SpecialExpenseItem::getProjectId, projectId)
+                .eq(StringUtils.hasText(category), SpecialExpenseItem::getCategory, category)
+                .eq(StringUtils.hasText(status), SpecialExpenseItem::getStatus, status));
         BigDecimal actual = BigDecimal.ZERO;
+        BigDecimal itemBudgetTotal = BigDecimal.ZERO;
         long pending = 0L;
         long done = 0L;
         long overBudget = 0L;
@@ -225,6 +228,7 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
             BigDecimal itemActual = item.getActualAmount() == null ? BigDecimal.ZERO : item.getActualAmount();
             BigDecimal itemBudget = item.getBudgetAmount() == null ? BigDecimal.ZERO : item.getBudgetAmount();
             actual = actual.add(itemActual);
+            itemBudgetTotal = itemBudgetTotal.add(itemBudget);
             if (ITEM_STATUS_DONE.equals(item.getStatus())) {
                 done++;
             } else if (!ITEM_STATUS_CANCELLED.equals(item.getStatus())) {
@@ -234,8 +238,13 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
                 overBudget++;
             }
         }
+        boolean filtered = StringUtils.hasText(category) || StringUtils.hasText(status);
+        BigDecimal scopeBudget = filtered
+                ? itemBudgetTotal
+                : (totalBudget == null ? BigDecimal.ZERO : totalBudget);
+        summary.setTotalBudget(scopeBudget);
         summary.setActualAmount(actual);
-        summary.setRemainingBudget(summary.getTotalBudget().subtract(actual));
+        summary.setRemainingBudget(scopeBudget.subtract(actual));
         summary.setItemCount((long) items.size());
         summary.setPendingCount(pending);
         summary.setDoneCount(done);

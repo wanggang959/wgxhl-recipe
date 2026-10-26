@@ -28,8 +28,8 @@ export function deleteExpenseProject(id) {
   return post('/expense/project/delete', { id })
 }
 
-export function getExpenseSummary(id) {
-  return post('/expense/project/summary', { id })
+export function getExpenseSummary(id, filters = {}) {
+  return post('/expense/project/summary', { id, ...filters })
 }
 
 export function pageExpenseItems(params) {

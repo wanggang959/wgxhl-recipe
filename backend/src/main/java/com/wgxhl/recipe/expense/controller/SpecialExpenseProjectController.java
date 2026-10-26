@@ -6,6 +6,7 @@ import com.wgxhl.recipe.common.dto.IdDTO;
 import com.wgxhl.recipe.config.AuthRequestAttributes;
 import com.wgxhl.recipe.expense.dto.SpecialExpenseProjectPageDTO;
 import com.wgxhl.recipe.expense.dto.SpecialExpenseSummaryDTO;
+import com.wgxhl.recipe.expense.dto.SpecialExpenseSummaryQueryDTO;
 import com.wgxhl.recipe.expense.entity.SpecialExpenseProject;
 import com.wgxhl.recipe.expense.service.SpecialExpenseProjectService;
 import com.wgxhl.recipe.user.entity.AppUser;
@@ -64,8 +65,9 @@ public class SpecialExpenseProjectController {
     }
 
     @PostMapping("/summary")
-    public ApiResponse<SpecialExpenseSummaryDTO> summary(@RequestBody IdDTO dto, HttpServletRequest request) {
-        return projectService.summary(dto.getId(), currentUser(request));
+    public ApiResponse<SpecialExpenseSummaryDTO> summary(@RequestBody SpecialExpenseSummaryQueryDTO dto,
+                                                         HttpServletRequest request) {
+        return projectService.summary(dto.getId(), dto.getCategory(), dto.getStatus(), currentUser(request));
     }
 
     private AppUser currentUser(HttpServletRequest request) {

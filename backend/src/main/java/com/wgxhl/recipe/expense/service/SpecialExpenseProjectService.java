@@ -24,5 +24,5 @@ public interface SpecialExpenseProjectService extends IService<SpecialExpensePro
 
     ApiResponse<Void> delete(String id, AppUser actor);
 
-    ApiResponse<SpecialExpenseSummaryDTO> summary(String projectId, AppUser actor);
+    ApiResponse<SpecialExpenseSummaryDTO> summary(String projectId, String category, String status, AppUser actor);
 }

@@ -244,6 +244,9 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (!StringUtils.hasText(entity.getCategory())) {
             entity.setCategory("OTHER");
         }
+        if (actor != null) {
+            entity.setCreateUserId(actor.getId());
+        }
         if (CollectionUtils.isEmpty(entity.getOwnerIds())) {
             if (StringUtils.hasText(entity.getOwnerId())) {
                 entity.setOwnerIds(Collections.singletonList(entity.getOwnerId()));
@@ -355,6 +358,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             todo = new Todo();
             todo.setRelatedType(RELATED_BIRTHDAY);
             todo.setRelatedId(user.getId());
+            todo.setCreateUserId(user.getId());
         }
         String name = StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
         todo.setTitle(name + "生日");

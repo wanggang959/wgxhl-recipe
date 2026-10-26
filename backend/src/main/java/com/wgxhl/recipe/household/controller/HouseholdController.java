@@ -7,10 +7,12 @@ import com.wgxhl.recipe.config.JwtAuthUtil;
 import com.wgxhl.recipe.household.dto.HouseholdCreateDTO;
 import com.wgxhl.recipe.household.dto.HouseholdInviteCreateDTO;
 import com.wgxhl.recipe.household.dto.HouseholdJoinDTO;
+import com.wgxhl.recipe.household.dto.HouseholdTransferDTO;
 import com.wgxhl.recipe.household.entity.Household;
 import com.wgxhl.recipe.household.entity.HouseholdInvite;
 import com.wgxhl.recipe.household.entity.HouseholdMember;
 import com.wgxhl.recipe.household.service.HouseholdInviteService;
+import com.wgxhl.recipe.household.service.HouseholdLeaveService;
 import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.household.service.HouseholdService;
 import com.wgxhl.recipe.household.vo.HouseholdInvitePreviewVO;
@@ -39,17 +41,20 @@ public class HouseholdController {
     private final HouseholdService householdService;
     private final HouseholdMemberService householdMemberService;
     private final HouseholdInviteService householdInviteService;
+    private final HouseholdLeaveService householdLeaveService;
     private final JwtAuthUtil jwtAuthUtil;
     private final AppUserMapper appUserMapper;
 
     public HouseholdController(HouseholdService householdService,
                                HouseholdMemberService householdMemberService,
                                HouseholdInviteService householdInviteService,
+                               HouseholdLeaveService householdLeaveService,
                                JwtAuthUtil jwtAuthUtil,
                                AppUserMapper appUserMapper) {
         this.householdService = householdService;
         this.householdMemberService = householdMemberService;
         this.householdInviteService = householdInviteService;
+        this.householdLeaveService = householdLeaveService;
         this.jwtAuthUtil = jwtAuthUtil;
         this.appUserMapper = appUserMapper;
     }
@@ -259,6 +264,40 @@ public class HouseholdController {
         householdMemberService.save(membership);
 
         return ApiResponse.success("已加入家庭", applyHousehold(user, household, membership));
+    }
+
+    @PostMapping("/leave")
+    public ApiResponse<AppUser> leave(HttpServletRequest request) {
+        AppUser user = currentUser(request);
+        Household household = currentHousehold(request);
+        HouseholdMember membership = currentMembership(request);
+        if (user == null || household == null || membership == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        return householdLeaveService.leave(user, household, membership);
+    }
+
+    @PostMapping("/transfer")
+    public ApiResponse<AppUser> transfer(@RequestBody HouseholdTransferDTO dto, HttpServletRequest request) {
+        AppUser user = currentUser(request);
+        Household household = currentHousehold(request);
+        HouseholdMember membership = currentMembership(request);
+        if (user == null || household == null || membership == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        return householdLeaveService.transfer(user, household, membership,
+                dto == null ? null : dto.getTargetUserId());
+    }
+
+    @PostMapping("/dissolve")
+    public ApiResponse<AppUser> dissolve(HttpServletRequest request) {
+        AppUser user = currentUser(request);
+        Household household = currentHousehold(request);
+        HouseholdMember membership = currentMembership(request);
+        if (user == null || household == null || membership == null) {
+            return ApiResponse.fail(401, "请先登录");
+        }
+        return householdLeaveService.dissolve(user, household, membership);
     }
 
     private boolean canManage(HouseholdMember membership) {

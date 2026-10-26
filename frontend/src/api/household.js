@@ -31,3 +31,15 @@ export function previewHouseholdInvite(inviteCode) {
 export function joinHousehold(inviteCode) {
   return post('/household/join', { inviteCode })
 }
+
+export function leaveHousehold() {
+  return post('/household/leave')
+}
+
+export function transferHousehold(targetUserId) {
+  return post('/household/transfer', { targetUserId })
+}
+
+export function dissolveHousehold() {
+  return post('/household/dissolve')
+}

@@ -5,14 +5,17 @@ import { closeToast, showConfirmDialog, showLoadingToast } from 'vant'
 import {
   createHousehold,
   createHouseholdInvite,
+  dissolveHousehold,
   joinHousehold,
+  leaveHousehold,
   listHouseholdInvites,
   listMyHouseholds,
   previewHouseholdInvite,
   revokeHouseholdInvite,
   switchHousehold,
+  transferHousehold,
 } from '../api/household'
-import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
+import { createUser, deleteUser, listMembers, pageUser, setUserStatus, updateUser } from '../api/user'
 import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
@@ -38,6 +41,11 @@ const inviteRole = ref('member')
 const inviteCreating = ref(false)
 const joinCode = ref('')
 const joining = ref(false)
+const householdMembers = ref([])
+const transferTargetId = ref('')
+const leaving = ref(false)
+const transferring = ref(false)
+const dissolving = ref(false)
 const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
@@ -78,6 +86,8 @@ const BUILTIN_ADMIN_USERNAME = '王师傅'
 
 const isEditingUser = computed(() => Boolean(userForm.id))
 const canManageHousehold = computed(() => ['owner', 'admin'].includes(userStore.user?.memberRole || ''))
+const isHouseholdOwner = computed(() => userStore.user?.memberRole === 'owner')
+const transferableMembers = computed(() => householdMembers.value.filter((member) => member.id !== userStore.userId))
 const editingBuiltinAdmin = ref(false)
 
 const GUEST_ID = 'guest'
@@ -437,6 +447,7 @@ async function openHouseholdPanel() {
     const res = await listMyHouseholds()
     householdList.value = res.data || []
     await loadInvites()
+    await loadHouseholdMembers()
   } catch (error) {
     showActionStatus(error.message || '家庭列表加载失败', 'error')
   } finally {
@@ -463,6 +474,7 @@ async function generateInvite() {
   try {
     await createHouseholdInvite({ memberRole: inviteRole.value, maxUses: 1, expiresInHours: 72 })
     await loadInvites()
+    await loadHouseholdMembers()
     showActionStatus('邀请码已生成')
   } catch (error) {
     showActionStatus(error.message || '生成邀请码失败', 'error')
@@ -475,6 +487,7 @@ async function revokeInvite(invite) {
   try {
     await revokeHouseholdInvite(invite.id)
     await loadInvites()
+    await loadHouseholdMembers()
     showActionStatus('邀请已撤销')
   } catch (error) {
     showActionStatus(error.message || '撤销失败', 'error')
@@ -519,6 +532,75 @@ async function joinByCode() {
 function formatInviteExpire(value) {
   if (!value) return '长期有效'
   return String(value).slice(0, 16).replace('T', ' ')
+}
+
+async function loadHouseholdMembers() {
+  try {
+    const res = await listMembers()
+    householdMembers.value = res.data || []
+  } catch (error) {
+    householdMembers.value = []
+  }
+}
+
+async function leaveCurrentHousehold() {
+  try {
+    await showConfirmDialog({
+      title: '退出家庭',
+      message: '确认退出当前家庭吗？你在该家庭的待办、收藏、想吃等数据会被清理，个人菜谱会保留。',
+    })
+    leaving.value = true
+    const res = await leaveHousehold()
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    leaving.value = false
+  }
+}
+
+async function transferOwnership() {
+  if (!transferTargetId.value) {
+    showActionStatus('请选择转让成员', 'error')
+    return
+  }
+  try {
+    await showConfirmDialog({
+      title: '转让所有权',
+      message: '转让后你将变为家庭管理员，确认继续吗？',
+    })
+    transferring.value = true
+    const res = await transferHousehold(transferTargetId.value)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    transferring.value = false
+  }
+}
+
+async function dissolveCurrentHousehold() {
+  try {
+    await showConfirmDialog({
+      title: '解散家庭',
+      message: '解散会删除该家庭的待办、专项开支、收藏等全部家庭数据，且无法恢复。仅当家庭只剩你一人时可解散，确认继续吗？',
+    })
+    dissolving.value = true
+    const res = await dissolveHousehold()
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    dissolving.value = false
+  }
 }
 
 async function switchToHousehold(item) {
@@ -931,6 +1013,27 @@ onMounted(() => {
             <input v-model="joinCode" class="invite-input" placeholder="输入邀请码" maxlength="16" />
             <van-button size="small" type="warning" :loading="joining" @click="joinByCode">加入</van-button>
           </div>
+        </div>
+
+        <div class="invite-box">
+          <h4>家庭管理</h4>
+          <template v-if="isHouseholdOwner">
+            <div class="invite-row">
+              <select v-model="transferTargetId" class="invite-select">
+                <option value="">选择成员转让</option>
+                <option v-for="member in transferableMembers" :key="member.id" :value="member.id">
+                  {{ member.nickname || member.username }}
+                </option>
+              </select>
+              <van-button size="small" :loading="transferring" @click="transferOwnership">转让</van-button>
+            </div>
+            <van-button size="small" plain type="danger" :loading="dissolving" @click="dissolveCurrentHousehold">
+              解散家庭
+            </van-button>
+          </template>
+          <van-button v-else size="small" plain type="danger" :loading="leaving" @click="leaveCurrentHousehold">
+            退出当前家庭
+          </van-button>
         </div>
       </div>
     </van-popup>

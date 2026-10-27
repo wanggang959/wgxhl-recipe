@@ -80,15 +80,15 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
       <button
         v-if="showLikeButton"
         class="like-pill"
-        :class="{ active: liked }"
+        :class="{ active: liked, 'is-icon-only': !liked && likeCount === 0 }"
         type="button"
         @click.stop="emit('like', recipe)"
       >
         <van-icon :name="liked ? 'good-job' : 'good-job-o'" size="14" />
-        <span>{{ likeCount }}</span>
+        <span v-if="liked || likeCount > 0">{{ likeCount }}</span>
       </button>
       <span v-else-if="likeCount > 0" class="like-pill is-static">
-        <van-icon name="good-job-o" size="14" />
+        <van-icon :name="liked ? 'good-job' : 'good-job-o'" size="14" />
         <span>{{ likeCount }}</span>
       </span>
     </div>
@@ -310,6 +310,12 @@ h3 {
 .like-pill.active {
   background: #fff;
   color: #ea580c;
+}
+
+.like-pill.is-icon-only {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
 }
 
 .like-pill.is-static {

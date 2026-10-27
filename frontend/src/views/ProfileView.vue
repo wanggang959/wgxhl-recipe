@@ -1499,6 +1499,10 @@ h2 {
   overscroll-behavior: contain;
 }
 
+.member-form-panel > * {
+  flex-shrink: 0;
+}
+
 .member-form-head {
   display: flex;
   align-items: center;
@@ -1864,6 +1868,10 @@ h2 {
   gap: 10px;
   max-height: 72vh;
   overflow-y: auto;
+}
+
+.household-panel > * {
+  flex-shrink: 0;
 }
 
 .household-panel-head {

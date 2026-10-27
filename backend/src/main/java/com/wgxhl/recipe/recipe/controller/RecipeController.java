@@ -9,6 +9,7 @@ import com.wgxhl.recipe.recipe.dto.RecipeStatusDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
+import com.wgxhl.recipe.recipe.vo.RecipeLikeStateVO;
 import com.wgxhl.recipe.config.AuthRequestAttributes;
 import com.wgxhl.recipe.user.entity.AppUser;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -85,5 +86,13 @@ public class RecipeController {
     @PostMapping("/setStatus")
     public ApiResponse<Void> setStatus(@RequestBody RecipeStatusDTO dto) {
         return recipeService.setStatus(dto.getId(), dto.getStatus());
+    }
+
+    /***
+     * @Description 点赞 / 取消点赞
+     **/
+    @PostMapping("/toggleLike")
+    public ApiResponse<RecipeLikeStateVO> toggleLike(@RequestBody IdDTO dto) {
+        return recipeService.toggleLike(dto.getId());
     }
 }

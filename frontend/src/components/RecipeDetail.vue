@@ -21,17 +21,33 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  showLike: {
+    type: Boolean,
+    default: false,
+  },
+  liked: {
+    type: Boolean,
+    default: false,
+  },
+  likeCount: {
+    type: Number,
+    default: 0,
+  },
   showFavorite: {
     type: Boolean,
     default: true,
   },
-  showTodoAction: {
+  showWantAction: {
     type: Boolean,
     default: true,
   },
+  wanted: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo', 'toggleStatus'])
+const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'want', 'toggleStatus', 'like'])
 
 const recipe = computed(() => props.detail.recipe || {})
 const cover = computed(() => getRecipeImage(recipe.value.coverImage))
@@ -60,29 +76,44 @@ const isOffline = computed(() => recipe.value.status === '下架')
           <ActionIcon name="heart" :filled="favorite" :size="21" />
         </button>
       </div>
-      <div class="hero-meta-tags">
-        <span v-if="isOffline" class="detail-tag offline">已下架</span>
-        <span v-if="recipe.ownerName" class="detail-tag owner">{{ recipe.ownerName }}</span>
-        <span class="detail-tag version">{{ formatRecipeVersionLabel(normalizeRecipeVersion(recipe.recipeVersion)) }}</span>
-      </div>
     </div>
 
     <section class="summary">
-      <div class="title-line">
-        <h1>{{ recipe.recipeName }}</h1>
-        <div class="title-actions">
+      <div class="summary-tags">
+        <span v-if="isOffline" class="detail-tag offline">已下架</span>
+        <span v-if="recipe.visibility === 'public'" class="detail-tag public">公共</span>
+        <span v-if="recipe.ownerName" class="detail-tag owner">{{ recipe.ownerName }}</span>
+        <span class="detail-tag version">{{ formatRecipeVersionLabel(normalizeRecipeVersion(recipe.recipeVersion)) }}</span>
+      </div>
+      <h1>{{ recipe.recipeName }}</h1>
+      <div class="title-actions">
           <van-button
-            v-if="showTodoAction"
+            v-if="showLike"
+            class="title-action"
+            :class="{ active: liked }"
             round
             size="small"
-            type="warning"
-            icon="todo-list-o"
-            @click="emit('todo', recipe)"
+            plain
+            icon="good-job-o"
+            @click="emit('like')"
           >
-            加入待办
+            {{ likeCount > 0 ? `赞 ${likeCount}` : '点赞' }}
+          </van-button>
+          <van-button
+            v-if="showWantAction"
+            class="title-action"
+            :class="{ active: wanted }"
+            round
+            size="small"
+            plain
+            icon="shopping-cart-o"
+            @click="emit('want')"
+          >
+            {{ wanted ? '已想吃' : '想吃' }}
           </van-button>
           <van-button
             v-if="canTakeDown"
+            class="title-action"
             round
             size="small"
             plain
@@ -91,14 +122,13 @@ const isOffline = computed(() => recipe.value.status === '下架')
           >
             {{ isOffline ? '恢复上架' : '下架' }}
           </van-button>
-          <van-button v-if="canEdit" round size="small" type="warning" icon="edit" @click="emit('edit')">
+          <van-button v-if="canEdit" class="title-action" round size="small" plain icon="edit" @click="emit('edit')">
             编辑
           </van-button>
-          <van-button v-if="canEdit" round size="small" plain type="danger" icon="delete-o" @click="emit('delete')">
+          <van-button v-if="canEdit" class="title-action is-danger" round size="small" plain icon="delete-o" @click="emit('delete')">
             删除
           </van-button>
         </div>
-      </div>
       <p v-if="recipe.recipeDesc">{{ recipe.recipeDesc }}</p>
       <div class="meta-grid">
         <div>
@@ -245,38 +275,27 @@ const isOffline = computed(() => recipe.value.status === '下架')
   justify-content: center;
 }
 
-.hero-meta-tags {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-  max-width: 58%;
-}
-
 .summary {
   position: relative;
-  margin-top: -28px;
-  padding: 18px 14px 14px;
+  margin-top: 0;
+  padding: 16px 14px 14px;
   border-radius: 22px 22px 0 0;
   background: var(--app-surface);
 }
 
-.title-line {
+.summary-tags {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .title-actions {
-  flex: 0 0 auto;
+  margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
 }
 
@@ -286,6 +305,22 @@ const isOffline = computed(() => recipe.value.status === '下架')
   padding: 0 11px;
   line-height: 1;
   white-space: nowrap;
+}
+
+.title-actions :deep(.title-action) {
+  border-color: #e5e7eb !important;
+  background: #fff !important;
+  color: #4b5563 !important;
+}
+
+.title-actions :deep(.title-action.active) {
+  border-color: rgba(234, 88, 12, 0.4) !important;
+  color: #c2410c !important;
+}
+
+.title-actions :deep(.title-action.is-danger) {
+  border-color: rgba(185, 28, 28, 0.25) !important;
+  color: #b91c1c !important;
 }
 
 h1 {
@@ -325,6 +360,12 @@ h1 {
   background: #f3f4f6;
   color: #6b7280;
   border: 1px solid rgba(107, 114, 128, 0.28);
+}
+
+.detail-tag.public {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid rgba(67, 56, 202, 0.24);
 }
 
 .detail-tag.version {
@@ -502,17 +543,5 @@ h2 {
   color: #7c5c46;
   line-height: 1.7;
   white-space: pre-wrap;
-}
-
-@media (max-width: 430px) {
-  .title-line {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .title-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 </style>

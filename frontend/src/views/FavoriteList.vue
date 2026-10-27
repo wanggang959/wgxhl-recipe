@@ -3,7 +3,7 @@ import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { deleteFavorite, pageFavorite } from '../api/favorite'
-import { getRecipeDetail } from '../api/recipe'
+import { getRecipeDetail, toggleRecipeLike } from '../api/recipe'
 import { checkWantedRecipe, createWantedRecipe } from '../api/want'
 import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -25,6 +25,7 @@ const loading = ref(false)
 const list = ref(favoriteListCache.userId === userStore.userId ? [...favoriteListCache.list] : [])
 const wantedMap = ref(favoriteListCache.userId === userStore.userId ? { ...favoriteListCache.wantedMap } : {})
 const wantedPendingMap = ref({})
+const likePendingMap = ref({})
 const wantActionVisible = ref(false)
 const wantDateVisible = ref(false)
 const wantTargetRecipe = ref(null)
@@ -156,6 +157,31 @@ async function removeSafe(item) {
   }
 }
 
+async function toggleLikeOnCard(item) {
+  if (!userStore.canMutate) {
+    closeToast()
+    showFailToast({ message: '请先登录后再点赞', duration: 1800 })
+    return
+  }
+  if (likePendingMap.value[item.id]) return
+  likePendingMap.value[item.id] = true
+  try {
+    const res = await toggleRecipeLike(item.id)
+    const target = list.value.find((entry) => entry.id === item.id)
+    if (target) {
+      target.liked = Boolean(res.data?.liked)
+      target.likeCount = Number(res.data?.likeCount || 0)
+    }
+    saveFavoriteCache()
+    markDataStale(DATA_SCOPE.recipes)
+  } catch (error) {
+    closeToast()
+    showFailToast({ message: error.message || '点赞失败', duration: 1800 })
+  } finally {
+    likePendingMap.value[item.id] = false
+  }
+}
+
 function formatDate(date) {
   const target = new Date(date)
   const year = target.getFullYear()
@@ -255,11 +281,15 @@ function submitCustomWantDate() {
         :recipe="item"
         favorite
         :wanted="Boolean(wantedMap[item.id])"
+        :liked="Boolean(item.liked)"
+        :like-count="Number(item.likeCount || 0)"
+        :show-like-button="userStore.canMutate"
         :show-favorite-button="userStore.canMutate"
         :show-want-button="userStore.canMutate"
         @open="router.push(`/recipe/${item.id}`)"
         @favorite="removeSafe"
         @want="openWantAction"
+        @like="toggleLikeOnCard"
       />
     </div>
 

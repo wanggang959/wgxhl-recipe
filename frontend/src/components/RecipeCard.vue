@@ -29,9 +29,21 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  liked: {
+    type: Boolean,
+    default: false,
+  },
+  likeCount: {
+    type: Number,
+    default: 0,
+  },
+  showLikeButton: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['open', 'favorite', 'want', 'edit', 'delete'])
+const emit = defineEmits(['open', 'favorite', 'want', 'edit', 'delete', 'like'])
 
 const cover = computed(() => getRecipeImage(props.recipe.coverImage))
 const taste = computed(() => props.recipe.taste || '家常')
@@ -65,6 +77,20 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
       >
         <ActionIcon name="cart" :size="18" />
       </button>
+      <button
+        v-if="showLikeButton"
+        class="like-pill"
+        :class="{ active: liked, 'is-icon-only': !liked && likeCount === 0 }"
+        type="button"
+        @click.stop="emit('like', recipe)"
+      >
+        <van-icon :name="liked ? 'good-job' : 'good-job-o'" size="14" />
+        <span v-if="liked || likeCount > 0">{{ likeCount }}</span>
+      </button>
+      <span v-else-if="likeCount > 0" class="like-pill is-static">
+        <van-icon :name="liked ? 'good-job' : 'good-job-o'" size="14" />
+        <span>{{ likeCount }}</span>
+      </span>
     </div>
     <div class="body">
       <div class="title-row">
@@ -252,6 +278,48 @@ h3 {
   background: #fff4e8;
   color: #9a3412;
   border: 1px solid rgba(249, 115, 22, 0.22);
+}
+
+.tag.like {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #fff1e6;
+  color: #c2410c;
+}
+
+.like-pill {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.55);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(6px);
+}
+
+.like-pill.active {
+  background: #fff;
+  color: #ea580c;
+}
+
+.like-pill.is-icon-only {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+
+.like-pill.is-static {
+  pointer-events: none;
 }
 
 .tag.version {

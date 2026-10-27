@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
-import { deleteRecipe, getRecipeDetail, setRecipeStatus } from '../api/recipe'
+import { deleteRecipe, getRecipeDetail, setRecipeStatus, toggleRecipeLike } from '../api/recipe'
+import { checkWantedRecipe, createWantedRecipe, deleteWantedRecipeByRecipeId } from '../api/want'
 import RecipeDetail from '../components/RecipeDetail.vue'
 import { useUserStore } from '../stores/user'
 import { DATA_SCOPE, markDataChanged, markDataStale } from '../utils/dataRefresh'
@@ -22,12 +23,12 @@ const detail = ref({
 })
 const isFavorite = ref(false)
 const favoritePending = ref(false)
+const likePending = ref(false)
+const isWanted = ref(false)
+const wantPending = ref(false)
 const errorText = ref('')
 const isOwner = computed(() => Boolean(userStore.userId && detail.value.recipe?.ownerUserId === userStore.userId))
-const canTakeDown = computed(() => {
-  if (!userStore.canMutate) return false
-  return isOwner.value || userStore.isHouseholdAdmin || userStore.isSuperAdmin
-})
+const canTakeDown = computed(() => Boolean(userStore.isSuperAdmin))
 
 onMounted(async () => {
   await loadDetail()
@@ -42,6 +43,10 @@ async function loadDetail() {
     if (userStore.userId) {
       const fav = await checkFavorite(userStore.userId, route.params.id)
       isFavorite.value = Boolean(fav.data)
+      if (!userStore.isGuest) {
+        const wanted = await checkWantedRecipe(userStore.userId, route.params.id)
+        isWanted.value = Boolean(wanted.data)
+      }
     }
   } catch (error) {
     errorText.value = error.message || '详情加载失败'
@@ -103,6 +108,68 @@ async function toggleFavoriteSafe() {
   }
 }
 
+function todayText() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+async function toggleWant() {
+  if (!userStore.canMutate) {
+    showFailToast('请先登录后再想吃')
+    return
+  }
+  if (wantPending.value) return
+  wantPending.value = true
+  try {
+    if (isWanted.value) {
+      await deleteWantedRecipeByRecipeId(userStore.userId, route.params.id)
+      isWanted.value = false
+      markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
+      showSuccessToast('已取消想吃')
+    } else {
+      await createWantedRecipe({
+        userId: userStore.userId,
+        recipeId: route.params.id,
+        plannedDate: todayText(),
+      })
+      isWanted.value = true
+      markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
+      showSuccessToast('已添加到想吃')
+    }
+  } catch (error) {
+    showFailToast(error.message || '想吃操作失败')
+  } finally {
+    wantPending.value = false
+  }
+}
+
+async function toggleLike() {
+  if (!userStore.canMutate) {
+    showFailToast('请先登录后再点赞')
+    return
+  }
+  if (likePending.value) return
+  likePending.value = true
+  try {
+    const res = await toggleRecipeLike(route.params.id)
+    detail.value = {
+      ...detail.value,
+      recipe: {
+        ...detail.value.recipe,
+        liked: Boolean(res.data?.liked),
+        likeCount: Number(res.data?.likeCount || 0),
+      },
+    }
+    markDataStale(DATA_SCOPE.recipes)
+  } catch (error) {
+    showFailToast(error.message || '点赞失败')
+  } finally {
+    likePending.value = false
+  }
+}
+
 async function toggleRecipeStatus() {
   const offline = detail.value.recipe?.status === '下架'
   const name = detail.value.recipe?.recipeName || '这道菜'
@@ -153,11 +220,16 @@ async function removeRecipe() {
         :favorite="isFavorite"
         :can-edit="isOwner"
         :can-take-down="canTakeDown"
+        :show-like="userStore.canMutate"
+        :liked="Boolean(detail.recipe?.liked)"
+        :like-count="Number(detail.recipe?.likeCount || 0)"
+        :show-want-action="userStore.canMutate"
+        :wanted="isWanted"
         :show-favorite="userStore.canMutate"
-        :show-todo-action="userStore.canMutate"
         @back="router.back()"
         @favorite="toggleFavoriteSafe"
-        @todo="router.push({ path: '/todo/create', query: { title: detail.recipe?.recipeName, category: 'COOK', relatedType: 'RECIPE', relatedId: detail.recipe?.id } })"
+        @like="toggleLike"
+        @want="toggleWant"
         @edit="router.push(`/recipe/${route.params.id}/edit`)"
         @delete="removeRecipe"
         @toggle-status="toggleRecipeStatus"

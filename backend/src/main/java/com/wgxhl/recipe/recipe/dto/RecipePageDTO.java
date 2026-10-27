@@ -37,4 +37,14 @@ public class RecipePageDTO extends PageDTO {
      * 状态
      */
     private String status;
+
+    /*
+     * 列表范围：family-家庭（默认），public-公共
+     */
+    private String scope;
+
+    /*
+     * 排序：latest-最新（默认），likes_desc-赞多优先，likes_asc-赞少优先，random-随机
+     */
+    private String sort;
 }

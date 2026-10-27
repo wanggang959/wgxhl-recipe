@@ -19,6 +19,7 @@ import com.wgxhl.recipe.household.vo.HouseholdInvitePreviewVO;
 import com.wgxhl.recipe.household.vo.HouseholdVO;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
+import com.wgxhl.recipe.user.service.AppUserService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,19 +45,22 @@ public class HouseholdController {
     private final HouseholdLeaveService householdLeaveService;
     private final JwtAuthUtil jwtAuthUtil;
     private final AppUserMapper appUserMapper;
+    private final AppUserService appUserService;
 
     public HouseholdController(HouseholdService householdService,
                                HouseholdMemberService householdMemberService,
                                HouseholdInviteService householdInviteService,
                                HouseholdLeaveService householdLeaveService,
                                JwtAuthUtil jwtAuthUtil,
-                               AppUserMapper appUserMapper) {
+                               AppUserMapper appUserMapper,
+                               AppUserService appUserService) {
         this.householdService = householdService;
         this.householdMemberService = householdMemberService;
         this.householdInviteService = householdInviteService;
         this.householdLeaveService = householdLeaveService;
         this.jwtAuthUtil = jwtAuthUtil;
         this.appUserMapper = appUserMapper;
+        this.appUserService = appUserService;
     }
 
     @PostMapping("/me")
@@ -328,6 +332,8 @@ public class HouseholdController {
     }
 
     private AppUser applyHousehold(AppUser user, Household household, HouseholdMember membership) {
+        appUserService.rememberHousehold(user.getId(), household.getId());
+        user.setActiveHouseholdId(household.getId());
         user.setHouseholdId(household.getId());
         user.setHouseholdName(household.getHouseholdName());
         user.setMemberRole(membership.getMemberRole());

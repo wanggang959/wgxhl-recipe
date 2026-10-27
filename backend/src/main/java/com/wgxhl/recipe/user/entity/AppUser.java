@@ -102,6 +102,11 @@ public class AppUser {
     private LocalDateTime updateTime;
 
     /*
+     * 上次所在家庭，登录时优先恢复
+     */
+    private String activeHouseholdId;
+
+    /*
      * 登录令牌（非数据库字段）
      */
     @TableField(exist = false)

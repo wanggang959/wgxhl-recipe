@@ -172,6 +172,8 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
             membership.setMemberRole(invite.getMemberRole());
             householdMemberService.save(membership);
 
+            appUserService.rememberHousehold(user.getId(), household.getId());
+            user.setActiveHouseholdId(household.getId());
             user.setHouseholdId(household.getId());
             user.setHouseholdName(household.getHouseholdName());
             user.setMemberRole(membership.getMemberRole());
@@ -187,6 +189,8 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
         membership.setMemberRole("owner");
         householdMemberService.save(membership);
 
+        appUserService.rememberHousehold(user.getId(), personal.getId());
+        user.setActiveHouseholdId(personal.getId());
         user.setHouseholdId(personal.getId());
         user.setHouseholdName(personal.getHouseholdName());
         user.setMemberRole("owner");

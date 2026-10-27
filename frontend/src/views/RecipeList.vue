@@ -81,6 +81,13 @@ const hasData = computed(() => list.value.length > 0)
 const todayCover = computed(() => getRecipeImage(suggestRecipe.value?.coverImage))
 const familyName = computed(() => userStore.user?.householdName || '王师傅家')
 const isTodayMode = computed(() => route.query.pick === 'today')
+const canManageRecipes = computed(() => userStore.isHouseholdAdmin || userStore.isSuperAdmin)
+const showOffline = computed(() => query.status === '下架')
+
+function toggleShowOffline() {
+  query.status = showOffline.value ? '上架' : '下架'
+  refreshList()
+}
 const isShowcaseMode = computed(() => route.query.mode === 'showcase')
 const showcasePage = ref(0)
 const showcasePageSize = 3
@@ -93,6 +100,9 @@ const minWantDate = computed(() => formatDate(new Date()))
 
 onMounted(async () => {
   window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+  if (!canManageRecipes.value && query.status !== '上架') {
+    query.status = '上架'
+  }
   const message = sessionStorage.getItem('recipeSaveMessage')
   const shouldForceRefresh = Boolean(message)
   if (message) {
@@ -594,6 +604,14 @@ function submitCustomWantDate() {
     </form>
 
     <CategoryTabs v-if="!isTodayMode" v-model="filter.categoryId" :categories="categories" @change="pickCategory" />
+
+    <div v-if="!isTodayMode && !isShowcaseMode && canManageRecipes" class="offline-filter">
+      <button type="button" :class="{ active: showOffline }" @click="toggleShowOffline">
+        <van-icon :name="showOffline ? 'eye-o' : 'closed-eye'" size="14" />
+        {{ showOffline ? '返回在架菜谱' : '查看已下架' }}
+      </button>
+      <span v-if="showOffline">下架的菜只有作者和家庭管理员能看到</span>
+    </div>
 
     <div v-if="saveMessage" class="save-banner">
       <van-icon name="success" />
@@ -1145,6 +1163,38 @@ function submitCustomWantDate() {
   font-weight: 800;
   white-space: nowrap;
   word-break: keep-all;
+}
+
+.offline-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.offline-filter button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.offline-filter button.active {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.offline-filter span {
+  font-size: 11px;
+  color: #9ca3af;
 }
 
 .save-banner,

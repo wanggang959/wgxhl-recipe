@@ -54,6 +54,9 @@ import java.util.stream.Collectors;
 public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         implements RecipeService {
 
+    private static final String STATUS_ON = "上架";
+    private static final String STATUS_OFF = "下架";
+
     private final RecipeCategoryService recipeCategoryService;
     private final RecipeStepService recipeStepService;
     private final RecipeImageService recipeImageService;
@@ -120,6 +123,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         }
         String keyword = StringUtils.hasText(dto.getRecipeName()) ? dto.getRecipeName().trim() : "";
         List<String> ownerUserIds = findOwnerUserIds(keyword, memberIds);
+        boolean manager = UserContext.isHouseholdManager();
         Page<Recipe> result = lambdaQuery()
                 .in(Recipe::getOwnerUserId, memberIds)
                 .and(wrapper -> wrapper
@@ -138,7 +142,11 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                 .like(StringUtils.hasText(dto.getCategoryName()), Recipe::getCategoryName, dto.getCategoryName())
                 .eq(StringUtils.hasText(dto.getDifficulty()), Recipe::getDifficulty, dto.getDifficulty())
                 .like(StringUtils.hasText(dto.getTaste()), Recipe::getTaste, dto.getTaste())
-                .eq(StringUtils.hasText(dto.getStatus()), Recipe::getStatus, dto.getStatus())
+                .eq(manager && StringUtils.hasText(dto.getStatus()), Recipe::getStatus, dto.getStatus())
+                .and(!manager, wrapper -> wrapper
+                        .ne(Recipe::getStatus, STATUS_OFF)
+                        .or()
+                        .eq(Recipe::getOwnerUserId, currentUserId))
                 .orderByDesc(Recipe::getCreateTime)
                 .page(page);
         return ApiResponse.success(result);
@@ -169,7 +177,49 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (recipe == null || !canView(recipe)) {
             return ApiResponse.fail("菜谱不存在");
         }
+        if (STATUS_OFF.equals(recipe.getStatus()) && !canTakeDown(recipe)) {
+            return ApiResponse.fail("这道菜已被下架");
+        }
         return ApiResponse.success(buildDetailVO(recipe));
+    }
+
+    @Override
+    public ApiResponse<Void> setStatus(String id, String status) {
+        if (!StringUtils.hasText(id)) {
+            return ApiResponse.fail("菜谱id不能为空");
+        }
+        if (!STATUS_ON.equals(status) && !STATUS_OFF.equals(status)) {
+            return ApiResponse.fail("菜谱状态无效");
+        }
+        Recipe recipe = super.getById(id);
+        if (recipe == null) {
+            return ApiResponse.fail("菜谱不存在");
+        }
+        if (!canTakeDown(recipe)) {
+            return ApiResponse.fail(403, "只有菜谱作者或家庭管理员可以下架菜谱");
+        }
+        if (status.equals(recipe.getStatus())) {
+            return ApiResponse.success(STATUS_OFF.equals(status) ? "这道菜已是下架状态" : "这道菜已在架上", null);
+        }
+        Recipe patch = new Recipe();
+        patch.setId(id);
+        patch.setStatus(status);
+        updateById(patch);
+        return ApiResponse.success(STATUS_OFF.equals(status) ? "已下架" : "已恢复上架", null);
+    }
+
+    /**
+     * 下架/恢复：作者本人，或菜谱作者所在家庭的 owner/admin
+     */
+    private boolean canTakeDown(Recipe recipe) {
+        String currentUserId = UserContext.requireUserId();
+        if (currentUserId.equals(recipe.getOwnerUserId())) {
+            return true;
+        }
+        if (!UserContext.isHouseholdManager()) {
+            return false;
+        }
+        return householdMemberService.listUserIds(TenantContext.require()).contains(recipe.getOwnerUserId());
     }
 
     @Override
@@ -182,6 +232,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         applyOwner(recipe, creator);
         normalizeVersion(recipe);
         normalizeVisibility(recipe);
+        normalizeStatus(recipe);
         ApiResponse<Void> validateResult = validateRecipe(recipe, null, dto.getRecipeStepList());
         if (validateResult != null) {
             return ApiResponse.fail(validateResult.getMessage());
@@ -218,6 +269,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         }
         normalizeVersion(recipe);
         normalizeVisibility(recipe);
+        normalizeStatus(recipe);
         ApiResponse<Void> validateResult = validateRecipe(recipe, recipe.getId(), dto.getRecipeStepList());
         if (validateResult != null) {
             return ApiResponse.fail(validateResult.getMessage());
@@ -276,6 +328,15 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         }
         if (!"private".equals(recipe.getVisibility())) {
             recipe.setVisibility("family");
+        }
+    }
+
+    private void normalizeStatus(Recipe recipe) {
+        if (recipe == null) {
+            return;
+        }
+        if (!STATUS_OFF.equals(recipe.getStatus())) {
+            recipe.setStatus(STATUS_ON);
         }
     }
 

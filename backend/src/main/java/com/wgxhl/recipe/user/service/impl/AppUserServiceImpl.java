@@ -554,7 +554,16 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     }
 
     private ApiResponse<AppUser> applyLoginHousehold(AppUser user) {
-        HouseholdMember membership = householdMemberService.findFirstByUser(user.getId());
+        HouseholdMember membership = null;
+        if (StringUtils.hasText(user.getActiveHouseholdId())) {
+            membership = householdMemberService.find(user.getActiveHouseholdId(), user.getId());
+            if (membership != null && !STATUS_NORMAL.equals(membership.getStatus())) {
+                membership = null;
+            }
+        }
+        if (membership == null) {
+            membership = householdMemberService.findFirstByUser(user.getId());
+        }
         if (membership == null) {
             return ApiResponse.fail("该账号尚未加入任何家庭，请联系管理员");
         }
@@ -562,10 +571,52 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (household == null || !STATUS_NORMAL.equals(household.getStatus())) {
             return ApiResponse.fail("所在家庭已停用，请联系管理员");
         }
+        rememberHousehold(user.getId(), household.getId());
+        user.setActiveHouseholdId(household.getId());
         user.setHouseholdId(household.getId());
         user.setHouseholdName(household.getHouseholdName());
         user.setMemberRole(membership.getMemberRole());
         return null;
+    }
+
+    @Override
+    public void rememberHousehold(String userId, String householdId) {
+        if (!StringUtils.hasText(userId) || !StringUtils.hasText(householdId)) {
+            return;
+        }
+        AppUser patch = new AppUser();
+        patch.setId(userId);
+        patch.setActiveHouseholdId(householdId);
+        updateById(patch);
+    }
+
+    @Override
+    public ApiResponse<Void> changePassword(String oldPassword, String newPassword) {
+        AppUser user = super.getById(UserContext.requireUserId());
+        if (user == null) {
+            return ApiResponse.fail("用户不存在");
+        }
+        if (isGuestUser(user)) {
+            return ApiResponse.fail(403, "游客账号不能修改密码");
+        }
+        if (!StringUtils.hasText(oldPassword)) {
+            return ApiResponse.fail("请输入原密码");
+        }
+        if (!StringUtils.hasText(newPassword) || newPassword.trim().length() < 6) {
+            return ApiResponse.fail("新密码至少 6 位");
+        }
+        String next = newPassword.trim();
+        if (!PasswordUtil.matches(oldPassword, user.getPassword())) {
+            return ApiResponse.fail("原密码不正确");
+        }
+        if (oldPassword.equals(next)) {
+            return ApiResponse.fail("新密码不能与原密码相同");
+        }
+        AppUser patch = new AppUser();
+        patch.setId(user.getId());
+        patch.setPassword(PasswordUtil.hash(next));
+        updateById(patch);
+        return ApiResponse.success("密码已更新", null);
     }
 
     @Override

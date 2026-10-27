@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.common.dto.IdDTO;
 import com.wgxhl.recipe.user.dto.UserLoginDTO;
+import com.wgxhl.recipe.user.dto.ChangePasswordDTO;
 import com.wgxhl.recipe.user.dto.UserPageDTO;
 import com.wgxhl.recipe.user.dto.UserStatusDTO;
 import com.wgxhl.recipe.user.dto.UserUsernameDTO;
@@ -117,5 +118,16 @@ public class UserController {
     @PostMapping("/setStatus")
     public ApiResponse<Void> setStatus(@RequestBody UserStatusDTO dto) {
         return appUserService.setStatus(dto.getId(), dto.getStatus());
+    }
+
+    /***
+     * @Description 本人修改密码
+     **/
+    @PostMapping("/changePassword")
+    public ApiResponse<Void> changePassword(@RequestBody ChangePasswordDTO dto) {
+        if (dto == null) {
+            return ApiResponse.fail("参数不能为空");
+        }
+        return appUserService.changePassword(dto.getOldPassword(), dto.getNewPassword());
     }
 }

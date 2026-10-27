@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
-import { deleteRecipe, getRecipeDetail } from '../api/recipe'
+import { deleteRecipe, getRecipeDetail, setRecipeStatus } from '../api/recipe'
 import RecipeDetail from '../components/RecipeDetail.vue'
 import { useUserStore } from '../stores/user'
 import { DATA_SCOPE, markDataChanged, markDataStale } from '../utils/dataRefresh'
@@ -24,6 +24,10 @@ const isFavorite = ref(false)
 const favoritePending = ref(false)
 const errorText = ref('')
 const isOwner = computed(() => Boolean(userStore.userId && detail.value.recipe?.ownerUserId === userStore.userId))
+const canTakeDown = computed(() => {
+  if (!userStore.canMutate) return false
+  return isOwner.value || userStore.isHouseholdAdmin || userStore.isSuperAdmin
+})
 
 onMounted(async () => {
   await loadDetail()
@@ -99,6 +103,25 @@ async function toggleFavoriteSafe() {
   }
 }
 
+async function toggleRecipeStatus() {
+  const offline = detail.value.recipe?.status === '下架'
+  const name = detail.value.recipe?.recipeName || '这道菜'
+  try {
+    await showConfirmDialog({
+      title: offline ? '恢复上架' : '下架菜谱',
+      message: offline
+        ? `确认把「${name}」恢复到家庭菜谱吗？`
+        : `下架后家人将看不到「${name}」，只有作者和家庭管理员还能打开。`,
+    })
+    await setRecipeStatus({ id: route.params.id, status: offline ? '上架' : '下架' })
+    markDataStale(DATA_SCOPE.recipes)
+    showSuccessToast(offline ? '已恢复上架' : '已下架')
+    await loadDetail()
+  } catch (error) {
+    if (error?.message) showFailToast(error.message)
+  }
+}
+
 async function removeRecipe() {
   const name = detail.value.recipe?.recipeName || '这道菜'
   try {
@@ -129,6 +152,7 @@ async function removeRecipe() {
         :detail="detail"
         :favorite="isFavorite"
         :can-edit="isOwner"
+        :can-take-down="canTakeDown"
         :show-favorite="userStore.canMutate"
         :show-todo-action="userStore.canMutate"
         @back="router.back()"
@@ -136,6 +160,7 @@ async function removeRecipe() {
         @todo="router.push({ path: '/todo/create', query: { title: detail.recipe?.recipeName, category: 'COOK', relatedType: 'RECIPE', relatedId: detail.recipe?.id } })"
         @edit="router.push(`/recipe/${route.params.id}/edit`)"
         @delete="removeRecipe"
+        @toggle-status="toggleRecipeStatus"
       />
     </main>
   </div>

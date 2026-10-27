@@ -30,6 +30,7 @@ import com.wgxhl.recipe.expense.entity.SpecialExpenseProject;
 import com.wgxhl.recipe.expense.mapper.SpecialExpenseItemMapper;
 import com.wgxhl.recipe.expense.mapper.SpecialExpenseProjectMapper;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.user.service.AppUserService;
 import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
 import org.springframework.stereotype.Service;
@@ -62,6 +63,7 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
     private final SpecialExpenseItemMapper specialExpenseItemMapper;
     private final SpecialExpenseProjectMapper specialExpenseProjectMapper;
     private final JwtAuthUtil jwtAuthUtil;
+    private final AppUserService appUserService;
 
     public HouseholdLeaveServiceImpl(HouseholdService householdService,
                                      HouseholdMemberService householdMemberService,
@@ -77,7 +79,8 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
                                      UserPushSubscriptionMapper userPushSubscriptionMapper,
                                      SpecialExpenseItemMapper specialExpenseItemMapper,
                                      SpecialExpenseProjectMapper specialExpenseProjectMapper,
-                                     JwtAuthUtil jwtAuthUtil) {
+                                     JwtAuthUtil jwtAuthUtil,
+                                     AppUserService appUserService) {
         this.householdService = householdService;
         this.householdMemberService = householdMemberService;
         this.householdInviteService = householdInviteService;
@@ -93,6 +96,7 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
         this.specialExpenseItemMapper = specialExpenseItemMapper;
         this.specialExpenseProjectMapper = specialExpenseProjectMapper;
         this.jwtAuthUtil = jwtAuthUtil;
+        this.appUserService = appUserService;
     }
 
     @Override
@@ -303,6 +307,8 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
     }
 
     private AppUser applyHousehold(AppUser user, Household household, HouseholdMember membership) {
+        appUserService.rememberHousehold(user.getId(), household.getId());
+        user.setActiveHouseholdId(household.getId());
         user.setHouseholdId(household.getId());
         user.setHouseholdName(household.getHouseholdName());
         user.setMemberRole(membership.getMemberRole());

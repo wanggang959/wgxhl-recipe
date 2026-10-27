@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { closeToast, showConfirmDialog, showLoadingToast } from 'vant'
+import { closeToast, showConfirmDialog, showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import {
   createHousehold,
   createHouseholdInvite,
@@ -15,7 +15,7 @@ import {
   switchHousehold,
   transferHousehold,
 } from '../api/household'
-import { createUser, deleteUser, listMembers, pageUser, setUserStatus, updateUser } from '../api/user'
+import { createUser, changePassword, deleteUser, listMembers, pageUser, setUserStatus, updateUser } from '../api/user'
 import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
@@ -173,6 +173,45 @@ async function logout() {
   resetUserForm()
   closeToast()
   goLoginPage()
+}
+
+const passwordVisible = ref(false)
+const savingPassword = ref(false)
+const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+
+function openPasswordForm() {
+  passwordForm.oldPassword = ''
+  passwordForm.newPassword = ''
+  passwordForm.confirmPassword = ''
+  passwordVisible.value = true
+}
+
+async function submitPassword() {
+  if (!passwordForm.oldPassword) {
+    showFailToast('请输入原密码')
+    return
+  }
+  if (passwordForm.newPassword.trim().length < 6) {
+    showFailToast('新密码至少 6 位')
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    showFailToast('两次输入的新密码不一致')
+    return
+  }
+  savingPassword.value = true
+  try {
+    await changePassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword,
+    })
+    passwordVisible.value = false
+    showSuccessToast('密码已更新')
+  } catch (error) {
+    showFailToast(error.message || '密码修改失败')
+  } finally {
+    savingPassword.value = false
+  }
 }
 
 async function refreshPushState() {
@@ -731,6 +770,12 @@ onMounted(() => {
       <h2>账号</h2>
       <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
       <van-cell title="权限" :value="userStore.roleText" />
+      <van-cell
+        v-if="userStore.isLogin && !userStore.isGuest"
+        title="修改密码"
+        is-link
+        @click="openPasswordForm"
+      />
       <div v-if="userStore.isLogin && !userStore.isGuest" class="push-setting">
         <div>
           <strong>手机通知</strong>
@@ -761,6 +806,43 @@ onMounted(() => {
         退出登录
       </van-button>
     </section>
+
+    <van-popup v-model:show="passwordVisible" position="bottom" round>
+      <div class="password-panel">
+        <div class="password-panel-head">
+          <h3>修改密码</h3>
+          <button type="button" @click="passwordVisible = false">关闭</button>
+        </div>
+        <p class="password-hint">修改后请用新密码重新登录。忘记原密码请联系家庭管理员重置。</p>
+        <van-field
+          v-model="passwordForm.oldPassword"
+          class="form-field"
+          label="原密码"
+          type="password"
+          placeholder="请输入当前密码"
+        />
+        <van-field
+          v-model="passwordForm.newPassword"
+          class="form-field"
+          label="新密码"
+          type="password"
+          placeholder="至少 6 位"
+        />
+        <van-field
+          v-model="passwordForm.confirmPassword"
+          class="form-field"
+          label="确认新密码"
+          type="password"
+          placeholder="再次输入新密码"
+        />
+        <div class="form-actions">
+          <van-button type="warning" round size="small" :loading="savingPassword" @click="submitPassword">
+            保存
+          </van-button>
+          <van-button round size="small" @click="passwordVisible = false">取消</van-button>
+        </div>
+      </div>
+    </van-popup>
 
     <section v-if="userStore.isLogin" class="form-card">
       <h2>家庭工具</h2>
@@ -1763,6 +1845,38 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.password-panel {
+  padding: 16px 16px calc(18px + var(--safe-area-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.password-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.password-panel-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.password-panel-head button {
+  border: 0;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.password-hint {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .household-panel-head h3 {

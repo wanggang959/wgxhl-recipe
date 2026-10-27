@@ -20,4 +20,6 @@ public interface RecipeService extends IService<Recipe> {
     ApiResponse<Void> update(RecipeSaveDTO dto);
 
     ApiResponse<Void> delete(String id);
+
+    ApiResponse<Void> setStatus(String id, String status);
 }

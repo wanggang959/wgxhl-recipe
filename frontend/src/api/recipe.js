@@ -19,3 +19,7 @@ export function updateRecipe(payload) {
 export function deleteRecipe(id) {
   return post('/recipe/delete', { id })
 }
+
+export function setRecipeStatus(payload) {
+  return post('/recipe/setStatus', payload)
+}

@@ -23,6 +23,8 @@ const DEFAULT_QUERY = {
   categoryId: '',
   difficulty: '',
   status: '上架',
+  scope: 'family',
+  sort: 'latest',
 }
 const DEFAULT_FILTER = {
   recipeName: '',
@@ -86,6 +88,30 @@ const showOffline = computed(() => query.status === '下架')
 
 function toggleShowOffline() {
   query.status = showOffline.value ? '上架' : '下架'
+  refreshList()
+}
+
+const isPublicScope = computed(() => query.scope === 'public')
+const sortOptions = [
+  { value: 'latest', label: '最新' },
+  { value: 'likes_desc', label: '最赞' },
+  { value: 'likes_asc', label: '冷门' },
+  { value: 'random', label: '随机' },
+]
+
+function pickScope(scope) {
+  if (query.scope === scope) return
+  query.scope = scope
+  query.status = '上架'
+  query.categoryId = ''
+  filter.categoryId = ''
+  suggestRecipe.value = null
+  refreshList()
+}
+
+function pickSort(sort) {
+  if (query.sort === sort) return
+  query.sort = sort
   refreshList()
 }
 const isShowcaseMode = computed(() => route.query.mode === 'showcase')
@@ -548,11 +574,40 @@ function submitCustomWantDate() {
         <h1>{{ familyName }}的生活日常</h1>
         <span>记录家里的味道，也照管家里的小事。</span>
       </div>
-      <button type="button" class="today-button" @click="chooseRandomRecipe({ showMessage: true })">
+      <button
+        v-if="!isPublicScope"
+        type="button"
+        class="today-button"
+        @click="chooseRandomRecipe({ showMessage: true })"
+      >
         <van-icon name="fire-o" size="18" />
         今天吃什么
       </button>
     </section>
+
+    <div v-if="!isTodayMode" class="scope-switch">
+      <div class="scope-tabs">
+        <button type="button" :class="{ active: !isPublicScope }" @click="pickScope('family')">
+          <van-icon name="friends-o" size="13" />
+          家庭
+        </button>
+        <button type="button" :class="{ active: isPublicScope }" @click="pickScope('public')">
+          <van-icon name="globe-o" size="13" />
+          公共
+        </button>
+      </div>
+      <div class="sort-switch">
+        <button
+          v-for="item in sortOptions"
+          :key="item.value"
+          type="button"
+          :class="{ active: query.sort === item.value }"
+          @click="pickSort(item.value)"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+    </div>
 
     <section v-else class="today-mode">
       <div class="today-mode-head">
@@ -607,9 +662,9 @@ function submitCustomWantDate() {
       <button type="submit">搜索</button>
     </form>
 
-    <CategoryTabs v-if="!isTodayMode" v-model="filter.categoryId" :categories="categories" @change="pickCategory" />
+    <CategoryTabs v-if="!isTodayMode && !isPublicScope" v-model="filter.categoryId" :categories="categories" @change="pickCategory" />
 
-    <div v-if="!isTodayMode && !isShowcaseMode && canManageRecipes" class="offline-filter">
+    <div v-if="!isTodayMode && !isShowcaseMode && !isPublicScope && canManageRecipes" class="offline-filter">
       <button type="button" :class="{ active: showOffline }" @click="toggleShowOffline">
         <van-icon :name="showOffline ? 'eye-o' : 'closed-eye'" size="14" />
         {{ showOffline ? '返回在架菜谱' : '查看已下架' }}
@@ -627,7 +682,7 @@ function submitCustomWantDate() {
       <span>{{ recommendMessage }}</span>
     </div>
 
-    <section v-if="suggestRecipe && !isTodayMode" class="today-card" @click="openDetail(suggestRecipe)">
+    <section v-if="suggestRecipe && !isTodayMode && !isPublicScope" class="today-card" @click="openDetail(suggestRecipe)">
       <img :src="todayCover" :alt="suggestRecipe.recipeName" />
       <div>
         <span>今日推荐</span>
@@ -650,7 +705,7 @@ function submitCustomWantDate() {
     </section>
 
     <div class="list-head">
-      <h2>{{ isTodayMode ? '也可以自己挑' : '菜单' }}</h2>
+      <h2>{{ isTodayMode ? '也可以自己挑' : (isPublicScope ? '公共菜谱' : '菜单') }}</h2>
       <span>{{ total }} 道菜</span>
     </div>
 
@@ -674,7 +729,12 @@ function submitCustomWantDate() {
           @want="openWantAction"
         />
       </div>
-      <EmptyState v-else-if="!loading" :show-button="canMutate" @action="router.push('/recipe/create')" />
+      <EmptyState
+        v-else-if="!loading"
+        :text="isPublicScope ? '还没有人公开菜谱，把你的拿手菜分享出来吧' : '还没有菜谱，先添加一道拿手菜吧'"
+        :show-button="canMutate"
+        @action="router.push('/recipe/create')"
+      />
     </van-list>
   </div>
 
@@ -1199,6 +1259,51 @@ function submitCustomWantDate() {
 .offline-filter span {
   font-size: 11px;
   color: #9ca3af;
+}
+
+.scope-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.scope-tabs,
+.sort-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(154, 52, 18, 0.05);
+}
+
+.scope-tabs button,
+.sort-switch button {
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scope-tabs button.active {
+  background: #fff1e6;
+  color: #c2410c;
+}
+
+.sort-switch button.active {
+  background: #f3f4f6;
+  color: #111827;
 }
 
 .save-banner,

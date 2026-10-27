@@ -21,6 +21,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  showLike: {
+    type: Boolean,
+    default: false,
+  },
+  liked: {
+    type: Boolean,
+    default: false,
+  },
+  likeCount: {
+    type: Number,
+    default: 0,
+  },
   showFavorite: {
     type: Boolean,
     default: true,
@@ -31,7 +43,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo', 'toggleStatus'])
+const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo', 'toggleStatus', 'like'])
 
 const recipe = computed(() => props.detail.recipe || {})
 const cover = computed(() => getRecipeImage(recipe.value.coverImage))
@@ -62,6 +74,7 @@ const isOffline = computed(() => recipe.value.status === '下架')
       </div>
       <div class="hero-meta-tags">
         <span v-if="isOffline" class="detail-tag offline">已下架</span>
+        <span v-if="recipe.visibility === 'public'" class="detail-tag public">公共</span>
         <span v-if="recipe.ownerName" class="detail-tag owner">{{ recipe.ownerName }}</span>
         <span class="detail-tag version">{{ formatRecipeVersionLabel(normalizeRecipeVersion(recipe.recipeVersion)) }}</span>
       </div>
@@ -71,6 +84,17 @@ const isOffline = computed(() => recipe.value.status === '下架')
       <div class="title-line">
         <h1>{{ recipe.recipeName }}</h1>
         <div class="title-actions">
+          <van-button
+            v-if="showLike"
+            round
+            size="small"
+            plain
+            :type="liked ? 'warning' : 'default'"
+            :icon="liked ? 'good-job' : 'good-job-o'"
+            @click="emit('like')"
+          >
+            {{ likeCount > 0 ? likeCount : '点赞' }}
+          </van-button>
           <van-button
             v-if="showTodoAction"
             round
@@ -325,6 +349,12 @@ h1 {
   background: #f3f4f6;
   color: #6b7280;
   border: 1px solid rgba(107, 114, 128, 0.28);
+}
+
+.detail-tag.public {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid rgba(67, 56, 202, 0.24);
 }
 
 .detail-tag.version {

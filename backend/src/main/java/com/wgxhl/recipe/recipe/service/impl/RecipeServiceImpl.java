@@ -18,10 +18,13 @@ import com.wgxhl.recipe.ingredient.mapper.IngredientMapper;
 import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
 import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
+import com.wgxhl.recipe.recipe.entity.RecipeLike;
+import com.wgxhl.recipe.recipe.mapper.RecipeLikeMapper;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.recipe.util.RecipeVersionUtil;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
+import com.wgxhl.recipe.recipe.vo.RecipeLikeStateVO;
 import com.wgxhl.recipe.record.mapper.RecipeViewRecordMapper;
 import com.wgxhl.recipe.relation.dto.RecipeIngredientRelBatchDTO;
 import com.wgxhl.recipe.relation.entity.RecipeIngredientRel;
@@ -69,6 +72,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private final HouseholdMemberService householdMemberService;
     private final IngredientMapper ingredientMapper;
     private final SeasoningMapper seasoningMapper;
+    private final RecipeLikeMapper recipeLikeMapper;
 
     public RecipeServiceImpl(RecipeCategoryService recipeCategoryService,
                              RecipeStepService recipeStepService,
@@ -81,7 +85,8 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                              AppUserMapper appUserMapper,
                              HouseholdMemberService householdMemberService,
                              IngredientMapper ingredientMapper,
-                             SeasoningMapper seasoningMapper) {
+                             SeasoningMapper seasoningMapper,
+                             RecipeLikeMapper recipeLikeMapper) {
         this.recipeCategoryService = recipeCategoryService;
         this.recipeStepService = recipeStepService;
         this.recipeImageService = recipeImageService;
@@ -94,6 +99,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         this.householdMemberService = householdMemberService;
         this.ingredientMapper = ingredientMapper;
         this.seasoningMapper = seasoningMapper;
+        this.recipeLikeMapper = recipeLikeMapper;
     }
 
     @Override
@@ -117,39 +123,83 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     public ApiResponse<Page<Recipe>> page(RecipePageDTO dto) {
         Page<Recipe> page = new Page<>(dto.getCurrent(), dto.getSize());
         String currentUserId = UserContext.requireUserId();
-        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
-        if (memberIds.isEmpty()) {
+        boolean publicScope = "public".equalsIgnoreCase(dto.getScope());
+        boolean manager = UserContext.isHouseholdManager();
+        List<String> memberIds = publicScope
+                ? Collections.emptyList()
+                : householdMemberService.listUserIds(TenantContext.require());
+        if (!publicScope && memberIds.isEmpty()) {
             return ApiResponse.success(page);
         }
         String keyword = StringUtils.hasText(dto.getRecipeName()) ? dto.getRecipeName().trim() : "";
-        List<String> ownerUserIds = findOwnerUserIds(keyword, memberIds);
-        boolean manager = UserContext.isHouseholdManager();
-        Page<Recipe> result = lambdaQuery()
-                .in(Recipe::getOwnerUserId, memberIds)
-                .and(wrapper -> wrapper
-                        .eq(Recipe::getVisibility, "family")
-                        .or()
-                        .eq(Recipe::getOwnerUserId, currentUserId))
-                .and(StringUtils.hasText(keyword), wrapper -> {
-                    wrapper.like(Recipe::getRecipeName, keyword)
+        List<String> ownerUserIds = publicScope ? Collections.emptyList() : findOwnerUserIds(keyword, memberIds);
+
+        LambdaQueryWrapper<Recipe> wrapper = new LambdaQueryWrapper<>();
+        if (publicScope) {
+            wrapper.eq(Recipe::getVisibility, "public")
+                    .eq(Recipe::getStatus, STATUS_ON);
+        } else {
+            wrapper.in(Recipe::getOwnerUserId, memberIds)
+                    .and(scope -> scope
+                            .in(Recipe::getVisibility, "family", "public")
+                            .or()
+                            .eq(Recipe::getOwnerUserId, currentUserId))
+                    .eq(manager && StringUtils.hasText(dto.getStatus()), Recipe::getStatus, dto.getStatus())
+                    .and(!manager, scope -> scope
+                            .ne(Recipe::getStatus, STATUS_OFF)
+                            .or()
+                            .eq(Recipe::getOwnerUserId, currentUserId));
+        }
+        wrapper.and(StringUtils.hasText(keyword), scope -> {
+                    scope.like(Recipe::getRecipeName, keyword)
                             .or()
                             .like(Recipe::getOwnerName, keyword);
                     if (!ownerUserIds.isEmpty()) {
-                        wrapper.or().in(Recipe::getOwnerUserId, ownerUserIds);
+                        scope.or().in(Recipe::getOwnerUserId, ownerUserIds);
                     }
                 })
                 .eq(StringUtils.hasText(dto.getCategoryId()), Recipe::getCategoryId, dto.getCategoryId())
                 .like(StringUtils.hasText(dto.getCategoryName()), Recipe::getCategoryName, dto.getCategoryName())
                 .eq(StringUtils.hasText(dto.getDifficulty()), Recipe::getDifficulty, dto.getDifficulty())
-                .like(StringUtils.hasText(dto.getTaste()), Recipe::getTaste, dto.getTaste())
-                .eq(manager && StringUtils.hasText(dto.getStatus()), Recipe::getStatus, dto.getStatus())
-                .and(!manager, wrapper -> wrapper
-                        .ne(Recipe::getStatus, STATUS_OFF)
-                        .or()
-                        .eq(Recipe::getOwnerUserId, currentUserId))
-                .orderByDesc(Recipe::getCreateTime)
-                .page(page);
+                .like(StringUtils.hasText(dto.getTaste()), Recipe::getTaste, dto.getTaste());
+        applySort(wrapper, dto.getSort());
+
+        Page<Recipe> result = page(page, wrapper);
+        fillLiked(result.getRecords(), currentUserId);
         return ApiResponse.success(result);
+    }
+
+    private void applySort(LambdaQueryWrapper<Recipe> wrapper, String sort) {
+        String value = StringUtils.hasText(sort) ? sort : "latest";
+        if ("likes_desc".equals(value)) {
+            wrapper.orderByDesc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime);
+        } else if ("likes_asc".equals(value)) {
+            wrapper.orderByAsc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime);
+        } else if ("random".equals(value)) {
+            wrapper.last("order by rand()");
+        } else {
+            wrapper.orderByDesc(Recipe::getCreateTime);
+        }
+    }
+
+    private void fillLiked(List<Recipe> records, String currentUserId) {
+        if (records == null || records.isEmpty() || !StringUtils.hasText(currentUserId)) {
+            return;
+        }
+        List<String> recipeIds = records.stream()
+                .map(Recipe::getId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+        if (recipeIds.isEmpty()) {
+            return;
+        }
+        Set<String> likedIds = recipeLikeMapper.selectList(new LambdaQueryWrapper<RecipeLike>()
+                        .eq(RecipeLike::getUserId, currentUserId)
+                        .in(RecipeLike::getRecipeId, recipeIds))
+                .stream()
+                .map(RecipeLike::getRecipeId)
+                .collect(Collectors.toSet());
+        records.forEach(recipe -> recipe.setLiked(likedIds.contains(recipe.getId())));
     }
 
     private List<String> findOwnerUserIds(String keyword, List<String> memberIds) {
@@ -180,7 +230,60 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (STATUS_OFF.equals(recipe.getStatus()) && !canTakeDown(recipe)) {
             return ApiResponse.fail("这道菜已被下架");
         }
+        recipe.setLiked(isLikedBy(id, UserContext.requireUserId()));
         return ApiResponse.success(buildDetailVO(recipe));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ApiResponse<RecipeLikeStateVO> toggleLike(String id) {
+        if (!StringUtils.hasText(id)) {
+            return ApiResponse.fail("菜谱id不能为空");
+        }
+        Recipe recipe = super.getById(id);
+        if (recipe == null || !canView(recipe)) {
+            return ApiResponse.fail("菜谱不存在");
+        }
+        if (STATUS_OFF.equals(recipe.getStatus())) {
+            return ApiResponse.fail("这道菜已被下架");
+        }
+        String currentUserId = UserContext.requireUserId();
+        RecipeLike existing = recipeLikeMapper.selectOne(new LambdaQueryWrapper<RecipeLike>()
+                .eq(RecipeLike::getRecipeId, id)
+                .eq(RecipeLike::getUserId, currentUserId)
+                .last("limit 1"));
+        boolean liked;
+        if (existing == null) {
+            RecipeLike like = new RecipeLike();
+            like.setId(IdUtil.simpleUUID());
+            like.setRecipeId(id);
+            like.setUserId(currentUserId);
+            LocalDateTime now = LocalDateTime.now();
+            like.setCreateTime(now);
+            like.setUpdateTime(now);
+            recipeLikeMapper.insert(like);
+            lambdaUpdate().eq(Recipe::getId, id).setSql("like_count = like_count + 1").update();
+            liked = true;
+        } else {
+            recipeLikeMapper.deleteById(existing.getId());
+            lambdaUpdate().eq(Recipe::getId, id).setSql("like_count = greatest(like_count - 1, 0)").update();
+            liked = false;
+        }
+        Recipe fresh = super.getById(id);
+        RecipeLikeStateVO state = new RecipeLikeStateVO();
+        state.setLiked(liked);
+        state.setLikeCount(fresh != null && fresh.getLikeCount() != null ? fresh.getLikeCount() : 0);
+        return ApiResponse.success(liked ? "已点赞" : "已取消点赞", state);
+    }
+
+    private boolean isLikedBy(String recipeId, String userId) {
+        if (!StringUtils.hasText(recipeId) || !StringUtils.hasText(userId)) {
+            return false;
+        }
+        Long count = recipeLikeMapper.selectCount(new LambdaQueryWrapper<RecipeLike>()
+                .eq(RecipeLike::getRecipeId, recipeId)
+                .eq(RecipeLike::getUserId, userId));
+        return count != null && count > 0;
     }
 
     @Override
@@ -214,6 +317,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private boolean canTakeDown(Recipe recipe) {
         String currentUserId = UserContext.requireUserId();
         if (currentUserId.equals(recipe.getOwnerUserId())) {
+            return true;
+        }
+        if ("public".equals(recipe.getVisibility()) && UserContext.isSuperAdmin()) {
             return true;
         }
         if (!UserContext.isHouseholdManager()) {
@@ -296,6 +402,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             return ApiResponse.fail(403, "只能删除自己的菜谱");
         }
         clearChildrenByRecipeId(id);
+        recipeLikeMapper.delete(new LambdaQueryWrapper<RecipeLike>().eq(RecipeLike::getRecipeId, id));
         userFavoriteMapper.deleteByRecipeIdAcrossHouseholds(id);
         recipeViewRecordMapper.deleteByRecipeIdAcrossHouseholds(id);
         userWantedRecipeMapper.deleteByRecipeIdAcrossHouseholds(id);
@@ -326,7 +433,8 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (recipe == null) {
             return;
         }
-        if (!"private".equals(recipe.getVisibility())) {
+        String visibility = recipe.getVisibility();
+        if (!"private".equals(visibility) && !"public".equals(visibility)) {
             recipe.setVisibility("family");
         }
     }
@@ -343,6 +451,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private boolean canView(Recipe recipe) {
         String currentUserId = UserContext.requireUserId();
         if (currentUserId.equals(recipe.getOwnerUserId())) {
+            return true;
+        }
+        if ("public".equals(recipe.getVisibility())) {
             return true;
         }
         if (!"family".equals(recipe.getVisibility())) {

@@ -76,6 +76,10 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
         <span class="tag">{{ taste }}</span>
         <span class="tag">{{ difficulty }}</span>
         <div class="tags-meta">
+          <span v-if="Number(recipe.likeCount) > 0" class="tag like">
+            <van-icon name="good-job-o" size="11" />
+            {{ recipe.likeCount }}
+          </span>
           <span v-if="ownerName" class="tag owner">{{ ownerName }}</span>
           <span class="tag version">{{ versionLabel }}</span>
         </div>
@@ -252,6 +256,14 @@ h3 {
   background: #fff4e8;
   color: #9a3412;
   border: 1px solid rgba(249, 115, 22, 0.22);
+}
+
+.tag.like {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #fff1e6;
+  color: #c2410c;
 }
 
 .tag.version {

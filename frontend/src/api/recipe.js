@@ -23,3 +23,7 @@ export function deleteRecipe(id) {
 export function setRecipeStatus(payload) {
   return post('/recipe/setStatus', payload)
 }
+
+export function toggleRecipeLike(id) {
+  return post('/recipe/toggleLike', { id })
+}

@@ -23,6 +23,7 @@ public class HouseholdTenantLineHandler implements TenantLineHandler {
             "recipe_ingredient_rel",
             "recipe_seasoning_rel",
             "recipe_category",
+            "recipe_like",
             "ingredient",
             "seasoning"
     ));

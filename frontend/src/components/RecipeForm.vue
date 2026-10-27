@@ -515,6 +515,7 @@ bootstrap()
             <span>可见范围</span>
             <select v-model="form.recipe.visibility" class="select-input">
               <option value="family">家庭成员可见</option>
+              <option value="public">所有人可见（公共）</option>
               <option value="private">仅自己可见</option>
             </select>
           </label>

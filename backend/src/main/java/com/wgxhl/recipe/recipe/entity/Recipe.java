@@ -1,6 +1,7 @@
 package com.wgxhl.recipe.recipe.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -60,9 +61,20 @@ public class Recipe {
     private String status;
 
     /*
-     * 可见范围：family-家庭成员可见，private-仅自己可见
+     * 可见范围：private-仅自己可见，family-家庭成员可见，public-所有人可见
      */
     private String visibility;
+
+    /*
+     * 点赞数
+     */
+    private Integer likeCount;
+
+    /*
+     * 当前用户是否已点赞（非数据库字段）
+     */
+    @TableField(exist = false)
+    private Boolean liked;
 
     /*
      * 分类id

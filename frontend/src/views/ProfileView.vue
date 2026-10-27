@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import {
@@ -50,7 +50,6 @@ const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
 const showMemberForm = ref(false)
-const memberPanelBodyRef = ref(null)
 const pushLoading = ref(false)
 const loggingOut = ref(false)
 const pushState = ref({
@@ -260,12 +259,6 @@ function resetUserForm() {
   showMemberForm.value = false
 }
 
-function scrollMemberPanelToTop() {
-  nextTick(() => {
-    memberPanelBodyRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
-  })
-}
-
 function beginAddUser() {
   userForm.id = ''
   userForm.username = ''
@@ -285,7 +278,6 @@ function beginAddUser() {
   userForm.notificationPreference = 'site'
   editingBuiltinAdmin.value = false
   showMemberForm.value = true
-  scrollMemberPanelToTop()
 }
 
 function editUser(item) {
@@ -307,7 +299,6 @@ function editUser(item) {
   userForm.notificationPreference = item.notificationPreference || 'site'
   editingBuiltinAdmin.value = isBuiltinAdminUser(item)
   showMemberForm.value = true
-  scrollMemberPanelToTop()
 }
 
 function selectAvatar(path) {
@@ -848,6 +839,116 @@ onMounted(() => {
       </div>
     </van-popup>
 
+    <van-popup v-model:show="showMemberForm" position="bottom" round>
+      <div class="member-form-panel">
+        <div class="member-form-head">
+          <h3>{{ isEditingUser ? '编辑成员' : '添加成员' }}</h3>
+          <button type="button" @click="resetUserForm">关闭</button>
+        </div>
+        <van-field
+          v-model="userForm.username"
+          class="form-field"
+          label="用户名"
+          placeholder="用户名唯一"
+          :disabled="editingBuiltinAdmin"
+        />
+        <p v-if="editingBuiltinAdmin" class="builtin-hint">内置管理员用户名固定为「王师傅」，如需改名请只修改昵称。</p>
+        <van-field v-model="userForm.nickname" class="form-field" label="昵称" placeholder="显示名称" />
+        <van-field
+          v-model="userForm.publicName"
+          class="form-field"
+          label="公开昵称"
+          maxlength="20"
+          placeholder="公共菜谱里的作者名，留空显示厨友XXXX"
+        />
+        <van-field v-model="userForm.email" class="form-field" label="邮箱" placeholder="用于邮箱提醒" />
+        <label class="role-field">
+          <span>生日历法</span>
+          <select v-model="userForm.birthdayCalendar">
+            <option value="SOLAR">公历生日</option>
+            <option value="LUNAR">农历生日</option>
+          </select>
+        </label>
+        <van-field
+          v-if="userForm.birthdayCalendar === 'SOLAR'"
+          v-model="userForm.birthday"
+          class="form-field"
+          label="生日"
+          type="date"
+        />
+        <div v-else class="lunar-birthday-fields">
+          <label>
+            <span>出生年</span>
+            <input v-model.number="userForm.lunarBirthdayYear" type="number" min="1900" max="2100" />
+          </label>
+          <label>
+            <span>农历月</span>
+            <input v-model.number="userForm.lunarBirthdayMonth" type="number" min="1" max="12" />
+          </label>
+          <label>
+            <span>农历日</span>
+            <input v-model.number="userForm.lunarBirthdayDay" type="number" min="1" max="30" />
+          </label>
+          <label class="lunar-leap">
+            <input v-model="userForm.lunarBirthdayLeap" type="checkbox" />
+            闰月
+          </label>
+        </div>
+        <van-field
+          v-model="userForm.password"
+          class="form-field"
+          label="密码"
+          type="password"
+          :placeholder="isEditingUser ? '不填则不修改密码' : '请输入密码'"
+        />
+        <label class="role-field">
+          <span>家庭角色</span>
+          <select
+            v-model="userForm.memberRole"
+            :disabled="editingBuiltinAdmin || editingMemberIsOwner || !isHouseholdOwner"
+          >
+            <option value="member">家人（记录菜谱、收藏、待办）</option>
+            <option value="admin">家庭管理员（可管理家人与邀请）</option>
+          </select>
+        </label>
+        <p v-if="!isHouseholdOwner && !editingMemberIsOwner" class="builtin-hint">
+          家庭角色由家庭所有者调整，你可以管理家人资料与邀请。
+        </p>
+        <label class="role-field">
+          <span>通知偏好</span>
+          <select v-model="userForm.notificationPreference">
+            <option value="site">仅站内</option>
+            <option value="email">仅邮箱</option>
+            <option value="site,email">站内+邮箱</option>
+            <option value="site,push">站内+App</option>
+            <option value="site,email,push">站内+邮箱+App</option>
+          </select>
+        </label>
+        <van-field v-model="userForm.remark" class="form-field" label="备注" placeholder="家庭称呼、提醒备注" />
+        <div class="avatar-field">
+          <span>头像</span>
+          <div class="avatar-picker">
+            <button
+              v-for="path in DEFAULT_AVATARS"
+              :key="path"
+              type="button"
+              class="avatar-option"
+              :class="{ active: userForm.avatar === path }"
+              @click="selectAvatar(path)"
+            >
+              <img :src="path" alt="" />
+            </button>
+          </div>
+        </div>
+        <div class="form-actions">
+          <van-button type="warning" round size="small" :loading="savingUser" @click="saveUser">
+            {{ isEditingUser ? '保存成员' : '新增成员' }}
+          </van-button>
+          <van-button round size="small" @click="resetUserForm">取消</van-button>
+        </div>
+      </div>
+    </van-popup>
+
     <section v-if="userStore.isLogin" class="form-card">
       <h2>家庭工具</h2>
       <button type="button" class="tool-entry" @click="router.push('/expenses')">
@@ -883,112 +984,7 @@ onMounted(() => {
         </button>
       </header>
 
-      <div ref="memberPanelBodyRef" class="member-panel-body">
-        <div v-if="showMemberForm" class="member-form-card">
-          <van-field
-            v-model="userForm.username"
-            class="form-field"
-            label="用户名"
-            placeholder="用户名唯一"
-            :disabled="editingBuiltinAdmin"
-          />
-          <p v-if="editingBuiltinAdmin" class="builtin-hint">内置管理员用户名固定为「王师傅」，如需改名请只修改昵称。</p>
-          <van-field v-model="userForm.nickname" class="form-field" label="昵称" placeholder="显示名称" />
-          <van-field
-            v-model="userForm.publicName"
-            class="form-field"
-            label="公开昵称"
-            maxlength="20"
-            placeholder="公共菜谱里的作者名，留空显示厨友XXXX"
-          />
-          <van-field v-model="userForm.email" class="form-field" label="邮箱" placeholder="用于邮箱提醒" />
-          <label class="role-field">
-            <span>生日历法</span>
-            <select v-model="userForm.birthdayCalendar">
-              <option value="SOLAR">公历生日</option>
-              <option value="LUNAR">农历生日</option>
-            </select>
-          </label>
-          <van-field
-            v-if="userForm.birthdayCalendar === 'SOLAR'"
-            v-model="userForm.birthday"
-            class="form-field"
-            label="生日"
-            type="date"
-          />
-          <div v-else class="lunar-birthday-fields">
-            <label>
-              <span>出生年</span>
-              <input v-model.number="userForm.lunarBirthdayYear" type="number" min="1900" max="2100" />
-            </label>
-            <label>
-              <span>农历月</span>
-              <input v-model.number="userForm.lunarBirthdayMonth" type="number" min="1" max="12" />
-            </label>
-            <label>
-              <span>农历日</span>
-              <input v-model.number="userForm.lunarBirthdayDay" type="number" min="1" max="30" />
-            </label>
-            <label class="lunar-leap">
-              <input v-model="userForm.lunarBirthdayLeap" type="checkbox" />
-              闰月
-            </label>
-          </div>
-          <van-field
-            v-model="userForm.password"
-            class="form-field"
-            label="密码"
-            type="password"
-            :placeholder="isEditingUser ? '不填则不修改密码' : '请输入密码'"
-          />
-          <label class="role-field">
-            <span>家庭角色</span>
-            <select
-              v-model="userForm.memberRole"
-              :disabled="editingBuiltinAdmin || editingMemberIsOwner || !isHouseholdOwner"
-            >
-              <option value="member">家人（记录菜谱、收藏、待办）</option>
-              <option value="admin">家庭管理员（可管理家人与邀请）</option>
-            </select>
-          </label>
-          <p v-if="!isHouseholdOwner && !editingMemberIsOwner" class="builtin-hint">
-            家庭角色由家庭所有者调整，你可以管理家人资料与邀请。
-          </p>
-          <label class="role-field">
-            <span>通知偏好</span>
-            <select v-model="userForm.notificationPreference">
-              <option value="site">仅站内</option>
-              <option value="email">仅邮箱</option>
-              <option value="site,email">站内+邮箱</option>
-              <option value="site,push">站内+App</option>
-              <option value="site,email,push">站内+邮箱+App</option>
-            </select>
-          </label>
-          <van-field v-model="userForm.remark" class="form-field" label="备注" placeholder="家庭称呼、提醒备注" />
-          <div class="avatar-field">
-            <span>头像</span>
-            <div class="avatar-picker">
-              <button
-                v-for="path in DEFAULT_AVATARS"
-                :key="path"
-                type="button"
-                class="avatar-option"
-                :class="{ active: userForm.avatar === path }"
-                @click="selectAvatar(path)"
-              >
-                <img :src="path" alt="" />
-              </button>
-            </div>
-          </div>
-          <div class="form-actions">
-            <van-button type="warning" round size="small" :loading="savingUser" @click="saveUser">
-              {{ isEditingUser ? '保存成员' : '新增成员' }}
-            </van-button>
-            <van-button round size="small" @click="resetUserForm">取消</van-button>
-          </div>
-        </div>
-
-        <template v-if="!showMemberForm">
+      <div class="member-panel-body">
           <van-empty v-if="users.length === 0" description="暂无用户数据" />
           <div v-else class="member-list">
           <article
@@ -1072,7 +1068,6 @@ onMounted(() => {
             </div>
           </article>
           </div>
-        </template>
 
         <footer class="member-footer">
           <van-icon name="shield-o" size="16" />
@@ -1494,13 +1489,32 @@ h2 {
   background: rgba(249, 115, 22, 0.35);
 }
 
-.member-form-card {
-  margin-bottom: 14px;
-  padding: 14px;
-  padding-bottom: 18px;
-  border-radius: 18px;
-  background: #fff;
-  border: 1px solid var(--app-border);
+.member-form-panel {
+  padding: 16px 16px calc(20px + var(--safe-area-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.member-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.member-form-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.member-form-head button {
+  border: 0;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 13px;
 }
 
 .member-list {

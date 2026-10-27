@@ -76,6 +76,9 @@ public class Recipe {
     @TableField(exist = false)
     private Boolean liked;
 
+    @TableField(exist = false)
+    private Long favoriteCount;
+
     /*
      * 分类id
      */

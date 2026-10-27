@@ -10,6 +10,7 @@ import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.config.TenantContext;
 import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.favorite.mapper.UserFavoriteMapper;
+import com.wgxhl.recipe.favorite.mapper.FavoriteCount;
 import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.image.dto.RecipeImageBatchDTO;
 import com.wgxhl.recipe.image.service.RecipeImageService;
@@ -169,6 +170,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
 
         Page<Recipe> result = page(page, wrapper);
         fillLiked(result.getRecords(), currentUserId);
+        fillFavoriteCounts(result.getRecords());
         maskPublicAuthorNames(result.getRecords());
         return ApiResponse.success(result);
     }
@@ -236,6 +238,15 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         return "厨友" + suffix;
     }
 
+    private void fillFavoriteCounts(List<Recipe> records) {
+        if (records == null || records.isEmpty()) return;
+        List<String> ids = records.stream().map(Recipe::getId).filter(StringUtils::hasText).collect(Collectors.toList());
+        if (ids.isEmpty()) return;
+        Map<String, Long> counts = userFavoriteMapper.countByRecipeIds(ids).stream()
+                .collect(Collectors.toMap(FavoriteCount::getRecipeId, FavoriteCount::getFavoriteCount));
+        records.forEach(recipe -> recipe.setFavoriteCount(counts.getOrDefault(recipe.getId(), 0L)));
+    }
+
     private void fillLiked(List<Recipe> records, String currentUserId) {
         if (records == null || records.isEmpty() || !StringUtils.hasText(currentUserId)) {
             return;
@@ -285,6 +296,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             return ApiResponse.fail("这道菜已被下架");
         }
         recipe.setLiked(isLikedBy(id, UserContext.requireUserId()));
+        fillFavoriteCounts(Collections.singletonList(recipe));
         if ("public".equals(recipe.getVisibility())) {
             recipe.setOwnerName(resolvePublicAuthorName(recipe.getOwnerUserId()));
         }

@@ -42,7 +42,7 @@ const inviteForm = reactive({
 const canSendCode = computed(() => countdown.value <= 0 && !sending.value)
 
 function isValidEmail(email) {
-  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
+  return email.length <= 200 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
 }
 
 function isValidUsername(username) {
@@ -211,7 +211,7 @@ function goLogin() {
       </div>
 
       <section v-if="mode === 'email'" class="register-card">
-        <van-field v-model="emailForm.email" label="邮箱" placeholder="用于接收验证码" />
+        <van-field v-model="emailForm.email" type="email" maxlength="200" label="邮箱" placeholder="用于接收验证码" />
         <div class="code-row">
           <van-field v-model="emailForm.code" label="验证码" placeholder="6 位验证码" maxlength="6" />
           <van-button

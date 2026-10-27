@@ -100,6 +100,10 @@ async function toggleFavoriteSafe() {
       closeToast()
       showSuccessToast({ message: '收藏成功', duration: 1400 })
     }
+    getRecipeDetail(route.params.id).then((res) => {
+      if (detail.value?.recipe) detail.value.recipe.favoriteCount = Number(res.data?.recipe?.favoriteCount || 0)
+    }).catch(() => {})
+    markDataStale(DATA_SCOPE.recipes)
   } catch (error) {
     closeToast()
     showFailToast({ message: error.message || '收藏操作失败', duration: 1800 })

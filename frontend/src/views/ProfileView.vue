@@ -326,6 +326,11 @@ async function saveUser() {
     showActionStatus('请输入用户名', 'error')
     return
   }
+  const email = userForm.email.trim()
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    showActionStatus('请输入有效的邮箱地址', 'error')
+    return
+  }
   if (!isEditingUser.value && !userForm.password.trim()) {
     showActionStatus('新增用户需要设置密码', 'error')
     return
@@ -861,7 +866,7 @@ onMounted(() => {
           maxlength="20"
           placeholder="公共菜谱里的作者名，留空显示厨友XXXX"
         />
-        <van-field v-model="userForm.email" class="form-field" label="邮箱" placeholder="用于邮箱提醒" />
+        <van-field v-model="userForm.email" class="form-field" type="email" label="邮箱" maxlength="200" placeholder="选填，用于登录和提醒" />
         <label class="role-field">
           <span>生日历法</span>
           <select v-model="userForm.birthdayCalendar">

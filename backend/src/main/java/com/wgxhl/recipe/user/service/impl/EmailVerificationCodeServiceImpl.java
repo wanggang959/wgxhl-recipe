@@ -28,7 +28,6 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
 
     private static final Logger log = LoggerFactory.getLogger(EmailVerificationCodeServiceImpl.class);
     private static final String PURPOSE_REGISTER = "REGISTER";
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final int CODE_EXPIRE_MINUTES = 10;
     private static final int RESEND_SECONDS = 60;
     private static final int HOURLY_LIMIT = 5;
@@ -49,12 +48,10 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
     @Override
     public ApiResponse<Void> sendRegisterCode(String email) {
         String target = normalizeEmail(email);
-        if (!EMAIL_PATTERN.matcher(target).matches()) {
+        if (!com.wgxhl.recipe.user.util.EmailAddress.isValid(target)) {
             return ApiResponse.fail("请输入有效的邮箱地址");
         }
-        Long existing = appUserMapper.selectCount(new LambdaQueryWrapper<AppUser>()
-                .eq(AppUser::getEmail, target));
-        if (existing != null && existing > 0) {
+        if (appUserMapper.countEmailUsedByAnotherUser(target, null) > 0) {
             return ApiResponse.fail("该邮箱已注册，请直接登录");
         }
         LocalDateTime now = LocalDateTime.now();

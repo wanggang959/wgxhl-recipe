@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
-import { pageRecipe, toggleRecipeLike } from '../api/recipe'
+import { getRecipeDetail, pageRecipe, toggleRecipeLike } from '../api/recipe'
 import { checkWantedRecipe, createWantedRecipe } from '../api/want'
 import CategoryTabs from '../components/CategoryTabs.vue'
 import ActionIcon from '../components/ActionIcon.vue'
@@ -455,6 +455,11 @@ async function toggleFavoriteSafe(item) {
       closeToast()
       showSuccessToast({ message: '收藏成功', duration: 1400 })
     }
+    getRecipeDetail(item.id).then((res) => {
+      item.favoriteCount = Number(res.data?.recipe?.favoriteCount || 0)
+      saveRecipeListCache()
+    }).catch(() => {})
+    markDataStale(DATA_SCOPE.recipes)
   } catch (error) {
     closeToast()
     showFailToast({ message: error.message || '收藏操作失败', duration: 1800 })
@@ -684,7 +689,7 @@ function submitCustomWantDate() {
 
     <form v-if="!isTodayMode" class="search-card" @submit.prevent="applySearch">
       <van-icon name="search" size="18" />
-      <input v-model="filter.recipeName" placeholder="搜索菜名、作者用户名" />
+      <input v-model="filter.recipeName" :placeholder="isPublicScope ? '搜索菜名' : '搜索菜名、作者用户名'" />
       <button type="submit">搜索</button>
     </form>
 

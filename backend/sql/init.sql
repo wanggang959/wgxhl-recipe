@@ -288,7 +288,8 @@ create table app_user
     update_time datetime comment '更新时间',
 
     primary key (id),
-    unique key uk_app_user_username (username)
+    unique key uk_app_user_username (username),
+    unique key uk_app_user_email ((nullif(lower(trim(email)), '')))
 )
 engine=innodb
 default charset=utf8mb4

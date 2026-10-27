@@ -32,7 +32,8 @@ const previewAvatarSrc = computed(() => {
 
 async function fetchUsernamePreview(username) {
   const name = username.trim()
-  if (!name) {
+  if (!name || name.includes('@')) {
+    previewRequestId++
     previewUser.value = null
     return
   }
@@ -52,7 +53,8 @@ watch(
   (value) => {
     window.clearTimeout(previewTimer)
     const name = value.trim()
-    if (!name) {
+    if (!name || name.includes('@')) {
+      previewRequestId++
       previewUser.value = null
       return
     }
@@ -78,7 +80,7 @@ function getRedirectTarget() {
 
 async function submit() {
   if (!form.username.trim() || !form.password.trim()) {
-    showStatus('请输入用户名和密码', 'error')
+    showStatus('请输入用户名或邮箱和密码', 'error')
     return
   }
 
@@ -181,7 +183,7 @@ function showStatus(message, type = 'success') {
           <div class="field-group">
             <label for="login-username">
               <van-icon name="contact-o" />
-              用户名
+              用户名或邮箱
             </label>
             <div class="input-shell username-shell" :class="{ 'has-avatar': previewAvatarSrc }">
               <input
@@ -189,7 +191,7 @@ function showStatus(message, type = 'success') {
                 v-model="form.username"
                 class="native-input"
                 :class="{ 'with-avatar': previewAvatarSrc }"
-                placeholder="请输入用户名"
+                placeholder="请输入用户名或邮箱"
                 autocomplete="username"
               >
               <div v-if="previewAvatarSrc" class="username-avatar" aria-hidden="true">

@@ -27,10 +27,13 @@ import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.AppUserService;
 import com.wgxhl.recipe.user.service.LoginAttemptService;
 import com.wgxhl.recipe.user.util.DefaultAvatars;
+import com.wgxhl.recipe.user.util.EmailAddress;
 import com.wgxhl.recipe.user.util.PasswordUtil;
 import com.wgxhl.recipe.want.service.UserWantedRecipeService;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
@@ -328,6 +331,15 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (lambdaQuery().eq(AppUser::getUsername, entity.getUsername()).exists()) {
             return ApiResponse.fail("用户名已存在");
         }
+        if (entity.getEmail() != null) {
+            entity.setEmail(entity.getEmail().trim().toLowerCase(java.util.Locale.ROOT));
+            if (!entity.getEmail().isEmpty() && !EmailAddress.isValid(entity.getEmail())) {
+                return ApiResponse.fail("请输入有效的邮箱地址");
+            }
+            if (!entity.getEmail().isEmpty() && baseMapper.countEmailUsedByAnotherUser(entity.getEmail(), null) > 0) {
+                return ApiResponse.fail("该邮箱已被其他账号使用");
+            }
+        }
         if (StringUtils.hasText(entity.getAvatar()) && !DefaultAvatars.isAllowed(entity.getAvatar())) {
             return ApiResponse.fail("头像地址无效，请从默认头像中选择");
         }
@@ -343,7 +355,11 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (StringUtils.hasText(entity.getPassword())) {
             entity.setPassword(PasswordUtil.hash(entity.getPassword()));
         }
-        save(entity);
+        try {
+            save(entity);
+        } catch (DuplicateKeyException ex) {
+            return ApiResponse.fail("用户名或邮箱已被使用");
+        }
         HouseholdMember member = new HouseholdMember();
         member.setHouseholdId(TenantContext.require());
         member.setUserId(entity.getId());
@@ -356,6 +372,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<Void> update(AppUser entity) {
         if (!StringUtils.hasText(entity.getId())) {
             return ApiResponse.fail("用户id不能为空");
@@ -372,6 +389,15 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         boolean manager = UserContext.isHouseholdManager();
         if (!self && !manager) {
             return ApiResponse.fail(403, "只有家庭管理员可以修改其他家人的资料");
+        }
+        if (entity.getEmail() != null) {
+            entity.setEmail(entity.getEmail().trim().toLowerCase(java.util.Locale.ROOT));
+            if (!entity.getEmail().isEmpty() && !EmailAddress.isValid(entity.getEmail())) {
+                return ApiResponse.fail("请输入有效的邮箱地址");
+            }
+            if (!entity.getEmail().isEmpty() && baseMapper.countEmailUsedByAnotherUser(entity.getEmail(), entity.getId()) > 0) {
+                return ApiResponse.fail("该邮箱已被其他账号使用");
+            }
         }
         ApiResponse<Void> roleResult = applyMemberRoleChange(entity, membership, manager);
         if (roleResult != null) {
@@ -435,7 +461,12 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (StringUtils.hasText(entity.getPassword())) {
             entity.setPassword(PasswordUtil.hash(entity.getPassword()));
         }
-        updateById(entity);
+        try {
+            updateById(entity);
+        } catch (DuplicateKeyException ex) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return ApiResponse.fail("用户名或邮箱已被使用");
+        }
         todoService.syncBirthdayTodo(super.getById(entity.getId()));
         return ApiResponse.success("更新成功", null);
     }
@@ -515,20 +546,29 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     @Override
     public ApiResponse<AppUser> login(UserLoginDTO dto, String clientIp) {
         if (dto == null || !StringUtils.hasText(dto.getUsername()) || !StringUtils.hasText(dto.getPassword())) {
-            return ApiResponse.fail("用户名或密码错误");
+            return ApiResponse.fail("用户名、邮箱或密码错误");
         }
-        String lockedMessage = loginAttemptService.lockedMessage(dto.getUsername(), clientIp);
+        String identifier = dto.getUsername().trim();
+        String attemptKey = "login:" + identifier;
+        String lockedMessage = loginAttemptService.lockedMessage(attemptKey, clientIp);
         if (lockedMessage != null) {
             return ApiResponse.fail(429, lockedMessage);
         }
-        AppUser user = lambdaQuery()
-                .eq(AppUser::getUsername, dto.getUsername())
-                .one();
-        if (user == null || !PasswordUtil.matches(dto.getPassword(), user.getPassword())) {
-            loginAttemptService.onFailure(dto.getUsername(), clientIp);
-            return ApiResponse.fail("用户名或密码错误");
+        List<AppUser> matches = baseMapper.findLoginByUsername(identifier);
+        if (matches.isEmpty() && identifier.contains("@")) {
+            matches = baseMapper.findLoginByEmail(identifier);
         }
-        loginAttemptService.onSuccess(dto.getUsername(), clientIp);
+        AppUser user = matches.size() == 1 ? matches.get(0) : null;
+        if (user != null) {
+            attemptKey = "user:" + user.getId();
+            lockedMessage = loginAttemptService.lockedMessage(attemptKey, clientIp);
+            if (lockedMessage != null) return ApiResponse.fail(429, lockedMessage);
+        }
+        if (user == null || !PasswordUtil.matches(dto.getPassword(), user.getPassword())) {
+            loginAttemptService.onFailure(attemptKey, clientIp);
+            return ApiResponse.fail("用户名、邮箱或密码错误");
+        }
+        loginAttemptService.onSuccess(attemptKey, clientIp);
         if (!STATUS_NORMAL.equals(user.getStatus())) {
             return ApiResponse.fail(disabledLoginMessage(user));
         }

@@ -25,6 +25,7 @@ import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.vo.UserPreviewVO;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.AppUserService;
+import com.wgxhl.recipe.user.service.LoginAttemptService;
 import com.wgxhl.recipe.user.util.DefaultAvatars;
 import com.wgxhl.recipe.user.util.PasswordUtil;
 import com.wgxhl.recipe.want.service.UserWantedRecipeService;
@@ -69,6 +70,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     private final JwtAuthUtil jwtAuthUtil;
     private final HouseholdMemberService householdMemberService;
     private final HouseholdService householdService;
+    private final LoginAttemptService loginAttemptService;
 
     public AppUserServiceImpl(UserFavoriteService userFavoriteService,
                               RecipeViewRecordService recipeViewRecordService,
@@ -78,7 +80,8 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                               TodoOwnerMapper todoOwnerMapper,
                               JwtAuthUtil jwtAuthUtil,
                               HouseholdMemberService householdMemberService,
-                              HouseholdService householdService) {
+                              HouseholdService householdService,
+                              LoginAttemptService loginAttemptService) {
         this.userFavoriteService = userFavoriteService;
         this.recipeViewRecordService = recipeViewRecordService;
         this.userWantedRecipeService = userWantedRecipeService;
@@ -88,6 +91,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         this.jwtAuthUtil = jwtAuthUtil;
         this.householdMemberService = householdMemberService;
         this.householdService = householdService;
+        this.loginAttemptService = loginAttemptService;
     }
 
     @PostConstruct
@@ -506,12 +510,18 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (dto == null || !StringUtils.hasText(dto.getUsername()) || !StringUtils.hasText(dto.getPassword())) {
             return ApiResponse.fail("用户名或密码错误");
         }
+        String lockedMessage = loginAttemptService.lockedMessage(dto.getUsername());
+        if (lockedMessage != null) {
+            return ApiResponse.fail(429, lockedMessage);
+        }
         AppUser user = lambdaQuery()
                 .eq(AppUser::getUsername, dto.getUsername())
                 .one();
         if (user == null || !PasswordUtil.matches(dto.getPassword(), user.getPassword())) {
+            loginAttemptService.onFailure(dto.getUsername());
             return ApiResponse.fail("用户名或密码错误");
         }
+        loginAttemptService.onSuccess(dto.getUsername());
         if (!STATUS_NORMAL.equals(user.getStatus())) {
             return ApiResponse.fail(disabledLoginMessage(user));
         }

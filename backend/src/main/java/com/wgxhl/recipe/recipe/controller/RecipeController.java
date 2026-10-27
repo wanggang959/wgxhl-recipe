@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.common.dto.IdDTO;
 import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
+import com.wgxhl.recipe.recipe.dto.RecipeBatchDTO;
 import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.dto.RecipeStatusDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 @RestController
 @RequestMapping("/recipe")
@@ -37,6 +39,11 @@ public class RecipeController {
     @PostMapping("/page")
     public ApiResponse<Page<Recipe>> page(@RequestBody RecipePageDTO dto) {
         return recipeService.page(dto);
+    }
+
+    @PostMapping("/batch")
+    public ApiResponse<List<Recipe>> batch(@RequestBody RecipeBatchDTO dto) {
+        return recipeService.batch(dto.getIds());
     }
 
     /***

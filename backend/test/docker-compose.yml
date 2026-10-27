@@ -1,0 +1,30 @@
+services:
+  mysql:
+    image: mysql:8.4.9
+    environment:
+      MYSQL_ROOT_PASSWORD: local-test-root-only
+      MYSQL_DATABASE: recipe
+      MYSQL_USER: recipe_test
+      MYSQL_PASSWORD: local-test-only
+    ports:
+      - "127.0.0.1:13307:3306"
+    volumes:
+      - recipe-test-mysql-data:/var/lib/mysql
+      - ../sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ../sql/add_household.sql:/docker-entrypoint-initdb.d/02-household.sql:ro
+      - ../sql/person_owned_recipe.sql:/docker-entrypoint-initdb.d/03-person.sql:ro
+      - ../sql/add_household_invite.sql:/docker-entrypoint-initdb.d/04-invite.sql:ro
+      - ../sql/add_todo_creator.sql:/docker-entrypoint-initdb.d/05-todo.sql:ro
+      - ../sql/add_email_verification_code.sql:/docker-entrypoint-initdb.d/06-email.sql:ro
+      - ../sql/add_recipe_offline_and_active_household.sql:/docker-entrypoint-initdb.d/07-household-active.sql:ro
+      - ../sql/add_recipe_like_and_public.sql:/docker-entrypoint-initdb.d/08-like.sql:ro
+      - ../sql/add_user_public_name.sql:/docker-entrypoint-initdb.d/09-public-name.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u recipe_test -plocal-test-only --silent"]
+      interval: 5s
+      timeout: 3s
+      start_period: 3m
+      retries: 30
+
+volumes:
+  recipe-test-mysql-data:

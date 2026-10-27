@@ -11,6 +11,7 @@ import com.wgxhl.recipe.config.TenantContext;
 import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.favorite.mapper.UserFavoriteMapper;
 import com.wgxhl.recipe.favorite.mapper.FavoriteCount;
+import com.wgxhl.recipe.favorite.entity.UserFavorite;
 import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.image.dto.RecipeImageBatchDTO;
 import com.wgxhl.recipe.image.service.RecipeImageService;
@@ -41,6 +42,7 @@ import com.wgxhl.recipe.step.service.RecipeStepService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
+import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -171,8 +173,46 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         Page<Recipe> result = page(page, wrapper);
         fillLiked(result.getRecords(), currentUserId);
         fillFavoriteCounts(result.getRecords());
+        fillPersonalStates(result.getRecords(), currentUserId);
         maskPublicAuthorNames(result.getRecords());
         return ApiResponse.success(result);
+    }
+
+    @Override
+    public ApiResponse<List<Recipe>> batch(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return ApiResponse.success(Collections.emptyList());
+        if (ids.size() > 200) return ApiResponse.fail("每次最多查询200道菜谱");
+        List<String> validIds = ids.stream().filter(StringUtils::hasText).distinct().collect(Collectors.toList());
+        if (validIds.isEmpty()) return ApiResponse.success(Collections.emptyList());
+        String userId = UserContext.requireUserId();
+        Set<String> memberIds = new HashSet<>(householdMemberService.listUserIds(TenantContext.require()));
+        List<Recipe> recipes = baseMapper.selectBatchIds(validIds).stream()
+                .filter(recipe -> userId.equals(recipe.getOwnerUserId())
+                        || "public".equals(recipe.getVisibility())
+                        || ("family".equals(recipe.getVisibility()) && memberIds.contains(recipe.getOwnerUserId())))
+                .filter(recipe -> !STATUS_OFF.equals(recipe.getStatus()) || canViewOffline(recipe))
+                .collect(Collectors.toList());
+        fillLiked(recipes, userId);
+        fillFavoriteCounts(recipes);
+        fillPersonalStates(recipes, userId);
+        maskPublicAuthorNames(recipes);
+        return ApiResponse.success(recipes);
+    }
+
+    private void fillPersonalStates(List<Recipe> records, String userId) {
+        if (records == null || records.isEmpty()) return;
+        List<String> ids = records.stream().map(Recipe::getId).filter(StringUtils::hasText).collect(Collectors.toList());
+        if (ids.isEmpty()) return;
+        Set<String> favorites = userFavoriteMapper.selectList(new LambdaQueryWrapper<UserFavorite>()
+                .eq(UserFavorite::getUserId, userId).in(UserFavorite::getRecipeId, ids))
+                .stream().map(UserFavorite::getRecipeId).collect(Collectors.toSet());
+        Set<String> wanted = userWantedRecipeMapper.selectList(new LambdaQueryWrapper<UserWantedRecipe>()
+                .eq(UserWantedRecipe::getUserId, userId).in(UserWantedRecipe::getRecipeId, ids))
+                .stream().map(UserWantedRecipe::getRecipeId).collect(Collectors.toSet());
+        records.forEach(recipe -> {
+            recipe.setFavorite(favorites.contains(recipe.getId()));
+            recipe.setWanted(wanted.contains(recipe.getId()));
+        });
     }
 
     private void applySort(LambdaQueryWrapper<Recipe> wrapper, String sort) {
@@ -309,7 +349,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("菜谱id不能为空");
         }
-        Recipe recipe = super.getById(id);
+        Recipe recipe = baseMapper.lockById(id);
         if (recipe == null || !canView(recipe)) {
             return ApiResponse.fail("菜谱不存在");
         }

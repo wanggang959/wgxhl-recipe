@@ -9,10 +9,13 @@ import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
 import com.wgxhl.recipe.recipe.vo.RecipeLikeStateVO;
 import com.wgxhl.recipe.user.entity.AppUser;
+import java.util.List;
 
 public interface RecipeService extends IService<Recipe> {
 
     ApiResponse<Page<Recipe>> page(RecipePageDTO dto);
+
+    ApiResponse<List<Recipe>> batch(List<String> ids);
 
     ApiResponse<RecipeDetailVO> getDetailById(String id);
 

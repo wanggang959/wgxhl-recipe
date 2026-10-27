@@ -150,7 +150,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         if (PUBLIC_USER_PATHS.contains(path)) {
             return true;
         }
-        if ("/user/members".equals(path) || "/push/status".equals(path)
+        if ("/user/members".equals(path) || "/push/status".equals(path) || "/recipe/batch".equals(path)
                 || "/household/me".equals(path) || "/household/list".equals(path)) {
             return true;
         }

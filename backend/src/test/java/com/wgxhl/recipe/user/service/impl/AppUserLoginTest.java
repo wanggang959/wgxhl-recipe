@@ -146,4 +146,24 @@ class AppUserLoginTest {
         assertFalse(EmailAddress.isValid("person name@example.com"));
         assertFalse(EmailAddress.isValid(new String(new char[201]).replace('\0', 'a') + "@example.com"));
     }
+
+    @Test
+    void invalidProfileDoesNotChangeMemberRole() {
+        AppUser owner = new AppUser();
+        owner.setId("owner-1");
+        UserContext.set(owner, UserContext.MEMBER_OWNER);
+        TenantContext.set("home-1");
+        HouseholdMember member = new HouseholdMember();
+        member.setId("membership-1");
+        member.setUserId("user-1");
+        member.setMemberRole("member");
+        when(mapper.selectById("user-1")).thenReturn(user);
+        when(members.find("home-1", "user-1")).thenReturn(member);
+        AppUser edit = new AppUser();
+        edit.setId("user-1");
+        edit.setMemberRole("admin");
+        edit.setPublicName("123456789012345678901");
+        assertEquals(500, service.update(edit).getStatus());
+        verify(members, never()).updateById(any(HouseholdMember.class));
+    }
 }

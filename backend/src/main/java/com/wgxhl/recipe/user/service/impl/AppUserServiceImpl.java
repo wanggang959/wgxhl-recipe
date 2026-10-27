@@ -399,10 +399,6 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 return ApiResponse.fail("该邮箱已被其他账号使用");
             }
         }
-        ApiResponse<Void> roleResult = applyMemberRoleChange(entity, membership, manager);
-        if (roleResult != null) {
-            return roleResult;
-        }
         if (!UserContext.isSuperAdmin()) {
             entity.setUserRole(existing.getUserRole());
             entity.setStatus(existing.getStatus());
@@ -460,6 +456,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         }
         if (StringUtils.hasText(entity.getPassword())) {
             entity.setPassword(PasswordUtil.hash(entity.getPassword()));
+        }
+        ApiResponse<Void> roleResult = applyMemberRoleChange(entity, membership, manager);
+        if (roleResult != null) {
+            return roleResult;
         }
         try {
             updateById(entity);

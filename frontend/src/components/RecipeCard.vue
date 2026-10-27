@@ -29,9 +29,21 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  liked: {
+    type: Boolean,
+    default: false,
+  },
+  likeCount: {
+    type: Number,
+    default: 0,
+  },
+  showLikeButton: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['open', 'favorite', 'want', 'edit', 'delete'])
+const emit = defineEmits(['open', 'favorite', 'want', 'edit', 'delete', 'like'])
 
 const cover = computed(() => getRecipeImage(props.recipe.coverImage))
 const taste = computed(() => props.recipe.taste || '家常')
@@ -65,6 +77,20 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
       >
         <ActionIcon name="cart" :size="18" />
       </button>
+      <button
+        v-if="showLikeButton"
+        class="like-pill"
+        :class="{ active: liked }"
+        type="button"
+        @click.stop="emit('like', recipe)"
+      >
+        <van-icon :name="liked ? 'good-job' : 'good-job-o'" size="14" />
+        <span>{{ likeCount }}</span>
+      </button>
+      <span v-else-if="likeCount > 0" class="like-pill is-static">
+        <van-icon name="good-job-o" size="14" />
+        <span>{{ likeCount }}</span>
+      </span>
     </div>
     <div class="body">
       <div class="title-row">
@@ -76,10 +102,6 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
         <span class="tag">{{ taste }}</span>
         <span class="tag">{{ difficulty }}</span>
         <div class="tags-meta">
-          <span v-if="Number(recipe.likeCount) > 0" class="tag like">
-            <van-icon name="good-job-o" size="11" />
-            {{ recipe.likeCount }}
-          </span>
           <span v-if="ownerName" class="tag owner">{{ ownerName }}</span>
           <span class="tag version">{{ versionLabel }}</span>
         </div>
@@ -264,6 +286,34 @@ h3 {
   gap: 2px;
   background: #fff1e6;
   color: #c2410c;
+}
+
+.like-pill {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.55);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(6px);
+}
+
+.like-pill.active {
+  background: #fff;
+  color: #ea580c;
+}
+
+.like-pill.is-static {
+  pointer-events: none;
 }
 
 .tag.version {

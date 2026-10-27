@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
 import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
-import { pageRecipe } from '../api/recipe'
+import { pageRecipe, toggleRecipeLike } from '../api/recipe'
 import { checkWantedRecipe, createWantedRecipe } from '../api/want'
 import CategoryTabs from '../components/CategoryTabs.vue'
 import ActionIcon from '../components/ActionIcon.vue'
@@ -57,6 +57,7 @@ const favoriteMap = ref({ ...recipeListCache.favoriteMap })
 const favoritePendingMap = ref({})
 const wantedMap = ref({ ...recipeListCache.wantedMap })
 const wantedPendingMap = ref({})
+const likePendingMap = ref({})
 const saveMessage = ref('')
 const recommendMessage = ref('')
 const suggestRecipe = ref(recipeListCache.suggestRecipe)
@@ -407,6 +408,31 @@ async function toggleFavorite(item) {
   }
 }
 
+async function toggleLikeOnCard(item) {
+  if (!canMutate.value) {
+    closeToast()
+    showFailToast('请先登录后再点赞')
+    return
+  }
+  if (likePendingMap.value[item.id]) return
+  likePendingMap.value[item.id] = true
+  try {
+    const res = await toggleRecipeLike(item.id)
+    const target = list.value.find((entry) => entry.id === item.id)
+    if (target) {
+      target.liked = Boolean(res.data?.liked)
+      target.likeCount = Number(res.data?.likeCount || 0)
+    }
+    markDataStale(DATA_SCOPE.recipes)
+    saveRecipeListCache()
+  } catch (error) {
+    closeToast()
+    showFailToast({ message: error.message || '点赞失败', duration: 1800 })
+  } finally {
+    likePendingMap.value[item.id] = false
+  }
+}
+
 async function toggleFavoriteSafe(item) {
   if (!userStore.userId) {
     closeToast()
@@ -722,11 +748,15 @@ function submitCustomWantDate() {
           :recipe="item"
           :favorite="Boolean(favoriteMap[item.id])"
           :wanted="Boolean(wantedMap[item.id])"
+          :liked="Boolean(item.liked)"
+          :like-count="Number(item.likeCount || 0)"
+          :show-like-button="canMutate"
           :show-favorite-button="canMutate"
           :show-want-button="canMutate"
           @open="openDetail"
           @favorite="toggleFavoriteSafe"
           @want="openWantAction"
+          @like="toggleLikeOnCard"
         />
       </div>
       <EmptyState

@@ -277,8 +277,8 @@ const isOffline = computed(() => recipe.value.status === '下架')
 
 .summary {
   position: relative;
-  margin-top: -28px;
-  padding: 18px 14px 14px;
+  margin-top: 0;
+  padding: 16px 14px 14px;
   border-radius: 22px 22px 0 0;
   background: var(--app-surface);
 }

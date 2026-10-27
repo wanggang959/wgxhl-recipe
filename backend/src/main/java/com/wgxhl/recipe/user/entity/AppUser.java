@@ -107,6 +107,11 @@ public class AppUser {
     private String activeHouseholdId;
 
     /*
+     * 公共菜谱展示名，为空时显示「厨友+id后四位」
+     */
+    private String publicName;
+
+    /*
      * 登录令牌（非数据库字段）
      */
     @TableField(exist = false)

@@ -425,6 +425,13 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(entity.getAvatar())) {
             entity.setAvatar(existing.getAvatar());
         }
+        if (entity.getPublicName() != null) {
+            String publicName = entity.getPublicName().trim();
+            if (publicName.length() > 20) {
+                return ApiResponse.fail("公开昵称不能超过 20 个字符");
+            }
+            entity.setPublicName(publicName);
+        }
         if (StringUtils.hasText(entity.getPassword())) {
             entity.setPassword(PasswordUtil.hash(entity.getPassword()));
         }

@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -151,9 +152,11 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                             .eq(Recipe::getOwnerUserId, currentUserId));
         }
         wrapper.and(StringUtils.hasText(keyword), scope -> {
-                    scope.like(Recipe::getRecipeName, keyword)
-                            .or()
-                            .like(Recipe::getOwnerName, keyword);
+                    scope.like(Recipe::getRecipeName, keyword);
+                    // 公共列表里作者名是别名，按真名搜索不能命中
+                    if (!publicScope) {
+                        scope.or().like(Recipe::getOwnerName, keyword);
+                    }
                     if (!ownerUserIds.isEmpty()) {
                         scope.or().in(Recipe::getOwnerUserId, ownerUserIds);
                     }
@@ -166,6 +169,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
 
         Page<Recipe> result = page(page, wrapper);
         fillLiked(result.getRecords(), currentUserId);
+        maskPublicAuthorNames(result.getRecords());
         return ApiResponse.success(result);
     }
 
@@ -180,6 +184,56 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         } else {
             wrapper.orderByDesc(Recipe::getCreateTime);
         }
+    }
+
+    /**
+     * 公共菜谱的作者展示名：优先用「公开昵称」，未设置时用稳定的「厨友+id后四位」。
+     */
+    private void maskPublicAuthorNames(List<Recipe> records) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+        List<Recipe> publicRecipes = records.stream()
+                .filter(recipe -> "public".equals(recipe.getVisibility()))
+                .collect(Collectors.toList());
+        if (publicRecipes.isEmpty()) {
+            return;
+        }
+        Set<String> ownerIds = publicRecipes.stream()
+                .map(Recipe::getOwnerUserId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        Map<String, String> nameById = new HashMap<>();
+        if (!ownerIds.isEmpty()) {
+            appUserMapper.selectList(new LambdaQueryWrapper<AppUser>().in(AppUser::getId, ownerIds))
+                    .forEach(user -> nameById.put(user.getId(), publicAuthorName(user)));
+        }
+        publicRecipes.forEach(recipe -> recipe.setOwnerName(
+                nameById.getOrDefault(recipe.getOwnerUserId(), anonymousAuthorName(recipe.getOwnerUserId()))));
+    }
+
+    private String resolvePublicAuthorName(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return anonymousAuthorName(null);
+        }
+        return publicAuthorName(appUserMapper.selectById(userId));
+    }
+
+    private String publicAuthorName(AppUser user) {
+        if (user == null) {
+            return anonymousAuthorName(null);
+        }
+        if (StringUtils.hasText(user.getPublicName())) {
+            return user.getPublicName().trim();
+        }
+        return anonymousAuthorName(user.getId());
+    }
+
+    private String anonymousAuthorName(String userId) {
+        String suffix = StringUtils.hasText(userId) && userId.length() >= 4
+                ? userId.substring(userId.length() - 4).toUpperCase(Locale.ROOT)
+                : "0000";
+        return "厨友" + suffix;
     }
 
     private void fillLiked(List<Recipe> records, String currentUserId) {
@@ -231,6 +285,9 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             return ApiResponse.fail("这道菜已被下架");
         }
         recipe.setLiked(isLikedBy(id, UserContext.requireUserId()));
+        if ("public".equals(recipe.getVisibility())) {
+            recipe.setOwnerName(resolvePublicAuthorName(recipe.getOwnerUserId()));
+        }
         return ApiResponse.success(buildDetailVO(recipe));
     }
 

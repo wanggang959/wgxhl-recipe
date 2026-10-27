@@ -532,6 +532,7 @@ bootstrap()
             <input v-model="cookingMinutes" class="text-input" inputmode="numeric" placeholder="如：30" />
           </label>
         </div>
+        <p class="visibility-hint">选「所有人可见」时，其他家庭和游客看到的是你的公开昵称（未设置则显示「厨友XXXX」），可在「我的」里修改。</p>
         <label class="form-label">
           <span>人数</span>
           <select v-model="form.recipe.servingCount" class="select-input">
@@ -928,6 +929,13 @@ h2 {
   margin-bottom: 6px;
   color: var(--app-muted);
   font-size: 13px;
+}
+
+.visibility-hint {
+  margin: 6px 2px 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .select-input,

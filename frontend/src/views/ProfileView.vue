@@ -67,6 +67,7 @@ const userForm = reactive({
   id: '',
   username: '',
   nickname: '',
+  publicName: '',
   password: '',
   memberRole: 'member',
   avatar: '',
@@ -242,6 +243,7 @@ function resetUserForm() {
   userForm.id = ''
   userForm.username = ''
   userForm.nickname = ''
+  userForm.publicName = ''
   userForm.password = ''
   userForm.memberRole = 'member'
   userForm.avatar = ''
@@ -268,6 +270,7 @@ function beginAddUser() {
   userForm.id = ''
   userForm.username = ''
   userForm.nickname = ''
+  userForm.publicName = ''
   userForm.password = ''
   userForm.memberRole = 'member'
   userForm.avatar = DEFAULT_AVATARS[0]
@@ -289,6 +292,7 @@ function editUser(item) {
   userForm.id = item.id
   userForm.username = item.username
   userForm.nickname = item.nickname || ''
+  userForm.publicName = item.publicName || ''
   userForm.password = ''
   userForm.memberRole = item.memberRole === 'admin' ? 'admin' : 'member'
   userForm.avatar = item.avatar || pickDefaultAvatar(item.id)
@@ -890,6 +894,13 @@ onMounted(() => {
           />
           <p v-if="editingBuiltinAdmin" class="builtin-hint">内置管理员用户名固定为「王师傅」，如需改名请只修改昵称。</p>
           <van-field v-model="userForm.nickname" class="form-field" label="昵称" placeholder="显示名称" />
+          <van-field
+            v-model="userForm.publicName"
+            class="form-field"
+            label="公开昵称"
+            maxlength="20"
+            placeholder="公共菜谱里的作者名，留空显示厨友XXXX"
+          />
           <van-field v-model="userForm.email" class="form-field" label="邮箱" placeholder="用于邮箱提醒" />
           <label class="role-field">
             <span>生日历法</span>

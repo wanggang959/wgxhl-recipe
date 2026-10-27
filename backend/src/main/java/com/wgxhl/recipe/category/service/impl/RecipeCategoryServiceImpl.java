@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper, RecipeCategory>
@@ -59,6 +61,8 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
                 .orderByAsc(RecipeCategory::getSortNo)
                 .orderByDesc(RecipeCategory::getCreateTime)
                 .page(page);
+        List<RecipeCategory> records = result.getRecords();
+        records.sort(Comparator.comparingInt((RecipeCategory item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 

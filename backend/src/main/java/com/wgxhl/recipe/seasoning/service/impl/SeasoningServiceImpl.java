@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning>
@@ -57,6 +59,8 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
                 .like(StringUtils.hasText(dto.getSeasoningName()), Seasoning::getSeasoningName, dto.getSeasoningName())
                 .orderByDesc(Seasoning::getCreateTime)
                 .page(page);
+        List<Seasoning> records = result.getRecords();
+        records.sort(Comparator.comparingInt((Seasoning item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 

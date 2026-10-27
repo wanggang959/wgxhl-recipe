@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredient>
@@ -57,6 +59,8 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
                 .like(StringUtils.hasText(dto.getIngredientName()), Ingredient::getIngredientName, dto.getIngredientName())
                 .orderByDesc(Ingredient::getCreateTime)
                 .page(page);
+        List<Ingredient> records = result.getRecords();
+        records.sort(Comparator.comparingInt((Ingredient item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 

@@ -76,18 +76,17 @@ const isOffline = computed(() => recipe.value.status === '下架')
           <ActionIcon name="heart" :filled="favorite" :size="21" />
         </button>
       </div>
-      <div class="hero-meta-tags">
+    </div>
+
+    <section class="summary">
+      <div class="summary-tags">
         <span v-if="isOffline" class="detail-tag offline">已下架</span>
         <span v-if="recipe.visibility === 'public'" class="detail-tag public">公共</span>
         <span v-if="recipe.ownerName" class="detail-tag owner">{{ recipe.ownerName }}</span>
         <span class="detail-tag version">{{ formatRecipeVersionLabel(normalizeRecipeVersion(recipe.recipeVersion)) }}</span>
       </div>
-    </div>
-
-    <section class="summary">
-      <div class="title-line">
-        <h1>{{ recipe.recipeName }}</h1>
-        <div class="title-actions">
+      <h1>{{ recipe.recipeName }}</h1>
+      <div class="title-actions">
           <van-button
             v-if="showLike"
             class="title-action"
@@ -130,7 +129,6 @@ const isOffline = computed(() => recipe.value.status === '下架')
             删除
           </van-button>
         </div>
-      </div>
       <p v-if="recipe.recipeDesc">{{ recipe.recipeDesc }}</p>
       <div class="meta-grid">
         <div>
@@ -277,18 +275,6 @@ const isOffline = computed(() => recipe.value.status === '下架')
   justify-content: center;
 }
 
-.hero-meta-tags {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-  max-width: 58%;
-}
-
 .summary {
   position: relative;
   margin-top: -28px;
@@ -297,18 +283,19 @@ const isOffline = computed(() => recipe.value.status === '下架')
   background: var(--app-surface);
 }
 
-.title-line {
+.summary-tags {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .title-actions {
-  flex: 0 0 auto;
+  margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
 }
 
@@ -556,17 +543,5 @@ h2 {
   color: #7c5c46;
   line-height: 1.7;
   white-space: pre-wrap;
-}
-
-@media (max-width: 430px) {
-  .title-line {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .title-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 </style>

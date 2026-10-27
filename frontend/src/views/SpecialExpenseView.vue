@@ -108,6 +108,22 @@ const selectedProject = computed(() => projects.value.find((item) => item.id ===
 const isEditingProject = computed(() => Boolean(projectForm.id))
 const isEditingItem = computed(() => Boolean(itemForm.id))
 const canWrite = computed(() => userStore.isLogin && !userStore.isGuest)
+
+/** 与后端一致：专项创建人可操作，家庭管理员可代管 */
+function canManageProject(project) {
+  if (!canWrite.value || !project) return false
+  if (userStore.isHouseholdAdmin) return true
+  return project.createUserId === userStore.userId
+}
+
+/** 与后端一致：开支负责人、专项创建人可操作，家庭管理员可代管 */
+function canManageItem(item) {
+  if (!canWrite.value || !item) return false
+  if (userStore.isHouseholdAdmin) return true
+  if (item.ownerId && item.ownerId === userStore.userId) return true
+  const project = projects.value.find((entry) => entry.id === item.projectId)
+  return Boolean(project && project.createUserId === userStore.userId)
+}
 const hasActiveItemFilter = computed(() => Boolean(itemCategoryFilter.value || itemStatusFilter.value))
 const displayItems = computed(() => [...items.value].sort((left, right) => {
   const leftDone = left.status === 'DONE' ? 1 : 0
@@ -498,11 +514,11 @@ function dateText(value) {
             <h2>{{ selectedProject.projectName }}</h2>
           </div>
           <div class="summary-actions">
-            <button v-if="canWrite" type="button" title="编辑专项" aria-label="编辑专项" @click="openProjectForm(selectedProject)">
+            <button v-if="canManageProject(selectedProject)" type="button" title="编辑专项" aria-label="编辑专项" @click="openProjectForm(selectedProject)">
               <van-icon name="edit" />
             </button>
             <button
-              v-if="canWrite"
+              v-if="canManageProject(selectedProject)"
               type="button"
               :title="selectedProject.archived ? '恢复专项' : '归档专项'"
               :aria-label="selectedProject.archived ? '恢复专项' : '归档专项'"
@@ -611,7 +627,7 @@ function dateText(value) {
               <span v-if="item.purchaseChannel">{{ item.purchaseChannel }}</span>
             </div>
             <p v-if="item.remark" class="expense-remark">{{ item.remark }}</p>
-            <div v-if="canWrite" class="expense-actions">
+            <div v-if="canManageItem(item)" class="expense-actions">
               <button v-if="item.status !== 'DONE'" type="button" class="primary" @click="quickStatus(item, 'DONE')">
                 <van-icon name="success" />
                 完成

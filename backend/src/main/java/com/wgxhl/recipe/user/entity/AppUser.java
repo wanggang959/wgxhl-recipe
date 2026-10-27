@@ -102,6 +102,11 @@ public class AppUser {
     private LocalDateTime updateTime;
 
     /*
+     * 上次所在家庭，登录时优先恢复
+     */
+    private String activeHouseholdId;
+
+    /*
      * 登录令牌（非数据库字段）
      */
     @TableField(exist = false)
@@ -112,4 +117,22 @@ public class AppUser {
      */
     @TableField(exist = false)
     private Long recentTodoCount;
+
+    /*
+     * 当前家庭id（非数据库字段）
+     */
+    @TableField(exist = false)
+    private String householdId;
+
+    /*
+     * 当前家庭名称（非数据库字段）
+     */
+    @TableField(exist = false)
+    private String householdName;
+
+    /*
+     * 当前家庭角色（非数据库字段）
+     */
+    @TableField(exist = false)
+    private String memberRole;
 }

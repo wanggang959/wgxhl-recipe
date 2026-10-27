@@ -46,6 +46,7 @@ const form = reactive({
     servingCount: '',
     taste: '',
     status: '上架',
+    visibility: 'family',
     categoryId: '',
     remark: '',
   },
@@ -510,6 +511,13 @@ bootstrap()
           </label>
         </div>
         <div class="select-grid">
+          <label class="form-label">
+            <span>可见范围</span>
+            <select v-model="form.recipe.visibility" class="select-input">
+              <option value="family">家庭成员可见</option>
+              <option value="private">仅自己可见</option>
+            </select>
+          </label>
           <label class="form-label">
             <span>难度</span>
             <select v-model="form.recipe.difficulty" class="select-input">

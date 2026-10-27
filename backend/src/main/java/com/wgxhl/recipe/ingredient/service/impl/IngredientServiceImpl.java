@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.ingredient.dto.IngredientPageDTO;
 import com.wgxhl.recipe.ingredient.entity.Ingredient;
 import com.wgxhl.recipe.ingredient.mapper.IngredientMapper;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredient>
@@ -46,10 +49,18 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
     @Override
     public ApiResponse<Page<Ingredient>> page(IngredientPageDTO dto) {
         Page<Ingredient> page = new Page<>(dto.getCurrent(), dto.getSize());
+        String userId = UserContext.requireUserId();
         Page<Ingredient> result = lambdaQuery()
+                .and(wrapper -> wrapper
+                        .eq(Ingredient::getScope, "platform")
+                        .or(personal -> personal
+                                .eq(Ingredient::getScope, "personal")
+                                .eq(Ingredient::getOwnerUserId, userId)))
                 .like(StringUtils.hasText(dto.getIngredientName()), Ingredient::getIngredientName, dto.getIngredientName())
                 .orderByDesc(Ingredient::getCreateTime)
                 .page(page);
+        List<Ingredient> records = result.getRecords();
+        records.sort(Comparator.comparingInt((Ingredient item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 
@@ -59,7 +70,7 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
             return ApiResponse.fail("食材id不能为空");
         }
         Ingredient ingredient = super.getById(id);
-        if (ingredient == null) {
+        if (ingredient == null || !canView(ingredient)) {
             return ApiResponse.fail("食材不存在");
         }
         return ApiResponse.success(ingredient);
@@ -70,7 +81,11 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
         if (!StringUtils.hasText(entity.getIngredientName())) {
             return ApiResponse.fail("食材名称不能为空");
         }
-        if (lambdaQuery().eq(Ingredient::getIngredientName, entity.getIngredientName()).exists()) {
+        applyScope(entity);
+        if (lambdaQuery()
+                .eq(Ingredient::getOwnerUserId, entity.getOwnerUserId())
+                .eq(Ingredient::getIngredientName, entity.getIngredientName())
+                .exists()) {
             return ApiResponse.fail("食材名称已存在");
         }
         save(entity);
@@ -82,12 +97,19 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
         if (!StringUtils.hasText(entity.getId())) {
             return ApiResponse.fail("食材id不能为空");
         }
-        if (super.getById(entity.getId()) == null) {
+        Ingredient existing = super.getById(entity.getId());
+        if (existing == null) {
             return ApiResponse.fail("食材不存在");
         }
+        if (!canManage(existing)) {
+            return ApiResponse.fail(403, "只能编辑自己的食材");
+        }
+        entity.setScope(existing.getScope());
+        entity.setOwnerUserId(existing.getOwnerUserId());
         if (StringUtils.hasText(entity.getIngredientName())
                 && lambdaQuery()
                 .ne(Ingredient::getId, entity.getId())
+                .eq(Ingredient::getOwnerUserId, existing.getOwnerUserId())
                 .eq(Ingredient::getIngredientName, entity.getIngredientName())
                 .exists()) {
             return ApiResponse.fail("食材名称已存在");
@@ -101,8 +123,12 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("食材id不能为空");
         }
-        if (super.getById(id) == null) {
+        Ingredient existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("食材不存在");
+        }
+        if (!canManage(existing)) {
+            return ApiResponse.fail(403, "只能删除自己的食材");
         }
         Long relCount = recipeIngredientRelMapper.selectCount(
                 new LambdaQueryWrapper<RecipeIngredientRel>()
@@ -112,5 +138,27 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
         }
         removeById(id);
         return ApiResponse.success("删除成功", null);
+    }
+
+    private void applyScope(Ingredient entity) {
+        if (UserContext.isSuperAdmin()) {
+            entity.setScope("platform");
+            entity.setOwnerUserId("platform");
+        } else {
+            entity.setScope("personal");
+            entity.setOwnerUserId(UserContext.requireUserId());
+        }
+    }
+
+    private boolean canView(Ingredient ingredient) {
+        return "platform".equals(ingredient.getScope())
+                || UserContext.requireUserId().equals(ingredient.getOwnerUserId());
+    }
+
+    private boolean canManage(Ingredient ingredient) {
+        if ("platform".equals(ingredient.getScope())) {
+            return UserContext.isSuperAdmin();
+        }
+        return UserContext.requireUserId().equals(ingredient.getOwnerUserId());
     }
 }

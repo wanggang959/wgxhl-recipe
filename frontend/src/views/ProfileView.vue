@@ -1,8 +1,21 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { closeToast, showConfirmDialog, showLoadingToast } from 'vant'
-import { createUser, deleteUser, pageUser, setUserStatus, updateUser } from '../api/user'
+import { closeToast, showConfirmDialog, showFailToast, showLoadingToast, showSuccessToast } from 'vant'
+import {
+  createHousehold,
+  createHouseholdInvite,
+  dissolveHousehold,
+  joinHousehold,
+  leaveHousehold,
+  listHouseholdInvites,
+  listMyHouseholds,
+  previewHouseholdInvite,
+  revokeHouseholdInvite,
+  switchHousehold,
+  transferHousehold,
+} from '../api/household'
+import { createUser, changePassword, deleteUser, listMembers, pageUser, setUserStatus, updateUser } from '../api/user'
 import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
@@ -18,6 +31,21 @@ import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
 const router = useRouter()
 const userStore = useUserStore()
 const savingUser = ref(false)
+const householdPanelVisible = ref(false)
+const householdList = ref([])
+const householdNameInput = ref('')
+const householdLoading = ref(false)
+const householdCreating = ref(false)
+const invites = ref([])
+const inviteRole = ref('member')
+const inviteCreating = ref(false)
+const joinCode = ref('')
+const joining = ref(false)
+const householdMembers = ref([])
+const transferTargetId = ref('')
+const leaving = ref(false)
+const transferring = ref(false)
+const dissolving = ref(false)
 const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
@@ -40,7 +68,7 @@ const userForm = reactive({
   username: '',
   nickname: '',
   password: '',
-  userRole: 'user',
+  memberRole: 'member',
   avatar: '',
   email: '',
   birthday: '',
@@ -57,7 +85,13 @@ const BUILTIN_ADMIN_ID = 'admin-wangshifu'
 const BUILTIN_ADMIN_USERNAME = '王师傅'
 
 const isEditingUser = computed(() => Boolean(userForm.id))
+const canManageHousehold = computed(() => userStore.isHouseholdAdmin)
+const isHouseholdOwner = computed(() => userStore.isHouseholdOwner)
+const transferableMembers = computed(() => householdMembers.value.filter((member) => member.id !== userStore.userId))
 const editingBuiltinAdmin = ref(false)
+const editingMemberIsOwner = computed(() => (
+  users.value.find((item) => item.id === userForm.id)?.memberRole === 'owner'
+))
 
 const GUEST_ID = 'guest'
 
@@ -93,12 +127,13 @@ function syncStoreFromUsersList() {
     nickname: fromList.nickname,
     username: fromList.username,
     userRole: fromList.userRole,
+    memberRole: fromList.memberRole || userStore.user.memberRole,
     avatar: fromList.avatar,
   })
 }
 
 async function loadUsers() {
-  if (!userStore.isAdmin) {
+  if (!userStore.canViewMembers) {
     users.value = []
     return
   }
@@ -140,6 +175,45 @@ async function logout() {
   goLoginPage()
 }
 
+const passwordVisible = ref(false)
+const savingPassword = ref(false)
+const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+
+function openPasswordForm() {
+  passwordForm.oldPassword = ''
+  passwordForm.newPassword = ''
+  passwordForm.confirmPassword = ''
+  passwordVisible.value = true
+}
+
+async function submitPassword() {
+  if (!passwordForm.oldPassword) {
+    showFailToast('请输入原密码')
+    return
+  }
+  if (passwordForm.newPassword.trim().length < 6) {
+    showFailToast('新密码至少 6 位')
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    showFailToast('两次输入的新密码不一致')
+    return
+  }
+  savingPassword.value = true
+  try {
+    await changePassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword,
+    })
+    passwordVisible.value = false
+    showSuccessToast('密码已更新')
+  } catch (error) {
+    showFailToast(error.message || '密码修改失败')
+  } finally {
+    savingPassword.value = false
+  }
+}
+
 async function refreshPushState() {
   if (!userStore.isLogin) return
   pushState.value = await loadPushState()
@@ -169,7 +243,7 @@ function resetUserForm() {
   userForm.username = ''
   userForm.nickname = ''
   userForm.password = ''
-  userForm.userRole = 'user'
+  userForm.memberRole = 'member'
   userForm.avatar = ''
   userForm.email = ''
   userForm.birthday = ''
@@ -195,7 +269,7 @@ function beginAddUser() {
   userForm.username = ''
   userForm.nickname = ''
   userForm.password = ''
-  userForm.userRole = 'user'
+  userForm.memberRole = 'member'
   userForm.avatar = DEFAULT_AVATARS[0]
   userForm.email = ''
   userForm.birthday = ''
@@ -216,7 +290,7 @@ function editUser(item) {
   userForm.username = item.username
   userForm.nickname = item.nickname || ''
   userForm.password = ''
-  userForm.userRole = item.userRole || 'user'
+  userForm.memberRole = item.memberRole === 'admin' ? 'admin' : 'member'
   userForm.avatar = item.avatar || pickDefaultAvatar(item.id)
   userForm.email = item.email || ''
   userForm.birthday = item.birthday || ''
@@ -242,14 +316,15 @@ function syncCurrentUserAfterSave(payload) {
     ...userStore.user,
     nickname: payload.nickname,
     username: payload.username,
-    userRole: payload.userRole,
+    userRole: payload.userRole || userStore.user.userRole,
+    memberRole: payload.memberRole || userStore.user.memberRole,
     avatar: payload.avatar,
   })
 }
 
 async function saveUser() {
-  if (!userStore.isAdmin) {
-    showActionStatus('只有管理员可以管理家庭成员', 'error')
+  if (userForm.id !== userStore.userId && !userStore.canManageMembers) {
+    showActionStatus('只有家庭管理员可以管理家人', 'error')
     return
   }
   if (!userForm.username.trim()) {
@@ -304,8 +379,8 @@ async function saveUser() {
 }
 
 async function removeUser(item) {
-  if (!userStore.isAdmin) {
-    showActionStatus('只有管理员可以删除家庭成员', 'error')
+  if (!userStore.canManageMembers) {
+    showActionStatus('只有家庭管理员可以移出家人', 'error')
     return
   }
   try {
@@ -322,9 +397,12 @@ async function removeUser(item) {
   }
 }
 
-function roleText(role) {
-  if (role === 'super_admin') return '超级管理员'
-  return role === 'admin' ? '管理员' : '普通用户'
+function roleText(item) {
+  if (isBuiltinAdminUser(item) || item?.userRole === 'super_admin') return '超级管理员'
+  if (isGuestUser(item)) return '游客'
+  if (item?.memberRole === 'owner') return '家庭所有者'
+  if (item?.memberRole === 'admin') return '家庭管理员'
+  return '家人'
 }
 
 function statusText(status) {
@@ -370,33 +448,42 @@ function showActionStatus(message, type = 'success') {
   }, 2200)
 }
 
-function roleIcon(role, item) {
-  if (isBuiltinAdminUser(item) || role === 'super_admin') return 'award-o'
-  if (role === 'admin') return 'manager-o'
+function roleIcon(item) {
+  if (isBuiltinAdminUser(item) || item?.userRole === 'super_admin') return 'award-o'
+  if (item?.memberRole === 'owner' || item?.memberRole === 'admin') return 'manager-o'
   return 'friends-o'
 }
 
 function avatarTone(item) {
   if (isGuestUser(item)) return 'guest'
   if (isBuiltinAdminUser(item) || item.userRole === 'super_admin') return 'super'
-  if (item.userRole === 'admin') return 'admin'
+  if (item.memberRole === 'owner' || item.memberRole === 'admin') return 'admin'
   return 'user'
 }
 
 function canEditUser(item) {
-  return userStore.isAdmin && !isGuestUser(item)
+  if (!item || isGuestUser(item) || !userStore.canViewMembers) return false
+  if (item.id === userStore.userId) return true
+  if (!userStore.canManageMembers) return false
+  if (item.memberRole === 'owner') {
+    return userStore.isHouseholdOwner || userStore.isSuperAdmin
+  }
+  return true
 }
 
 function canDeleteUser(item) {
-  return userStore.isAdmin && !isBuiltinAdminUser(item) && !isGuestUser(item)
+  if (!userStore.canManageMembers) return false
+  if (isBuiltinAdminUser(item) || isGuestUser(item)) return false
+  if (item.memberRole === 'owner' || item.id === userStore.userId) return false
+  return true
 }
 
 const sortedUsers = computed(() => {
   const rank = (item) => {
     if (isGuestUser(item)) return 0
-    if (item.userRole === 'super_admin' || isBuiltinAdminUser(item)) return 3
-    if (item.userRole === 'admin') return 2
-    return 1
+    if (item.memberRole === 'member') return 1
+    if (item.memberRole === 'admin') return 2
+    return 3
   }
   return [...users.value].sort((a, b) => rank(a) - rank(b))
 })
@@ -408,7 +495,223 @@ const currentProfileUser = computed(() => {
   return fromList ? { ...userStore.user, ...fromList } : userStore.user
 })
 
-if (userStore.isAdmin) {
+async function openHouseholdPanel() {
+  if (!userStore.isLogin || userStore.isGuest) return
+  householdPanelVisible.value = true
+  householdLoading.value = true
+  try {
+    const res = await listMyHouseholds()
+    householdList.value = res.data || []
+    await loadInvites()
+    await loadHouseholdMembers()
+  } catch (error) {
+    showActionStatus(error.message || '家庭列表加载失败', 'error')
+  } finally {
+    householdLoading.value = false
+  }
+}
+
+async function loadInvites() {
+  if (!canManageHousehold.value) {
+    invites.value = []
+    return
+  }
+  try {
+    const res = await listHouseholdInvites()
+    invites.value = res.data || []
+  } catch (error) {
+    invites.value = []
+  }
+}
+
+async function generateInvite() {
+  if (inviteCreating.value) return
+  inviteCreating.value = true
+  try {
+    await createHouseholdInvite({ memberRole: inviteRole.value, maxUses: 1, expiresInHours: 72 })
+    await loadInvites()
+    await loadHouseholdMembers()
+    showActionStatus('邀请码已生成')
+  } catch (error) {
+    showActionStatus(error.message || '生成邀请码失败', 'error')
+  } finally {
+    inviteCreating.value = false
+  }
+}
+
+async function revokeInvite(invite) {
+  try {
+    await revokeHouseholdInvite(invite.id)
+    await loadInvites()
+    await loadHouseholdMembers()
+    showActionStatus('邀请已撤销')
+  } catch (error) {
+    showActionStatus(error.message || '撤销失败', 'error')
+  }
+}
+
+async function copyInvite(invite) {
+  try {
+    await navigator.clipboard.writeText(invite.inviteCode)
+    showActionStatus('邀请码已复制')
+  } catch (error) {
+    showActionStatus(`邀请码：${invite.inviteCode}`)
+  }
+}
+
+function inviteLink(inviteCode) {
+  return `${window.location.origin}${window.location.pathname}#/join?code=${encodeURIComponent(inviteCode)}`
+}
+
+async function copyInviteLink(invite) {
+  const link = inviteLink(invite.inviteCode)
+  try {
+    await navigator.clipboard.writeText(link)
+    showActionStatus('邀请链接已复制')
+  } catch (error) {
+    showActionStatus(link)
+  }
+}
+
+async function joinByCode() {
+  const code = joinCode.value.trim().toUpperCase()
+  if (!code) {
+    showActionStatus('请输入邀请码', 'error')
+    return
+  }
+  joining.value = true
+  try {
+    const preview = await previewHouseholdInvite(code)
+    await showConfirmDialog({
+      title: '加入家庭',
+      message: `确认加入「${preview.data.householdName}」吗？`,
+    })
+    const res = await joinHousehold(code)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    joinCode.value = ''
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    joining.value = false
+  }
+}
+
+function formatInviteExpire(value) {
+  if (!value) return '长期有效'
+  return String(value).slice(0, 16).replace('T', ' ')
+}
+
+async function loadHouseholdMembers() {
+  try {
+    const res = await listMembers()
+    householdMembers.value = res.data || []
+  } catch (error) {
+    householdMembers.value = []
+  }
+}
+
+async function leaveCurrentHousehold() {
+  try {
+    await showConfirmDialog({
+      title: '退出家庭',
+      message: '确认退出当前家庭吗？你在该家庭的待办、收藏、想吃等数据会被清理，个人菜谱会保留。',
+    })
+    leaving.value = true
+    const res = await leaveHousehold()
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    leaving.value = false
+  }
+}
+
+async function transferOwnership() {
+  if (!transferTargetId.value) {
+    showActionStatus('请选择转让成员', 'error')
+    return
+  }
+  try {
+    await showConfirmDialog({
+      title: '转让所有权',
+      message: '转让后你将变为家庭管理员，确认继续吗？',
+    })
+    transferring.value = true
+    const res = await transferHousehold(transferTargetId.value)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    transferring.value = false
+  }
+}
+
+async function dissolveCurrentHousehold() {
+  try {
+    await showConfirmDialog({
+      title: '解散家庭',
+      message: '解散会删除该家庭的待办、专项开支、收藏等全部家庭数据，且无法恢复。仅当家庭只剩你一人时可解散，确认继续吗？',
+    })
+    dissolving.value = true
+    const res = await dissolveHousehold()
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    if (error?.message) showActionStatus(error.message, 'error')
+  } finally {
+    dissolving.value = false
+  }
+}
+
+async function switchToHousehold(item) {
+  if (!item) return
+  if (item.active) {
+    householdPanelVisible.value = false
+    return
+  }
+  try {
+    const res = await switchHousehold(item.id)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    showActionStatus(error.message || '切换家庭失败', 'error')
+  }
+}
+
+async function createNewHousehold() {
+  const name = householdNameInput.value.trim()
+  if (!name) {
+    showActionStatus('请输入家庭名称', 'error')
+    return
+  }
+  householdCreating.value = true
+  try {
+    const res = await createHousehold(name)
+    userStore.setUser(res.data)
+    householdPanelVisible.value = false
+    householdNameInput.value = ''
+    window.location.hash = '#/recipes'
+    window.location.reload()
+  } catch (error) {
+    showActionStatus(error.message || '创建家庭失败', 'error')
+  } finally {
+    householdCreating.value = false
+  }
+}
+
+if (userStore.canViewMembers) {
   loadUsers()
 }
 
@@ -418,7 +721,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="profile-page" :class="{ 'profile-page--fill': userStore.isAdmin }">
+  <section class="profile-page" :class="{ 'profile-page--fill': userStore.canViewMembers }">
     <div class="profile-page-top">
     <div class="profile-card">
       <div class="avatar">
@@ -442,14 +745,24 @@ onMounted(() => {
       <span>{{ actionStatus }}</span>
     </div>
 
-    <div v-if="userStore.isAdmin" class="action-grid">
+    <section v-if="userStore.isLogin && !userStore.isGuest" class="form-card">
+      <h2>家庭</h2>
+      <van-cell title="当前家庭" :value="userStore.user?.householdName || '未加入'" />
+      <div class="household-actions">
+        <van-button size="small" round plain type="warning" @click="openHouseholdPanel">
+          切换 / 创建家庭
+        </van-button>
+      </div>
+    </section>
+
+    <div v-if="userStore.canMutate" class="action-grid">
       <button type="button" @click="router.push('/recipe/create')">
         <van-icon name="plus" />
         添加菜谱
       </button>
       <button type="button" @click="router.push('/manage/base')">
         <van-icon name="apps-o" />
-        分类食材
+        基础数据
       </button>
     </div>
 
@@ -457,6 +770,12 @@ onMounted(() => {
       <h2>账号</h2>
       <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
       <van-cell title="权限" :value="userStore.roleText" />
+      <van-cell
+        v-if="userStore.isLogin && !userStore.isGuest"
+        title="修改密码"
+        is-link
+        @click="openPasswordForm"
+      />
       <div v-if="userStore.isLogin && !userStore.isGuest" class="push-setting">
         <div>
           <strong>手机通知</strong>
@@ -488,6 +807,43 @@ onMounted(() => {
       </van-button>
     </section>
 
+    <van-popup v-model:show="passwordVisible" position="bottom" round>
+      <div class="password-panel">
+        <div class="password-panel-head">
+          <h3>修改密码</h3>
+          <button type="button" @click="passwordVisible = false">关闭</button>
+        </div>
+        <p class="password-hint">修改后请用新密码重新登录。忘记原密码请联系家庭管理员重置。</p>
+        <van-field
+          v-model="passwordForm.oldPassword"
+          class="form-field"
+          label="原密码"
+          type="password"
+          placeholder="请输入当前密码"
+        />
+        <van-field
+          v-model="passwordForm.newPassword"
+          class="form-field"
+          label="新密码"
+          type="password"
+          placeholder="至少 6 位"
+        />
+        <van-field
+          v-model="passwordForm.confirmPassword"
+          class="form-field"
+          label="确认新密码"
+          type="password"
+          placeholder="再次输入新密码"
+        />
+        <div class="form-actions">
+          <van-button type="warning" round size="small" :loading="savingPassword" @click="submitPassword">
+            保存
+          </van-button>
+          <van-button round size="small" @click="passwordVisible = false">取消</van-button>
+        </div>
+      </div>
+    </van-popup>
+
     <section v-if="userStore.isLogin" class="form-card">
       <h2>家庭工具</h2>
       <button type="button" class="tool-entry" @click="router.push('/expenses')">
@@ -501,7 +857,7 @@ onMounted(() => {
     </section>
     </div>
 
-    <section v-if="userStore.isAdmin" class="member-panel">
+    <section v-if="userStore.canViewMembers" class="member-panel">
       <header class="member-panel-head">
         <div class="member-panel-title">
           <div class="title-icon">
@@ -509,10 +865,15 @@ onMounted(() => {
           </div>
           <div>
             <h2>家庭成员</h2>
-            <p>管理家人账号，设置不同的权限</p>
+            <p>{{ userStore.canManageMembers ? '管理家人账号，设置家庭角色' : '查看家人，维护自己的资料' }}</p>
           </div>
         </div>
-        <button v-if="!showMemberForm" type="button" class="add-member-btn" @click="beginAddUser">
+        <button
+          v-if="!showMemberForm && userStore.canManageMembers"
+          type="button"
+          class="add-member-btn"
+          @click="beginAddUser"
+        >
           <van-icon name="plus" size="14" />
           添加成员
         </button>
@@ -570,12 +931,18 @@ onMounted(() => {
             :placeholder="isEditingUser ? '不填则不修改密码' : '请输入密码'"
           />
           <label class="role-field">
-            <span>权限</span>
-            <select v-model="userForm.userRole" :disabled="editingBuiltinAdmin">
-              <option value="user">普通用户（查看、收藏）</option>
-              <option value="admin">管理员（完全控制）</option>
+            <span>家庭角色</span>
+            <select
+              v-model="userForm.memberRole"
+              :disabled="editingBuiltinAdmin || editingMemberIsOwner || !isHouseholdOwner"
+            >
+              <option value="member">家人（记录菜谱、收藏、待办）</option>
+              <option value="admin">家庭管理员（可管理家人与邀请）</option>
             </select>
           </label>
+          <p v-if="!isHouseholdOwner && !editingMemberIsOwner" class="builtin-hint">
+            家庭角色由家庭所有者调整，你可以管理家人资料与邀请。
+          </p>
           <label class="role-field">
             <span>通知偏好</span>
             <select v-model="userForm.notificationPreference">
@@ -629,9 +996,9 @@ onMounted(() => {
                     <h3>{{ u.nickname || u.username }}</h3>
                     <p>用户名：{{ u.username }}</p>
                   </div>
-                  <span class="role-badge" :class="`role-${u.userRole || 'user'}`">
-                    <van-icon :name="roleIcon(u.userRole, u)" size="12" />
-                    {{ roleText(u.userRole) }}
+                  <span class="role-badge" :class="`role-${u.memberRole || 'member'}`">
+                    <van-icon :name="roleIcon(u)" size="12" />
+                    {{ roleText(u) }}
                   </span>
                 </div>
                 <div class="member-bottom">
@@ -706,12 +1073,96 @@ onMounted(() => {
     <section v-else class="form-card">
       <h2>家庭成员</h2>
       <div v-if="userStore.isLogin" class="permission-note">
-        普通用户可以查看菜谱和收藏菜谱；管理员可管理成员，仅超级管理员王师傅可禁用账户。
+        家人可以记录菜谱、收藏和管理自己的待办与开支；家庭所有者和管理员可以管理家人与邀请；菜谱只有作者本人能改，平台公共的分类、食材、调料只有超级管理员王师傅能维护。
       </div>
       <div v-else class="permission-note">
-        登录后可查看自己的权限，管理员可管理家庭成员。
+        登录后可以看到自己在家庭里的角色，家庭所有者和管理员可以管理家人。
       </div>
     </section>
+
+    <van-popup v-model:show="householdPanelVisible" position="bottom" round>
+      <div class="household-panel">
+        <div class="household-panel-head">
+          <h3>我的家庭</h3>
+          <button type="button" @click="householdPanelVisible = false">关闭</button>
+        </div>
+        <div v-if="householdLoading" class="household-loading">加载中...</div>
+        <button
+          v-for="item in householdList"
+          :key="item.id"
+          type="button"
+          class="household-item"
+          :class="{ active: item.active }"
+          @click="switchToHousehold(item)"
+        >
+          <div>
+            <strong>{{ item.householdName }}</strong>
+            <span>{{ item.memberRole }} · {{ item.memberCount }} 人</span>
+          </div>
+          <van-icon :name="item.active ? 'success' : 'arrow'" />
+        </button>
+        <div class="household-create">
+          <van-field v-model="householdNameInput" label="新家庭" placeholder="输入家庭名称" maxlength="64" />
+          <van-button block round type="warning" :loading="householdCreating" @click="createNewHousehold">
+            创建并切换
+          </van-button>
+        </div>
+
+        <div v-if="canManageHousehold" class="invite-box">
+          <h4>邀请成员</h4>
+          <div class="invite-row">
+            <select v-model="inviteRole" class="invite-select">
+              <option value="member">成员</option>
+              <option value="admin">管理员</option>
+            </select>
+            <van-button size="small" type="warning" :loading="inviteCreating" @click="generateInvite">
+              生成邀请码
+            </van-button>
+          </div>
+          <p class="invite-hint">把链接发给家人，登录后即可预览并加入。</p>
+          <div v-for="invite in invites" :key="invite.id" class="invite-item">
+            <div>
+              <strong>{{ invite.inviteCode }}</strong>
+              <span>{{ invite.memberRole }} · {{ invite.usedCount }}/{{ invite.maxUses }} · {{ formatInviteExpire(invite.expiresAt) }}</span>
+            </div>
+            <div class="invite-item-actions">
+              <button type="button" @click="copyInvite(invite)">复制码</button>
+              <button type="button" @click="copyInviteLink(invite)">复制链接</button>
+              <button type="button" @click="revokeInvite(invite)">撤销</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="invite-box">
+          <h4>加入家庭</h4>
+          <div class="invite-row">
+            <input v-model="joinCode" class="invite-input" placeholder="输入邀请码" maxlength="16" />
+            <van-button size="small" type="warning" :loading="joining" @click="joinByCode">加入</van-button>
+          </div>
+        </div>
+
+        <div class="invite-box">
+          <h4>家庭管理</h4>
+          <template v-if="isHouseholdOwner">
+            <div class="invite-row">
+              <select v-model="transferTargetId" class="invite-select">
+                <option value="">选择成员转让</option>
+                <option v-for="member in transferableMembers" :key="member.id" :value="member.id">
+                  {{ member.nickname || member.username }}
+                </option>
+              </select>
+              <van-button size="small" :loading="transferring" @click="transferOwnership">转让</van-button>
+            </div>
+            <van-button size="small" plain type="danger" :loading="dissolving" @click="dissolveCurrentHousehold">
+              解散家庭
+            </van-button>
+          </template>
+          <van-button v-else size="small" plain type="danger" :loading="leaving" @click="leaveCurrentHousehold">
+            退出当前家庭
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
   </section>
 </template>
 
@@ -1180,6 +1631,7 @@ h2 {
   gap: 4px;
 }
 
+.role-badge.role-owner,
 .role-badge.role-admin,
 .role-badge.role-super_admin {
   background: #fff7ed;
@@ -1375,5 +1827,187 @@ h2 {
   color: #9a6b4f;
   font-size: 12px;
   line-height: 1.5;
+}
+.household-actions {
+  padding: 0 16px 14px;
+}
+
+.household-panel {
+  padding: 16px 16px calc(18px + var(--safe-area-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.household-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.password-panel {
+  padding: 16px 16px calc(18px + var(--safe-area-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.password-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.password-panel-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.password-panel-head button {
+  border: 0;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.password-hint {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.household-panel-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.household-panel-head button {
+  border: 0;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.household-loading {
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.household-item {
+  width: 100%;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  color: var(--app-text);
+}
+
+.household-item.active {
+  border-color: var(--app-primary);
+  background: #fff7ed;
+}
+
+.household-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.household-item span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.household-create {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.invite-box {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--app-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invite-box h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.invite-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invite-select,
+.invite-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--app-text);
+  font-size: 14px;
+}
+
+.invite-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+
+.invite-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.invite-item strong {
+  letter-spacing: 1px;
+}
+
+.invite-hint {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.invite-item span {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.invite-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-item-actions button {
+  border: 0;
+  background: transparent;
+  color: var(--app-primary);
+  font-size: 12px;
+  padding: 0;
 }
 </style>

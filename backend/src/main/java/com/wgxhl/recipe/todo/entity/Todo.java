@@ -16,6 +16,11 @@ public class Todo {
     @TableId(value = "id", type = IdType.INPUT)
     private String id;
 
+    /*
+     * 创建人用户id
+     */
+    private String createUserId;
+
     private String title;
 
     private String category;

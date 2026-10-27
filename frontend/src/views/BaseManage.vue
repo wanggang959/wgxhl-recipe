@@ -389,7 +389,23 @@ async function removeSeasoning(item) {
   }
 }
 
-if (userStore.isAdmin) {
+function scopeLabel(item) {
+  return item.scope === 'platform' ? '公共' : '我的'
+}
+
+function scopeIcon(item) {
+  return item.scope === 'platform' ? 'globe-o' : 'user-o'
+}
+
+function scopeClass(item) {
+  return item.scope === 'platform' ? 'is-public' : 'is-mine'
+}
+
+function canManageBase(item) {
+  return item.scope !== 'platform' || userStore.isSuperAdmin
+}
+
+if (userStore.isLogin && !userStore.isGuest) {
   loadCategory().catch((e) => showFailToast(e.message || '分类加载失败'))
   loadIngredient().catch((e) => showFailToast(e.message || '食材加载失败'))
   loadSeasoning().catch((e) => showFailToast(e.message || '调料加载失败'))
@@ -402,13 +418,7 @@ if (userStore.isAdmin) {
     <main class="page-wrap">
     <section class="page">
       <van-nav-bar title="基础数据管理" left-arrow @click-left="router.back()" />
-      <div v-if="!userStore.isAdmin" class="permission-card">
-        <van-icon name="warning-o" size="24" />
-        <strong>需要管理员权限</strong>
-        <p>分类、食材、调料管理只能由管理员操作。</p>
-        <van-button round type="warning" size="small" @click="router.push('/profile')">去登录</van-button>
-      </div>
-      <template v-else>
+      <p class="scope-hint">橙色「我的」排在前面，仅自己可见、可跨家庭使用；蓝色「公共」由王师傅维护，所有人可用。</p>
       <div v-if="actionStatus" class="action-status">
         <van-icon name="success" />
         <span>{{ actionStatus }}</span>
@@ -429,11 +439,19 @@ if (userStore.isAdmin) {
             <van-cell
               v-for="item in categoryList"
               :key="item.id"
-              :title="item.categoryName"
               :label="`${item.categoryCode} / 排序:${item.sortNo ?? '-'}`"
             >
+              <template #title>
+                <span class="cell-title">
+                  <span class="scope-chip" :class="scopeClass(item)">
+                    <van-icon :name="scopeIcon(item)" size="11" />
+                    {{ scopeLabel(item) }}
+                  </span>
+                  <span>{{ item.categoryName }}</span>
+                </span>
+              </template>
               <template #right-icon>
-                <div class="cell-actions">
+                <div v-if="canManageBase(item)" class="cell-actions">
                   <van-button size="mini" plain type="primary" @click="editCategory(item)">编辑</van-button>
                   <van-button size="mini" plain type="danger" @click="removeCategory(item)">删除</van-button>
                 </div>
@@ -468,7 +486,12 @@ if (userStore.isAdmin) {
             没有找到「{{ ingredientKeyword }}」相关食材
           </div>
           <div class="ingredient-list">
-            <article v-for="item in ingredientList" :key="item.id" class="ingredient-card">
+            <article
+              v-for="item in ingredientList"
+              :key="item.id"
+              class="ingredient-card"
+              :class="{ 'is-mine': item.scope !== 'platform' }"
+            >
               <img
                 v-if="item.ingredientImage"
                 class="ingredient-image"
@@ -479,10 +502,16 @@ if (userStore.isAdmin) {
                 <van-icon name="photo-o" size="20" />
               </div>
               <div class="ingredient-info">
-                <div class="ingredient-name">{{ item.ingredientName }}</div>
+                <div class="ingredient-name">
+                  <span class="scope-chip" :class="scopeClass(item)">
+                    <van-icon :name="scopeIcon(item)" size="11" />
+                    {{ scopeLabel(item) }}
+                  </span>
+                  <span>{{ item.ingredientName }}</span>
+                </div>
                 <div class="ingredient-desc">{{ item.ingredientDesc || '暂无描述' }}</div>
               </div>
-              <div class="cell-actions">
+              <div v-if="canManageBase(item)" class="cell-actions">
                 <van-button size="mini" plain type="primary" @click="editIngredient(item)">编辑</van-button>
                 <van-button size="mini" plain type="danger" @click="removeIngredient(item)">删除</van-button>
               </div>
@@ -532,7 +561,12 @@ if (userStore.isAdmin) {
             没有找到「{{ seasoningKeyword }}」相关调料
           </div>
           <div class="ingredient-list">
-            <article v-for="item in seasoningList" :key="item.id" class="ingredient-card">
+            <article
+              v-for="item in seasoningList"
+              :key="item.id"
+              class="ingredient-card"
+              :class="{ 'is-mine': item.scope !== 'platform' }"
+            >
               <img
                 v-if="item.seasoningImage"
                 class="ingredient-image"
@@ -543,10 +577,16 @@ if (userStore.isAdmin) {
                 <van-icon name="photo-o" size="20" />
               </div>
               <div class="ingredient-info">
-                <div class="ingredient-name">{{ item.seasoningName }}</div>
+                <div class="ingredient-name">
+                  <span class="scope-chip" :class="scopeClass(item)">
+                    <van-icon :name="scopeIcon(item)" size="11" />
+                    {{ scopeLabel(item) }}
+                  </span>
+                  <span>{{ item.seasoningName }}</span>
+                </div>
                 <div class="ingredient-desc">{{ item.seasoningDesc || '暂无描述' }}</div>
               </div>
-              <div class="cell-actions">
+              <div v-if="canManageBase(item)" class="cell-actions">
                 <van-button size="mini" plain type="primary" @click="editSeasoning(item)">编辑</van-button>
                 <van-button size="mini" plain type="danger" @click="removeSeasoning(item)">删除</van-button>
               </div>
@@ -570,7 +610,6 @@ if (userStore.isAdmin) {
           </div>
         </van-tab>
       </van-tabs>
-      </template>
     </section>
     </main>
     <BottomNav />
@@ -588,6 +627,46 @@ if (userStore.isAdmin) {
 
 .form-panel {
   padding: 12px;
+}
+
+.scope-hint {
+  margin: 10px 16px 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.scope-chip.is-mine {
+  background: #fff1e6;
+  border-color: rgba(234, 88, 12, 0.3);
+  color: #c2410c;
+}
+
+.scope-chip.is-public {
+  background: #eef2ff;
+  border-color: rgba(67, 56, 202, 0.24);
+  color: #4338ca;
+}
+
+.cell-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .permission-card {
@@ -720,6 +799,11 @@ if (userStore.isAdmin) {
   gap: 10px;
 }
 
+.ingredient-card.is-mine {
+  background: #fff8f1;
+  border-color: rgba(234, 88, 12, 0.32);
+}
+
 .inline-edit-panel {
   grid-column: 1 / -1;
   margin-top: 4px;
@@ -759,6 +843,10 @@ if (userStore.isAdmin) {
   font-size: 15px;
   font-weight: 700;
   overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .ingredient-desc {

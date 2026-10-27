@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.TenantContext;
+import com.wgxhl.recipe.config.UserContext;
+import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.notification.service.NotificationService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.todo.dto.TodoPageDTO;
@@ -72,6 +75,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private final AppUserMapper appUserMapper;
     private final NotificationService notificationService;
     private final UserPushSubscriptionService userPushSubscriptionService;
+    private final HouseholdMemberService householdMemberService;
     private final JavaMailSender mailSender;
 
     @Value("${spring.mail.username:}")
@@ -83,6 +87,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                            AppUserMapper appUserMapper,
                            NotificationService notificationService,
                            UserPushSubscriptionService userPushSubscriptionService,
+                           HouseholdMemberService householdMemberService,
                            ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.todoNoticeRuleMapper = todoNoticeRuleMapper;
         this.todoOwnerMapper = todoOwnerMapper;
@@ -90,6 +95,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         this.appUserMapper = appUserMapper;
         this.notificationService = notificationService;
         this.userPushSubscriptionService = userPushSubscriptionService;
+        this.householdMemberService = householdMemberService;
         this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
@@ -239,6 +245,9 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (!StringUtils.hasText(entity.getCategory())) {
             entity.setCategory("OTHER");
         }
+        if (actor != null) {
+            entity.setCreateUserId(actor.getId());
+        }
         if (CollectionUtils.isEmpty(entity.getOwnerIds())) {
             if (StringUtils.hasText(entity.getOwnerId())) {
                 entity.setOwnerIds(Collections.singletonList(entity.getOwnerId()));
@@ -269,6 +278,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (isGuest(actor)) {
             return ApiResponse.fail("游客不能编辑待办");
         }
+        String editDenied = manageDeniedReason(existing, actor);
+        if (editDenied != null) {
+            return ApiResponse.fail(403, editDenied);
+        }
         if (!CollectionUtils.isEmpty(entity.getOwnerIds())) {
             entity.setOwnerId(firstOwnerId(entity.getOwnerIds()));
         }
@@ -289,6 +302,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         }
         if (isGuest(actor)) {
             return ApiResponse.fail("游客不能操作待办");
+        }
+        String completeDenied = manageDeniedReason(todo, actor);
+        if (completeDenied != null) {
+            return ApiResponse.fail(403, completeDenied);
         }
         String disabledReason = completeDisabledReason(todo);
         if (StringUtils.hasText(disabledReason)) {
@@ -323,6 +340,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (isGuest(actor)) {
             return ApiResponse.fail("游客不能删除待办");
         }
+        String deleteDenied = manageDeniedReason(todo, actor);
+        if (deleteDenied != null) {
+            return ApiResponse.fail(403, deleteDenied);
+        }
         removeById(id);
         todoNoticeRuleMapper.delete(new LambdaQueryWrapper<TodoNoticeRule>().eq(TodoNoticeRule::getTodoId, id));
         todoOwnerMapper.delete(new LambdaQueryWrapper<TodoOwner>().eq(TodoOwner::getTodoId, id));
@@ -350,6 +371,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             todo = new Todo();
             todo.setRelatedType(RELATED_BIRTHDAY);
             todo.setRelatedId(user.getId());
+            todo.setCreateUserId(user.getId());
         }
         String name = StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
         todo.setTitle(name + "生日");
@@ -387,11 +409,15 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     private List<String> birthdayReminderOwnerIds(String birthdayUserId) {
-        return appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
-                        .eq(AppUser::getStatus, "normal")
-                        .ne(AppUser::getId, "guest")
-                        .ne(StringUtils.hasText(birthdayUserId), AppUser::getId, birthdayUserId))
-                .stream()
+        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        if (memberIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return appUserMapper.selectBatchIds(memberIds).stream()
+                .filter(user -> user != null
+                        && "normal".equals(user.getStatus())
+                        && !"guest".equals(user.getId())
+                        && (!StringUtils.hasText(birthdayUserId) || !birthdayUserId.equals(user.getId())))
                 .map(AppUser::getId)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toList());
@@ -428,7 +454,11 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     private void syncAllBirthdayTodos() {
-        List<AppUser> users = appUserMapper.selectList(null);
+        List<String> memberIds = householdMemberService.listUserIds(TenantContext.require());
+        if (memberIds.isEmpty()) {
+            return;
+        }
+        List<AppUser> users = appUserMapper.selectBatchIds(memberIds);
         for (AppUser user : users) {
             if (user == null || "guest".equals(user.getId()) || !"normal".equals(user.getStatus())) {
                 continue;
@@ -442,7 +472,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     private int sendByRule(Todo todo, TodoNoticeRule rule, LocalDateTime targetTime) {
         int sent = 0;
-        String title = "【王师傅家提醒】" + todo.getTitle();
+        String title = "【王师傅生活助手】" + todo.getTitle();
         String content = buildNoticeContent(todo, rule);
         List<AppUser> owners = resolveOwners(todo);
         if (owners.isEmpty()) {
@@ -1339,6 +1369,30 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     private boolean isGuest(AppUser actor) {
         return actor != null && GUEST_ID.equals(actor.getId());
+    }
+
+    /**
+     * 待办归家庭所有：创建人、负责人可以操作，家庭管理员（owner/admin）可代管全家庭的待办。
+     *
+     * @return 允许操作返回 null，否则返回提示语
+     */
+    private String manageDeniedReason(Todo todo, AppUser actor) {
+        if (todo == null || actor == null || !StringUtils.hasText(actor.getId())) {
+            return "只有待办负责人、创建人或家庭管理员可以操作";
+        }
+        if (UserContext.isHouseholdManager()) {
+            return null;
+        }
+        if (actor.getId().equals(todo.getCreateUserId()) || actor.getId().equals(todo.getOwnerId())) {
+            return null;
+        }
+        Long ownerCount = todoOwnerMapper.selectCount(new LambdaQueryWrapper<TodoOwner>()
+                .eq(TodoOwner::getTodoId, todo.getId())
+                .eq(TodoOwner::getOwnerId, actor.getId()));
+        if (ownerCount != null && ownerCount > 0) {
+            return null;
+        }
+        return "只有待办负责人、创建人或家庭管理员可以操作";
     }
 
     private boolean isCookTodo(Todo todo) {

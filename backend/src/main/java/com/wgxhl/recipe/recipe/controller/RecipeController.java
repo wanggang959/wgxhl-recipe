@@ -5,6 +5,7 @@ import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.common.dto.IdDTO;
 import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
 import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
+import com.wgxhl.recipe.recipe.dto.RecipeStatusDTO;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
@@ -76,5 +77,13 @@ public class RecipeController {
     @PostMapping("/delete")
     public ApiResponse<Void> delete(@RequestBody IdDTO dto) {
         return recipeService.delete(dto.getId());
+    }
+
+    /***
+     * @Description 下架 / 恢复上架
+     **/
+    @PostMapping("/setStatus")
+    public ApiResponse<Void> setStatus(@RequestBody RecipeStatusDTO dto) {
+        return recipeService.setStatus(dto.getId(), dto.getStatus());
     }
 }

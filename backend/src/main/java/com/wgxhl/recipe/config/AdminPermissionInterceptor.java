@@ -3,6 +3,10 @@ package com.wgxhl.recipe.config;
 import cn.hutool.jwt.JWT;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.household.entity.Household;
+import com.wgxhl.recipe.household.entity.HouseholdMember;
+import com.wgxhl.recipe.household.service.HouseholdMemberService;
+import com.wgxhl.recipe.household.service.HouseholdService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import org.springframework.http.MediaType;
@@ -21,8 +25,6 @@ import java.util.Set;
 @Component
 public class AdminPermissionInterceptor implements HandlerInterceptor {
 
-    private static final String ROLE_SUPER_ADMIN = "super_admin";
-    private static final String ROLE_ADMIN = "admin";
     private static final String STATUS_NORMAL = "normal";
     private static final String GUEST_ID = "guest";
     private static final String GUEST_USERNAME = "guest";
@@ -30,19 +32,29 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
     private static final Set<String> PUBLIC_USER_PATHS = new HashSet<>(Arrays.asList(
             "/user/login",
             "/user/guestLogin",
-            "/user/preview"
+            "/user/preview",
+            "/user/register/sendCode",
+            "/user/register/inviteInfo",
+            "/user/register/email",
+            "/user/register/invite"
     ));
 
     private final ObjectMapper objectMapper;
     private final JwtAuthUtil jwtAuthUtil;
     private final AppUserMapper appUserMapper;
+    private final HouseholdMemberService householdMemberService;
+    private final HouseholdService householdService;
 
     public AdminPermissionInterceptor(ObjectMapper objectMapper,
                                       JwtAuthUtil jwtAuthUtil,
-                                      AppUserMapper appUserMapper) {
+                                      AppUserMapper appUserMapper,
+                                      HouseholdMemberService householdMemberService,
+                                      HouseholdService householdService) {
         this.objectMapper = objectMapper;
         this.jwtAuthUtil = jwtAuthUtil;
         this.appUserMapper = appUserMapper;
+        this.householdMemberService = householdMemberService;
+        this.householdService = householdService;
     }
 
     @Override
@@ -73,31 +85,54 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         request.setAttribute(AuthRequestAttributes.CURRENT_USER, currentUser);
 
         String path = normalizePath(request.getRequestURI());
-        if (isGuestUser(currentUser) && !isGuestReadOnlyPath(path)) {
+        if (isGuestUser(currentUser) && !isReadOnlyPath(path)) {
             writeJson(response, ApiResponse.fail(403, "游客仅可查看，无法执行此操作"));
             return false;
         }
 
-        String userRole = jwtAuthUtil.getUserRole(jwt);
-        if (requiresSuperAdmin(path)) {
-            if (ROLE_SUPER_ADMIN.equals(userRole)) {
-                return true;
-            }
+        String householdId = jwtAuthUtil.getHouseholdId(jwt);
+        HouseholdMember membership = householdMemberService.find(householdId, userId);
+        if (membership == null) {
+            membership = householdMemberService.findFirstByUser(userId);
+        }
+        if (membership == null || !STATUS_NORMAL.equals(membership.getStatus())) {
+            writeJson(response, ApiResponse.fail(403, "该账号尚未加入任何家庭，请联系管理员"));
+            return false;
+        }
+        Household household = householdService.getById(membership.getHouseholdId());
+        if (household == null || !STATUS_NORMAL.equals(household.getStatus())) {
+            writeJson(response, ApiResponse.fail(403, "所在家庭已停用，请联系管理员"));
+            return false;
+        }
+
+        if (requiresSuperAdmin(path) && !UserContext.isSuperAdmin()) {
             writeJson(response, ApiResponse.fail(403, "仅超级管理员王师傅可以禁用或启用账户"));
             return false;
         }
-        if (!requiresAdmin(request.getRequestURI())) {
-            return true;
-        }
-        if (isAdminRole(userRole)) {
-            return true;
-        }
-        writeJson(response, ApiResponse.fail(403, "需要管理员权限"));
-        return false;
+        return allow(request, currentUser, household, membership);
     }
 
-    private boolean isAdminRole(String userRole) {
-        return ROLE_ADMIN.equals(userRole) || ROLE_SUPER_ADMIN.equals(userRole);
+    private boolean allow(HttpServletRequest request,
+                          AppUser currentUser,
+                          Household household,
+                          HouseholdMember membership) {
+        TenantContext.set(household.getId());
+        UserContext.set(currentUser, membership.getMemberRole());
+        currentUser.setHouseholdId(household.getId());
+        currentUser.setHouseholdName(household.getHouseholdName());
+        currentUser.setMemberRole(membership.getMemberRole());
+        request.setAttribute(AuthRequestAttributes.CURRENT_HOUSEHOLD, household);
+        request.setAttribute(AuthRequestAttributes.CURRENT_MEMBERSHIP, membership);
+        return true;
+    }
+
+    @Override
+    public void afterCompletion(@NonNull HttpServletRequest request,
+                                @NonNull HttpServletResponse response,
+                                @NonNull Object handler,
+                                Exception ex) {
+        TenantContext.clear();
+        UserContext.clear();
     }
 
     private boolean requiresSuperAdmin(String path) {
@@ -108,14 +143,15 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         return user != null && (GUEST_ID.equals(user.getId()) || GUEST_USERNAME.equals(user.getUsername()));
     }
 
-    private boolean isGuestReadOnlyPath(String path) {
+    private boolean isReadOnlyPath(String path) {
         if ("/health".equals(path)) {
             return true;
         }
         if (PUBLIC_USER_PATHS.contains(path)) {
             return true;
         }
-        if ("/user/members".equals(path) || "/push/status".equals(path)) {
+        if ("/user/members".equals(path) || "/push/status".equals(path)
+                || "/household/me".equals(path) || "/household/list".equals(path)) {
             return true;
         }
         return path.endsWith("/page")
@@ -154,34 +190,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
 
     private boolean isPublicPath(String uri) {
         String path = normalizePath(uri);
-        if (path.equals("/health")) {
-            return true;
-        }
-        if (PUBLIC_USER_PATHS.contains(path)) {
-            return true;
-        }
-        if (path.startsWith("/todo/") || path.startsWith("/notification/") || path.startsWith("/expense/")) {
-            return false;
-        }
-        return path.endsWith("/page")
-                || path.endsWith("/getById")
-                || path.endsWith("/check");
-    }
-
-    private boolean requiresAdmin(String uri) {
-        String path = normalizePath(uri);
-        if ("/user/members".equals(path)) {
-            return false;
-        }
-        return path.startsWith("/category/")
-                || path.startsWith("/ingredient/")
-                || path.startsWith("/seasoning/")
-                || path.startsWith("/recipe/")
-                || path.startsWith("/image/")
-                || path.startsWith("/step/")
-                || path.startsWith("/relation/")
-                || path.startsWith("/seasoningrelation/")
-                || path.startsWith("/user/");
+        return "/health".equals(path) || PUBLIC_USER_PATHS.contains(path);
     }
 
     private String normalizePath(String uri) {

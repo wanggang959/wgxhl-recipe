@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { completeTodo, deleteTodo, getTodoDetail } from '../api/todo'
@@ -12,6 +12,17 @@ const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
 const todo = ref(null)
+
+/** 与后端一致：创建人、负责人可操作，家庭管理员可代管 */
+const canManageTodo = computed(() => {
+  if (userStore.isGuest || !todo.value) return false
+  if (userStore.isHouseholdAdmin) return true
+  const userId = userStore.userId
+  if (!userId) return false
+  const item = todo.value
+  if (item.createUserId === userId || item.ownerId === userId) return true
+  return Array.isArray(item.ownerIds) && item.ownerIds.includes(userId)
+})
 
 onMounted(loadTodo)
 
@@ -87,7 +98,7 @@ async function remove() {
   <TodoDetail
     v-else-if="todo"
     :todo="todo"
-    :readonly="userStore.isGuest"
+    :readonly="!canManageTodo"
     @back="router.back()"
     @edit="router.push(`/todo/${route.params.id}/edit`)"
     @complete="finish"

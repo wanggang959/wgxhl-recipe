@@ -44,6 +44,7 @@ const REMOTE_JAR_NAME = 'recipe-backend-1.0.0-SNAPSHOT.jar'
 const REMOTE_FRONTEND_DIR = '/opt/1panel/www/sites/recipe.wgxhl.space/index'
 const REMOTE_STAGING_DIR = '/opt/wgxhl-deploy/staging'
 const REMOTE_BACKUP_ROOT = '/opt/wgxhl-deploy/backups'
+const REMOTE_SCRIPTS_DIR = '/opt/wgxhl-deploy/scripts'
 const BACKUP_KEEP = 5
 
 const BACKEND_JAR = path.join(root, 'backend', 'target', REMOTE_JAR_NAME)
@@ -136,8 +137,36 @@ function scpTo(localPath, remotePath) {
   }
 }
 
-function setupLocalBuildTools() {
-  const localJavaRoot = 'D:\\software\\java'
+function syncProdScripts() {
+  const localDir = path.join(root, 'scripts', 'prod')
+  if (!fs.existsSync(localDir)) {
+    return
+  }
+  const files = fs.readdirSync(localDir).filter((name) => !name.startsWith('.'))
+  if (files.length === 0) {
+    return
+  }
+  const remoteCmd = `mkdir -p '${REMOTE_SCRIPTS_DIR}'`
+  if (spawnSync('ssh', [...SSH_OPTS, '-i', SSH_KEY, TARGET, remoteCmd], { stdio: 'ignore' }).status !== 0) {
+    console.warn('运维脚本目录创建失败，跳过同步（不影响本次发布）')
+    return
+  }
+  for (const file of files) {
+    const result = spawnSync(
+      'scp',
+      [...SSH_OPTS, '-i', SSH_KEY, path.join(localDir, file), `${TARGET}:${REMOTE_SCRIPTS_DIR}/${file}`],
+      { stdio: 'inherit' },
+    )
+    if (result.status !== 0) {
+      console.warn(`运维脚本 ${file} 同步失败（不影响本次发布）`)
+      return
+    }
+  }
+  spawnSync('ssh', [...SSH_OPTS, '-i', SSH_KEY, TARGET, `chmod 755 '${REMOTE_SCRIPTS_DIR}'/*`], { stdio: 'ignore' })
+  console.log(`运维脚本已同步：${files.join(', ')}`)
+}
+
+function setupLocalBuildTools() {  const localJavaRoot = 'D:\\software\\java'
   const localJavaHome = path.join(localJavaRoot, 'jdk8')
   const localMavenHome = path.join(localJavaRoot, 'maven')
   const binDirs = []
@@ -273,6 +302,7 @@ if (dryRun) {
 }
 
 step('5/6 替换线上文件')
+syncProdScripts()
 if (doBackend) {
   ssh(`mv '${REMOTE_STAGING_DIR}/recipe-backend.jar.new' '${REMOTE_BACKEND_DIR}/${REMOTE_JAR_NAME}' && chmod 644 '${REMOTE_BACKEND_DIR}/${REMOTE_JAR_NAME}'`)
   console.log('后端 jar 已替换')

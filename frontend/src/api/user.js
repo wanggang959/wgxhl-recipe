@@ -35,3 +35,7 @@ export function deleteUser(id) {
 export function setUserStatus(payload) {
   return post('/user/setStatus', payload)
 }
+
+export function changePassword(payload) {
+  return post('/user/changePassword', payload)
+}

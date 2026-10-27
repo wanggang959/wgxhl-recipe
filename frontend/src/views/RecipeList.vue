@@ -79,7 +79,15 @@ const filter = reactive({
 
 const hasData = computed(() => list.value.length > 0)
 const todayCover = computed(() => getRecipeImage(suggestRecipe.value?.coverImage))
+const familyName = computed(() => userStore.user?.householdName || '王师傅家')
 const isTodayMode = computed(() => route.query.pick === 'today')
+const canManageRecipes = computed(() => userStore.isHouseholdAdmin || userStore.isSuperAdmin)
+const showOffline = computed(() => query.status === '下架')
+
+function toggleShowOffline() {
+  query.status = showOffline.value ? '上架' : '下架'
+  refreshList()
+}
 const isShowcaseMode = computed(() => route.query.mode === 'showcase')
 const showcasePage = ref(0)
 const showcasePageSize = 3
@@ -92,6 +100,9 @@ const minWantDate = computed(() => formatDate(new Date()))
 
 onMounted(async () => {
   window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+  if (!canManageRecipes.value && query.status !== '上架') {
+    query.status = '上架'
+  }
   const message = sessionStorage.getItem('recipeSaveMessage')
   const shouldForceRefresh = Boolean(message)
   if (message) {
@@ -180,6 +191,9 @@ async function loadMore(options = {}) {
       finished.value = true
     }
     await Promise.all([syncFavoriteState(records), syncWantedState(records)])
+    if (suggestRecipe.value?.status === '下架') {
+      suggestRecipe.value = null
+    }
     if (!suggestRecipe.value && list.value.length > 0) {
       chooseRandomRecipe()
     }
@@ -256,15 +270,16 @@ function pickCategory(categoryId = '') {
 function chooseRandomRecipe(options = {}) {
   const showMessage = Boolean(options.showMessage)
   const forceDifferent = Boolean(options.forceDifferent)
+  const available = list.value.filter((item) => item.status !== '下架')
 
-  if (list.value.length === 0) {
+  if (available.length === 0) {
     suggestRecipe.value = null
     return
   }
 
-  let pool = list.value
-  if (forceDifferent && suggestRecipe.value && list.value.length > 1) {
-    pool = list.value.filter((item) => item.id !== suggestRecipe.value.id)
+  let pool = available
+  if (forceDifferent && suggestRecipe.value && available.length > 1) {
+    pool = available.filter((item) => item.id !== suggestRecipe.value.id)
   }
 
   const randomIndex = Math.floor(Math.random() * pool.length)
@@ -278,7 +293,7 @@ function chooseRandomRecipe(options = {}) {
     return
   }
 
-  if (forceDifferent && list.value.length <= 1) {
+  if (forceDifferent && available.length <= 1) {
     showRecommendMessage('目前只有一道菜，先去添加更多吧')
     return
   }
@@ -470,7 +485,7 @@ function submitCustomWantDate() {
   <div v-if="isShowcaseMode" class="showcase-page">
     <header class="showcase-header">
       <div>
-        <p>王刚家的大菜单</p>
+        <p>{{ familyName }}的大菜单</p>
         <h1>今晚想吃哪一道？</h1>
         <span>一页一页慢慢翻，只看菜名、口味、作者和版本。</span>
       </div>
@@ -484,7 +499,7 @@ function submitCustomWantDate() {
     <EmptyState
       v-else-if="list.length === 0"
       text="还没有菜谱，先添加一道拿手菜吧"
-      :show-button="userStore.isAdmin"
+      :show-button="canMutate"
       @action="router.push('/recipe/create')"
     />
     <section v-else class="showcase-board">
@@ -530,8 +545,8 @@ function submitCustomWantDate() {
     <section v-if="!isTodayMode" class="hero">
       <div>
         <p>欢迎回家</p>
-        <h1>王刚家的家常菜谱</h1>
-        <span>记录家里的味道，今天想吃什么？</span>
+        <h1>{{ familyName }}的生活日常</h1>
+        <span>记录家里的味道，也照管家里的小事。</span>
       </div>
       <button type="button" class="today-button" @click="chooseRandomRecipe({ showMessage: true })">
         <van-icon name="fire-o" size="18" />
@@ -581,7 +596,7 @@ function submitCustomWantDate() {
       <EmptyState
         v-else-if="!loading"
         text="还没有菜谱，先添加一道拿手菜吧"
-        :show-button="userStore.isAdmin"
+        :show-button="canMutate"
         @action="router.push('/recipe/create')"
       />
     </section>
@@ -593,6 +608,14 @@ function submitCustomWantDate() {
     </form>
 
     <CategoryTabs v-if="!isTodayMode" v-model="filter.categoryId" :categories="categories" @change="pickCategory" />
+
+    <div v-if="!isTodayMode && !isShowcaseMode && canManageRecipes" class="offline-filter">
+      <button type="button" :class="{ active: showOffline }" @click="toggleShowOffline">
+        <van-icon :name="showOffline ? 'eye-o' : 'closed-eye'" size="14" />
+        {{ showOffline ? '返回在架菜谱' : '查看已下架' }}
+      </button>
+      <span v-if="showOffline">下架的菜只有作者和家庭管理员能看到</span>
+    </div>
 
     <div v-if="saveMessage" class="save-banner">
       <van-icon name="success" />
@@ -651,7 +674,7 @@ function submitCustomWantDate() {
           @want="openWantAction"
         />
       </div>
-      <EmptyState v-else-if="!loading" :show-button="userStore.isAdmin" @action="router.push('/recipe/create')" />
+      <EmptyState v-else-if="!loading" :show-button="canMutate" @action="router.push('/recipe/create')" />
     </van-list>
   </div>
 
@@ -1144,6 +1167,38 @@ function submitCustomWantDate() {
   font-weight: 800;
   white-space: nowrap;
   word-break: keep-all;
+}
+
+.offline-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.offline-filter button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.offline-filter button.active {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.offline-filter span {
+  font-size: 11px;
+  color: #9ca3af;
 }
 
 .save-banner,

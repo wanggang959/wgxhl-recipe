@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.seasoning.dto.SeasoningPageDTO;
 import com.wgxhl.recipe.seasoning.entity.Seasoning;
 import com.wgxhl.recipe.seasoning.mapper.SeasoningMapper;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning>
@@ -46,10 +49,18 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
     @Override
     public ApiResponse<Page<Seasoning>> page(SeasoningPageDTO dto) {
         Page<Seasoning> page = new Page<>(dto.getCurrent(), dto.getSize());
+        String userId = UserContext.requireUserId();
         Page<Seasoning> result = lambdaQuery()
+                .and(wrapper -> wrapper
+                        .eq(Seasoning::getScope, "platform")
+                        .or(personal -> personal
+                                .eq(Seasoning::getScope, "personal")
+                                .eq(Seasoning::getOwnerUserId, userId)))
                 .like(StringUtils.hasText(dto.getSeasoningName()), Seasoning::getSeasoningName, dto.getSeasoningName())
                 .orderByDesc(Seasoning::getCreateTime)
                 .page(page);
+        List<Seasoning> records = result.getRecords();
+        records.sort(Comparator.comparingInt((Seasoning item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 
@@ -59,7 +70,7 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
             return ApiResponse.fail("调料id不能为空");
         }
         Seasoning seasoning = super.getById(id);
-        if (seasoning == null) {
+        if (seasoning == null || !canView(seasoning)) {
             return ApiResponse.fail("调料不存在");
         }
         return ApiResponse.success(seasoning);
@@ -70,7 +81,11 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
         if (!StringUtils.hasText(entity.getSeasoningName())) {
             return ApiResponse.fail("调料名称不能为空");
         }
-        if (lambdaQuery().eq(Seasoning::getSeasoningName, entity.getSeasoningName()).exists()) {
+        applyScope(entity);
+        if (lambdaQuery()
+                .eq(Seasoning::getOwnerUserId, entity.getOwnerUserId())
+                .eq(Seasoning::getSeasoningName, entity.getSeasoningName())
+                .exists()) {
             return ApiResponse.fail("调料名称已存在");
         }
         save(entity);
@@ -82,12 +97,19 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
         if (!StringUtils.hasText(entity.getId())) {
             return ApiResponse.fail("调料id不能为空");
         }
-        if (super.getById(entity.getId()) == null) {
+        Seasoning existing = super.getById(entity.getId());
+        if (existing == null) {
             return ApiResponse.fail("调料不存在");
         }
+        if (!canManage(existing)) {
+            return ApiResponse.fail(403, "只能编辑自己的调料");
+        }
+        entity.setScope(existing.getScope());
+        entity.setOwnerUserId(existing.getOwnerUserId());
         if (StringUtils.hasText(entity.getSeasoningName())
                 && lambdaQuery()
                 .ne(Seasoning::getId, entity.getId())
+                .eq(Seasoning::getOwnerUserId, existing.getOwnerUserId())
                 .eq(Seasoning::getSeasoningName, entity.getSeasoningName())
                 .exists()) {
             return ApiResponse.fail("调料名称已存在");
@@ -101,8 +123,12 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("调料id不能为空");
         }
-        if (super.getById(id) == null) {
+        Seasoning existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("调料不存在");
+        }
+        if (!canManage(existing)) {
+            return ApiResponse.fail(403, "只能删除自己的调料");
         }
         Long relCount = recipeSeasoningRelMapper.selectCount(
                 new LambdaQueryWrapper<RecipeSeasoningRel>()
@@ -112,5 +138,27 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
         }
         removeById(id);
         return ApiResponse.success("删除成功", null);
+    }
+
+    private void applyScope(Seasoning entity) {
+        if (UserContext.isSuperAdmin()) {
+            entity.setScope("platform");
+            entity.setOwnerUserId("platform");
+        } else {
+            entity.setScope("personal");
+            entity.setOwnerUserId(UserContext.requireUserId());
+        }
+    }
+
+    private boolean canView(Seasoning seasoning) {
+        return "platform".equals(seasoning.getScope())
+                || UserContext.requireUserId().equals(seasoning.getOwnerUserId());
+    }
+
+    private boolean canManage(Seasoning seasoning) {
+        if ("platform".equals(seasoning.getScope())) {
+            return UserContext.isSuperAdmin();
+        }
+        return UserContext.requireUserId().equals(seasoning.getOwnerUserId());
     }
 }

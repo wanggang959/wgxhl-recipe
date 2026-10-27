@@ -7,6 +7,16 @@ const routes = [
     component: () => import('../views/LoginView.vue'),
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/RegisterView.vue'),
+  },
+  {
+    path: '/join',
+    name: 'JoinHousehold',
+    component: () => import('../views/JoinHouseholdView.vue'),
+  },
+  {
     path: '/',
     component: () => import('../views/MainLayout.vue'),
     children: [
@@ -123,6 +133,11 @@ router.beforeEach((to) => {
     return true
   }
 
+  if (to.path === '/register') {
+    if (isLogin) return '/recipes'
+    return true
+  }
+
   if (!isLogin) {
     return {
       path: '/login',
@@ -142,12 +157,7 @@ router.beforeEach((to) => {
     if (guestWriteBlocked) return isGuestTodoPath(to.path) ? '/todo' : '/recipes'
   }
 
-  const adminOnly = to.path === '/manage/base'
-    || to.path === '/recipe/create'
-    || /^\/recipe\/[^/]+\/edit$/.test(to.path)
-  if (!adminOnly) return true
-  if (user.userRole === 'admin' || user.userRole === 'super_admin') return true
-  return '/recipes'
+  return true
 })
 
 function isGuestTodoPath(path) {

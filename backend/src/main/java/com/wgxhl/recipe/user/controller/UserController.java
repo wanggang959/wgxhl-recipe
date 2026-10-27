@@ -3,7 +3,9 @@ package com.wgxhl.recipe.user.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.common.dto.IdDTO;
+import com.wgxhl.recipe.config.ClientIpResolver;
 import com.wgxhl.recipe.user.dto.UserLoginDTO;
+import com.wgxhl.recipe.user.dto.ChangePasswordDTO;
 import com.wgxhl.recipe.user.dto.UserPageDTO;
 import com.wgxhl.recipe.user.dto.UserStatusDTO;
 import com.wgxhl.recipe.user.dto.UserUsernameDTO;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 @RestController
@@ -83,8 +86,8 @@ public class UserController {
      * @Author wg
      **/
     @PostMapping("/login")
-    public ApiResponse<AppUser> login(@RequestBody UserLoginDTO dto) {
-        return appUserService.login(dto);
+    public ApiResponse<AppUser> login(@RequestBody UserLoginDTO dto, HttpServletRequest request) {
+        return appUserService.login(dto, ClientIpResolver.resolve(request));
     }
 
     /***
@@ -117,5 +120,16 @@ public class UserController {
     @PostMapping("/setStatus")
     public ApiResponse<Void> setStatus(@RequestBody UserStatusDTO dto) {
         return appUserService.setStatus(dto.getId(), dto.getStatus());
+    }
+
+    /***
+     * @Description 本人修改密码
+     **/
+    @PostMapping("/changePassword")
+    public ApiResponse<Void> changePassword(@RequestBody ChangePasswordDTO dto) {
+        if (dto == null) {
+            return ApiResponse.fail("参数不能为空");
+        }
+        return appUserService.changePassword(dto.getOldPassword(), dto.getNewPassword());
     }
 }

@@ -30,6 +30,16 @@ public class Ingredient {
     private String ingredientDesc;
 
     /*
+     * 数据范围：platform-平台公共，personal-个人
+     */
+    private String scope;
+
+    /*
+     * 归属人：平台数据固定为 platform，个人数据为用户id
+     */
+    private String ownerUserId;
+
+    /*
      * 创建时间
      */
     private LocalDateTime createTime;

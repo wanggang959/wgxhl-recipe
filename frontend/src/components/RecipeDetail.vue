@@ -17,6 +17,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  canTakeDown: {
+    type: Boolean,
+    default: false,
+  },
   showFavorite: {
     type: Boolean,
     default: true,
@@ -27,7 +31,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo'])
+const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo', 'toggleStatus'])
 
 const recipe = computed(() => props.detail.recipe || {})
 const cover = computed(() => getRecipeImage(recipe.value.coverImage))
@@ -35,6 +39,7 @@ const ingredients = computed(() => props.detail.ingredientList || [])
 const seasonings = computed(() => props.detail.seasoningList || [])
 const steps = computed(() => props.detail.recipeStepList || [])
 const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || '')
+const isOffline = computed(() => recipe.value.status === '下架')
 </script>
 
 <template>
@@ -56,6 +61,7 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
         </button>
       </div>
       <div class="hero-meta-tags">
+        <span v-if="isOffline" class="detail-tag offline">已下架</span>
         <span v-if="recipe.ownerName" class="detail-tag owner">{{ recipe.ownerName }}</span>
         <span class="detail-tag version">{{ formatRecipeVersionLabel(normalizeRecipeVersion(recipe.recipeVersion)) }}</span>
       </div>
@@ -74,6 +80,16 @@ const tips = computed(() => recipe.value.remark || recipe.value.recipeDesc || ''
             @click="emit('todo', recipe)"
           >
             加入待办
+          </van-button>
+          <van-button
+            v-if="canTakeDown"
+            round
+            size="small"
+            plain
+            :icon="isOffline ? 'eye-o' : 'closed-eye'"
+            @click="emit('toggleStatus')"
+          >
+            {{ isOffline ? '恢复上架' : '下架' }}
           </van-button>
           <van-button v-if="canEdit" round size="small" type="warning" icon="edit" @click="emit('edit')">
             编辑
@@ -303,6 +319,12 @@ h1 {
   background: #fff4e8;
   color: #9a3412;
   border: 1px solid rgba(249, 115, 22, 0.22);
+}
+
+.detail-tag.offline {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.28);
 }
 
 .detail-tag.version {

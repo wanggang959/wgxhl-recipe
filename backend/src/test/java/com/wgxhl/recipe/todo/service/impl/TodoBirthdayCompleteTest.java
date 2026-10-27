@@ -1,5 +1,6 @@
 package com.wgxhl.recipe.todo.service.impl;
 
+import com.wgxhl.recipe.household.service.HouseholdMemberService;
 import com.wgxhl.recipe.notification.service.NotificationService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.todo.entity.Todo;
@@ -44,6 +45,8 @@ class TodoBirthdayCompleteTest {
     @Mock
     private UserPushSubscriptionService userPushSubscriptionService;
     @Mock
+    private HouseholdMemberService householdMemberService;
+    @Mock
     private JavaMailSender mailSender;
     @Mock
     private TodoMapper todoMapper;
@@ -63,6 +66,7 @@ class TodoBirthdayCompleteTest {
                 appUserMapper,
                 notificationService,
                 userPushSubscriptionService,
+                householdMemberService,
                 mailSenderProvider
         );
         ReflectionTestUtils.setField(todoService, "baseMapper", todoMapper);

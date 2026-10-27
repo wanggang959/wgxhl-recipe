@@ -4,6 +4,7 @@ import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.recipe.service.RecipeOwnershipGuard;
 import com.wgxhl.recipe.step.dto.RecipeStepBatchDTO;
 import com.wgxhl.recipe.step.entity.RecipeStep;
 import com.wgxhl.recipe.step.mapper.RecipeStepMapper;
@@ -20,6 +21,12 @@ import java.util.Set;
 @Service
 public class RecipeStepServiceImpl extends ServiceImpl<RecipeStepMapper, RecipeStep>
         implements RecipeStepService {
+
+    private final RecipeOwnershipGuard ownershipGuard;
+
+    public RecipeStepServiceImpl(RecipeOwnershipGuard ownershipGuard) {
+        this.ownershipGuard = ownershipGuard;
+    }
 
     @Override
     public boolean save(RecipeStep entity) {
@@ -55,6 +62,10 @@ public class RecipeStepServiceImpl extends ServiceImpl<RecipeStepMapper, RecipeS
         if (!StringUtils.hasText(entity.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkEditable(entity.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
+        }
         if (entity.getStepNo() == null) {
             return ApiResponse.fail("步骤序号不能为空");
         }
@@ -77,6 +88,10 @@ public class RecipeStepServiceImpl extends ServiceImpl<RecipeStepMapper, RecipeS
         if (existing == null) {
             return ApiResponse.fail("步骤不存在");
         }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
+        }
         if (entity.getStepNo() != null
                 && lambdaQuery()
                 .ne(RecipeStep::getId, entity.getId())
@@ -94,8 +109,13 @@ public class RecipeStepServiceImpl extends ServiceImpl<RecipeStepMapper, RecipeS
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("步骤id不能为空");
         }
-        if (super.getById(id) == null) {
+        RecipeStep existing = super.getById(id);
+        if (existing == null) {
             return ApiResponse.fail("步骤不存在");
+        }
+        String denied = ownershipGuard.checkEditable(existing.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         removeById(id);
         return ApiResponse.success("删除成功", null);
@@ -106,6 +126,10 @@ public class RecipeStepServiceImpl extends ServiceImpl<RecipeStepMapper, RecipeS
     public ApiResponse<Void> saveBatchByRecipeId(RecipeStepBatchDTO dto) {
         if (dto == null || !StringUtils.hasText(dto.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
+        }
+        String denied = ownershipGuard.checkEditable(dto.getRecipeId());
+        if (denied != null) {
+            return ApiResponse.fail(403, denied);
         }
         ApiResponse<Void> validateResult = validateStepList(dto.getStepList());
         if (validateResult != null) {

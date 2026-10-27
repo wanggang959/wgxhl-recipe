@@ -288,7 +288,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
 
             if (allowNotify(user, NOTICE_EMAIL)) {
                 try {
-                    sendEmail(user, "【王师傅家提醒】" + title, target.body);
+                    sendEmail(user, "【王师傅生活助手】" + title, target.body);
                     log.info("Wanted recipe email sent, user={}, to={}", userLabel(user), maskEmail(user.getEmail()));
                     sent++;
                 } catch (Exception ex) {

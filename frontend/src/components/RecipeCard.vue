@@ -46,6 +46,7 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   <article class="recipe-card" @click="emit('open', recipe)">
     <div class="cover-wrap">
       <img class="cover" :src="cover" :alt="recipe.recipeName" loading="lazy" />
+      <span v-if="recipe.status === '下架'" class="offline-badge">已下架</span>
       <button
         v-if="showFavoriteButton"
         class="favorite"
@@ -100,6 +101,19 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   position: relative;
   aspect-ratio: 4 / 3;
   background: var(--app-primary-soft);
+}
+
+.offline-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .cover {

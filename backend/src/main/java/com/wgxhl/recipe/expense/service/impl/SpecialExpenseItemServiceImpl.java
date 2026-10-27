@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.expense.dto.SpecialExpenseItemPageDTO;
 import com.wgxhl.recipe.expense.entity.SpecialExpenseItem;
 import com.wgxhl.recipe.expense.entity.SpecialExpenseProject;
@@ -131,6 +132,10 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
         if (existing == null) {
             return ApiResponse.fail("开支项不存在");
         }
+        String editDenied = manageDeniedReason(existing, actor);
+        if (editDenied != null) {
+            return ApiResponse.fail(403, editDenied);
+        }
         ApiResponse<Void> validate = validate(entity);
         if (validate.getStatus() != 200) {
             return validate;
@@ -153,6 +158,10 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
         SpecialExpenseItem item = super.getById(id);
         if (item == null) {
             return ApiResponse.fail("开支项不存在");
+        }
+        String deleteDenied = manageDeniedReason(item, actor);
+        if (deleteDenied != null) {
+            return ApiResponse.fail(403, deleteDenied);
         }
         if (StringUtils.hasText(item.getTodoId())) {
             todoService.delete(item.getTodoId(), actor);
@@ -283,5 +292,28 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
 
     private boolean isGuest(AppUser actor) {
         return actor != null && ("guest".equals(actor.getId()) || "guest".equals(actor.getUsername()));
+    }
+
+    /**
+     * 开支归家庭所有：开支负责人、专项创建人可以操作，家庭管理员（owner/admin）可代管。
+     *
+     * @return 允许操作返回 null，否则返回提示语
+     */
+    private String manageDeniedReason(SpecialExpenseItem item, AppUser actor) {
+        String denied = "只有开支负责人、专项创建人或家庭管理员可以操作";
+        if (UserContext.isHouseholdManager()) {
+            return null;
+        }
+        if (actor == null || !StringUtils.hasText(actor.getId())) {
+            return denied;
+        }
+        if (actor.getId().equals(item.getOwnerId())) {
+            return null;
+        }
+        SpecialExpenseProject project = projectMapper.selectById(item.getProjectId());
+        if (project != null && actor.getId().equals(project.getCreateUserId())) {
+            return null;
+        }
+        return denied;
     }
 }

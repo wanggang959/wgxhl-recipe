@@ -22,7 +22,7 @@ public interface AppUserService extends IService<AppUser> {
 
     ApiResponse<Void> delete(String id);
 
-    ApiResponse<AppUser> login(UserLoginDTO dto);
+    ApiResponse<AppUser> login(UserLoginDTO dto, String clientIp);
 
     ApiResponse<AppUser> guestLogin();
 
@@ -31,4 +31,14 @@ public interface AppUserService extends IService<AppUser> {
     ApiResponse<List<UserPreviewVO>> listMembers();
 
     ApiResponse<Void> setStatus(String id, String status);
+
+    /**
+     * 本人修改密码，需要校验原密码
+     */
+    ApiResponse<Void> changePassword(String oldPassword, String newPassword);
+
+    /**
+     * 记住账号上次所在家庭，登录时优先恢复
+     */
+    void rememberHousehold(String userId, String householdId);
 }

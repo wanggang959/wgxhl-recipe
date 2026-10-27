@@ -83,7 +83,7 @@ const hasData = computed(() => list.value.length > 0)
 const todayCover = computed(() => getRecipeImage(suggestRecipe.value?.coverImage))
 const familyName = computed(() => userStore.user?.householdName || '王师傅家')
 const isTodayMode = computed(() => route.query.pick === 'today')
-const canManageRecipes = computed(() => userStore.isHouseholdAdmin || userStore.isSuperAdmin)
+const canManageRecipes = computed(() => Boolean(userStore.isSuperAdmin))
 const showOffline = computed(() => query.status === '下架')
 
 function toggleShowOffline() {

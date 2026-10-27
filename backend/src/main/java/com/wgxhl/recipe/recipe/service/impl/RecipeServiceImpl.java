@@ -124,7 +124,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         Page<Recipe> page = new Page<>(dto.getCurrent(), dto.getSize());
         String currentUserId = UserContext.requireUserId();
         boolean publicScope = "public".equalsIgnoreCase(dto.getScope());
-        boolean manager = UserContext.isHouseholdManager();
+        boolean canSeeOffline = UserContext.isSuperAdmin();
         List<String> memberIds = publicScope
                 ? Collections.emptyList()
                 : householdMemberService.listUserIds(TenantContext.require());
@@ -144,8 +144,8 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                             .in(Recipe::getVisibility, "family", "public")
                             .or()
                             .eq(Recipe::getOwnerUserId, currentUserId))
-                    .eq(manager && StringUtils.hasText(dto.getStatus()), Recipe::getStatus, dto.getStatus())
-                    .and(!manager, scope -> scope
+                    .eq(canSeeOffline && StringUtils.hasText(dto.getStatus()), Recipe::getStatus, dto.getStatus())
+                    .and(!canSeeOffline, scope -> scope
                             .ne(Recipe::getStatus, STATUS_OFF)
                             .or()
                             .eq(Recipe::getOwnerUserId, currentUserId));
@@ -227,7 +227,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (recipe == null || !canView(recipe)) {
             return ApiResponse.fail("菜谱不存在");
         }
-        if (STATUS_OFF.equals(recipe.getStatus()) && !canTakeDown(recipe)) {
+        if (STATUS_OFF.equals(recipe.getStatus()) && !canViewOffline(recipe)) {
             return ApiResponse.fail("这道菜已被下架");
         }
         recipe.setLiked(isLikedBy(id, UserContext.requireUserId()));
@@ -299,7 +299,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             return ApiResponse.fail("菜谱不存在");
         }
         if (!canTakeDown(recipe)) {
-            return ApiResponse.fail(403, "只有菜谱作者或家庭管理员可以下架菜谱");
+            return ApiResponse.fail(403, "只有王师傅可以下架或恢复菜谱");
         }
         if (status.equals(recipe.getStatus())) {
             return ApiResponse.success(STATUS_OFF.equals(status) ? "这道菜已是下架状态" : "这道菜已在架上", null);
@@ -312,20 +312,18 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     }
 
     /**
-     * 下架/恢复：作者本人，或菜谱作者所在家庭的 owner/admin
+     * 下架和恢复只有超级管理员王师傅可以操作，属于平台层面的内容管理。
      */
     private boolean canTakeDown(Recipe recipe) {
-        String currentUserId = UserContext.requireUserId();
-        if (currentUserId.equals(recipe.getOwnerUserId())) {
-            return true;
-        }
-        if ("public".equals(recipe.getVisibility()) && UserContext.isSuperAdmin()) {
-            return true;
-        }
-        if (!UserContext.isHouseholdManager()) {
-            return false;
-        }
-        return householdMemberService.listUserIds(TenantContext.require()).contains(recipe.getOwnerUserId());
+        return UserContext.isSuperAdmin();
+    }
+
+    /**
+     * 已下架的菜谱：作者本人仍可打开查看，超管也可以。
+     */
+    private boolean canViewOffline(Recipe recipe) {
+        return UserContext.isSuperAdmin()
+                || UserContext.requireUserId().equals(recipe.getOwnerUserId());
     }
 
     @Override

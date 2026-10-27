@@ -37,13 +37,17 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  showTodoAction: {
+  showWantAction: {
     type: Boolean,
     default: true,
   },
+  wanted: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'todo', 'toggleStatus', 'like'])
+const emit = defineEmits(['back', 'favorite', 'edit', 'delete', 'want', 'toggleStatus', 'like'])
 
 const recipe = computed(() => props.detail.recipe || {})
 const cover = computed(() => getRecipeImage(recipe.value.coverImage))
@@ -86,27 +90,31 @@ const isOffline = computed(() => recipe.value.status === '下架')
         <div class="title-actions">
           <van-button
             v-if="showLike"
+            class="title-action"
+            :class="{ active: liked }"
             round
             size="small"
             plain
-            :type="liked ? 'warning' : 'default'"
-            :icon="liked ? 'good-job' : 'good-job-o'"
+            icon="good-job-o"
             @click="emit('like')"
           >
-            {{ likeCount > 0 ? likeCount : '点赞' }}
+            {{ likeCount > 0 ? `赞 ${likeCount}` : '点赞' }}
           </van-button>
           <van-button
-            v-if="showTodoAction"
+            v-if="showWantAction"
+            class="title-action"
+            :class="{ active: wanted }"
             round
             size="small"
-            type="warning"
-            icon="todo-list-o"
-            @click="emit('todo', recipe)"
+            plain
+            icon="shopping-cart-o"
+            @click="emit('want')"
           >
-            加入待办
+            {{ wanted ? '已想吃' : '想吃' }}
           </van-button>
           <van-button
             v-if="canTakeDown"
+            class="title-action"
             round
             size="small"
             plain
@@ -115,10 +123,10 @@ const isOffline = computed(() => recipe.value.status === '下架')
           >
             {{ isOffline ? '恢复上架' : '下架' }}
           </van-button>
-          <van-button v-if="canEdit" round size="small" type="warning" icon="edit" @click="emit('edit')">
+          <van-button v-if="canEdit" class="title-action" round size="small" plain icon="edit" @click="emit('edit')">
             编辑
           </van-button>
-          <van-button v-if="canEdit" round size="small" plain type="danger" icon="delete-o" @click="emit('delete')">
+          <van-button v-if="canEdit" class="title-action is-danger" round size="small" plain icon="delete-o" @click="emit('delete')">
             删除
           </van-button>
         </div>
@@ -310,6 +318,22 @@ const isOffline = computed(() => recipe.value.status === '下架')
   padding: 0 11px;
   line-height: 1;
   white-space: nowrap;
+}
+
+.title-actions :deep(.title-action) {
+  border-color: #e5e7eb !important;
+  background: #fff !important;
+  color: #4b5563 !important;
+}
+
+.title-actions :deep(.title-action.active) {
+  border-color: rgba(234, 88, 12, 0.4) !important;
+  color: #c2410c !important;
+}
+
+.title-actions :deep(.title-action.is-danger) {
+  border-color: rgba(185, 28, 28, 0.25) !important;
+  color: #b91c1c !important;
 }
 
 h1 {

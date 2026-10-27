@@ -17,9 +17,7 @@ export const useUserStore = defineStore('user', {
           && (user.userRole === 'super_admin' || user.username === '王师傅'),
       )
     },
-    isNormalUser: (state) => Boolean(state.user?.id && state.user?.token && state.user?.userRole === 'user'),
     isGuest: (state) => state.user?.id === 'guest' || state.user?.username === 'guest',
-    memberRole: (state) => state.user?.memberRole || '',
     isHouseholdOwner: (state) => state.user?.memberRole === 'owner',
     isHouseholdAdmin: (state) => ['owner', 'admin'].includes(state.user?.memberRole || ''),
     canManageMembers: (state) => {

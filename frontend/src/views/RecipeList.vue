@@ -191,6 +191,9 @@ async function loadMore(options = {}) {
       finished.value = true
     }
     await Promise.all([syncFavoriteState(records), syncWantedState(records)])
+    if (suggestRecipe.value?.status === '下架') {
+      suggestRecipe.value = null
+    }
     if (!suggestRecipe.value && list.value.length > 0) {
       chooseRandomRecipe()
     }
@@ -267,15 +270,16 @@ function pickCategory(categoryId = '') {
 function chooseRandomRecipe(options = {}) {
   const showMessage = Boolean(options.showMessage)
   const forceDifferent = Boolean(options.forceDifferent)
+  const available = list.value.filter((item) => item.status !== '下架')
 
-  if (list.value.length === 0) {
+  if (available.length === 0) {
     suggestRecipe.value = null
     return
   }
 
-  let pool = list.value
-  if (forceDifferent && suggestRecipe.value && list.value.length > 1) {
-    pool = list.value.filter((item) => item.id !== suggestRecipe.value.id)
+  let pool = available
+  if (forceDifferent && suggestRecipe.value && available.length > 1) {
+    pool = available.filter((item) => item.id !== suggestRecipe.value.id)
   }
 
   const randomIndex = Math.floor(Math.random() * pool.length)
@@ -289,7 +293,7 @@ function chooseRandomRecipe(options = {}) {
     return
   }
 
-  if (forceDifferent && list.value.length <= 1) {
+  if (forceDifferent && available.length <= 1) {
     showRecommendMessage('目前只有一道菜，先去添加更多吧')
     return
   }

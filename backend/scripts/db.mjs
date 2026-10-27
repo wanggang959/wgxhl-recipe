@@ -6,14 +6,20 @@
  *   node backend/scripts/db.mjs "select * from todo limit 5"
  *   node backend/scripts/db.mjs --file backend/sql/add_xxx.sql --write
  *   node backend/scripts/db.mjs --write "update todo set status='DONE' where id='...'"
+ *   node backend/scripts/db.mjs --tunnel "select count(*) from recipe"
  *   echo "show tables" | node backend/scripts/db.mjs
  *
  * 默认只允许 SELECT / SHOW / DESCRIBE / EXPLAIN；
  * 其他语句必须显式加 --write，执行前请确认已备份。
- * 可用 MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASS / MYSQL_DB 覆盖配置。
+ * 生产 MySQL 只监听 127.0.0.1，远程访问需加 --tunnel（自动开 SSH 隧道）。
+ * 可用 MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASS / MYSQL_DB 覆盖配置，
+ * 隧道相关可用 MYSQL_SSH_HOST / MYSQL_SSH_USER / MYSQL_SSH_KEY / MYSQL_TUNNEL_PORT。
  */
 import fs from 'node:fs'
+import net from 'node:net'
+import os from 'node:os'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import mysql from 'mysql2/promise'
 
@@ -22,6 +28,7 @@ const repoRoot = path.resolve(__dirname, '../..')
 
 const args = process.argv.slice(2)
 const allowWrite = args.includes('--write')
+const useTunnel = args.includes('--tunnel') || process.env.MYSQL_TUNNEL === '1'
 const fileIndex = args.indexOf('--file')
 
 function loadConfig() {
@@ -58,7 +65,7 @@ function readSql() {
     return fs.readFileSync(path.resolve(process.cwd(), filePath), 'utf8')
   }
   const inline = args.filter((arg, index) => index !== fileIndex + 1 || fileIndex < 0)
-    .filter((arg) => arg !== '--write' && arg !== '--file')
+    .filter((arg) => arg !== '--write' && arg !== '--file' && arg !== '--tunnel')
   if (inline.length > 0) return inline.join(' ')
   return fs.readFileSync(0, 'utf8')
 }
@@ -77,6 +84,57 @@ function formatRows(rows) {
   return JSON.stringify(rows, null, 2)
 }
 
+function waitForPort(port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  return new Promise((resolve, reject) => {
+    const attempt = () => {
+      const socket = net.connect({ host: '127.0.0.1', port })
+      socket.setTimeout(1000)
+      socket.once('connect', () => {
+        socket.destroy()
+        resolve()
+      })
+      const retry = () => {
+        socket.destroy()
+        if (Date.now() > deadline) {
+          reject(new Error(`等待本地端口 ${port} 超时`))
+          return
+        }
+        setTimeout(attempt, 500)
+      }
+      socket.once('error', retry)
+      socket.once('timeout', retry)
+    }
+    attempt()
+  })
+}
+
+let tunnel = null
+
+async function startTunnel(config) {
+  const sshHost = process.env.MYSQL_SSH_HOST || config.host
+  const sshUser = process.env.MYSQL_SSH_USER || 'root'
+  const sshKey = process.env.MYSQL_SSH_KEY
+    || path.join(os.homedir(), 'Desktop', 'ssh-key-154.219.110.161.key')
+  const localPort = Number(process.env.MYSQL_TUNNEL_PORT || 13306)
+  if (!fs.existsSync(sshKey)) {
+    throw new Error(`找不到 SSH 私钥：${sshKey}（可用 MYSQL_SSH_KEY 指定）`)
+  }
+  tunnel = spawn('ssh', [
+    '-i', sshKey,
+    '-o', 'BatchMode=yes',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    '-o', 'ExitOnForwardFailure=yes',
+    '-N',
+    '-L', `127.0.0.1:${localPort}:127.0.0.1:3306`,
+    `${sshUser}@${sshHost}`,
+  ], { stdio: 'ignore' })
+  tunnel.on('error', () => {})
+  await waitForPort(localPort, 15000)
+  console.error(`SSH 隧道已建立：127.0.0.1:${localPort} -> ${sshHost}:3306`)
+  return { host: '127.0.0.1', port: localPort }
+}
+
 const sql = readSql().trim()
 if (!sql) {
   console.error('SQL 不能为空')
@@ -88,11 +146,21 @@ if (!allowWrite && !isReadOnly(sql)) {
 }
 
 const config = loadConfig()
+if (useTunnel) {
+  const local = await startTunnel(config)
+  config.host = local.host
+  config.port = local.port
+}
+
 const conn = await mysql.createConnection({
   ...config,
   charset: 'utf8mb4',
   connectTimeout: 15000,
   multipleStatements: allowWrite,
+})
+
+process.on('exit', () => {
+  if (tunnel) tunnel.kill()
 })
 
 try {
@@ -108,4 +176,5 @@ try {
   }
 } finally {
   await conn.end()
+  if (tunnel) tunnel.kill()
 }

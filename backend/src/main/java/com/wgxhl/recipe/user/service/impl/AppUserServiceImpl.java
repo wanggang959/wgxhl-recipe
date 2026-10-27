@@ -506,11 +506,11 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     }
 
     @Override
-    public ApiResponse<AppUser> login(UserLoginDTO dto) {
+    public ApiResponse<AppUser> login(UserLoginDTO dto, String clientIp) {
         if (dto == null || !StringUtils.hasText(dto.getUsername()) || !StringUtils.hasText(dto.getPassword())) {
             return ApiResponse.fail("用户名或密码错误");
         }
-        String lockedMessage = loginAttemptService.lockedMessage(dto.getUsername());
+        String lockedMessage = loginAttemptService.lockedMessage(dto.getUsername(), clientIp);
         if (lockedMessage != null) {
             return ApiResponse.fail(429, lockedMessage);
         }
@@ -518,10 +518,10 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 .eq(AppUser::getUsername, dto.getUsername())
                 .one();
         if (user == null || !PasswordUtil.matches(dto.getPassword(), user.getPassword())) {
-            loginAttemptService.onFailure(dto.getUsername());
+            loginAttemptService.onFailure(dto.getUsername(), clientIp);
             return ApiResponse.fail("用户名或密码错误");
         }
-        loginAttemptService.onSuccess(dto.getUsername());
+        loginAttemptService.onSuccess(dto.getUsername(), clientIp);
         if (!STATUS_NORMAL.equals(user.getStatus())) {
             return ApiResponse.fail(disabledLoginMessage(user));
         }

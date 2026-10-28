@@ -11,12 +11,10 @@ import com.wgxhl.recipe.user.service.EmailVerificationCodeService;
 import com.wgxhl.recipe.user.service.EmailSendQuotaService;
 import com.wgxhl.recipe.user.util.PasswordUtil;
 import com.wgxhl.recipe.user.util.SecurityTokenUtil;
+import com.wgxhl.recipe.mail.MailDeliveryService;
+import com.wgxhl.recipe.mail.MailDeliveryService.Kind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -35,17 +33,14 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
     private static final int MAX_ATTEMPTS = 5;
 
     private final AppUserMapper appUserMapper;
-    private final JavaMailSender mailSender;
+    private final MailDeliveryService mailDeliveryService;
     private final EmailSendQuotaService quotaService;
 
-    @Value("${spring.mail.username:}")
-    private String mailUsername;
-
     public EmailVerificationCodeServiceImpl(AppUserMapper appUserMapper,
-                                            ObjectProvider<JavaMailSender> mailSenderProvider,
+                                            MailDeliveryService mailDeliveryService,
                                             EmailSendQuotaService quotaService) {
         this.appUserMapper = appUserMapper;
-        this.mailSender = mailSenderProvider.getIfAvailable();
+        this.mailDeliveryService = mailDeliveryService;
         this.quotaService = quotaService;
     }
 
@@ -77,7 +72,7 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
         if (hourlyCount >= HOURLY_LIMIT) {
             return ApiResponse.fail("验证码发送次数过多，请稍后再试");
         }
-        if (mailSender == null || !StringUtils.hasText(mailUsername)) {
+        if (!mailDeliveryService.isReady(Kind.CODE)) {
             return ApiResponse.fail("邮箱服务未配置，暂时无法发送验证码");
         }
 
@@ -97,13 +92,7 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
         save(entity);
 
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailUsername);
-            message.setTo(target);
-            message.setSubject("【王师傅生活助手】注册验证码");
-            message.setText("你的注册验证码是 " + code + "，"
-                    + CODE_EXPIRE_MINUTES + " 分钟内有效。如非本人操作，请忽略此邮件。");
-            mailSender.send(message);
+            mailDeliveryService.sendCode(target, "注册", code);
         } catch (Exception ex) {
             removeById(entity.getId());
             log.warn("Register verification email failed, email={}, type={}", maskEmail(target), ex.getClass().getSimpleName());

@@ -25,12 +25,10 @@ import com.wgxhl.recipe.todo.service.TodoService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.impl.AppUserServiceImpl;
+import com.wgxhl.recipe.mail.MailDeliveryService;
+import com.wgxhl.recipe.mail.MailDeliveryService.ReminderType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -42,6 +40,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -77,10 +76,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private final NotificationService notificationService;
     private final UserPushSubscriptionService userPushSubscriptionService;
     private final HouseholdMemberService householdMemberService;
-    private final JavaMailSender mailSender;
-
-    @Value("${spring.mail.username:}")
-    private String mailUsername;
+    private final MailDeliveryService mailDeliveryService;
 
     public TodoServiceImpl(TodoNoticeRuleMapper todoNoticeRuleMapper,
                            TodoOwnerMapper todoOwnerMapper,
@@ -89,7 +85,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                            NotificationService notificationService,
                            UserPushSubscriptionService userPushSubscriptionService,
                            HouseholdMemberService householdMemberService,
-                           ObjectProvider<JavaMailSender> mailSenderProvider) {
+                           MailDeliveryService mailDeliveryService) {
         this.todoNoticeRuleMapper = todoNoticeRuleMapper;
         this.todoOwnerMapper = todoOwnerMapper;
         this.todoSendLogMapper = todoSendLogMapper;
@@ -97,7 +93,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         this.notificationService = notificationService;
         this.userPushSubscriptionService = userPushSubscriptionService;
         this.householdMemberService = householdMemberService;
-        this.mailSender = mailSenderProvider.getIfAvailable();
+        this.mailDeliveryService = mailDeliveryService;
     }
 
     @Override
@@ -477,7 +473,6 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     private int sendByRule(Todo todo, TodoNoticeRule rule, LocalDateTime targetTime) {
         int sent = 0;
-        String title = "【王师傅生活助手】" + todo.getTitle();
         String content = buildNoticeContent(todo, rule);
         List<AppUser> owners = resolveOwners(todo);
         if (owners.isEmpty()) {
@@ -512,7 +507,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                         todo.getId(), ownerLabel(owner), owner == null ? null : owner.getNotificationPreference());
             } else if (shouldAttempt(todo, rule, targetTime, NOTICE_EMAIL, owner)) {
                 try {
-                    sendEmail(owner, title, content);
+                    sendEmail(owner, todo);
                     logSend(todo, rule, targetTime, owner, NOTICE_EMAIL, "SUCCESS", null);
                     log.info("Todo email sent, todoId={}, owner={}, to={}", todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()));
                     sent++;
@@ -584,19 +579,14 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         return email.charAt(0) + "***" + email.substring(atIndex);
     }
 
-    private void sendEmail(AppUser owner, String title, String content) {
-        if (mailSender == null || !StringUtils.hasText(mailUsername)) {
-            throw new IllegalStateException("邮箱服务未配置");
-        }
+    private void sendEmail(AppUser owner, Todo todo) {
         if (owner == null || !StringUtils.hasText(owner.getEmail())) {
             throw new IllegalStateException("负责人邮箱未配置");
         }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailUsername);
-        message.setTo(owner.getEmail());
-        message.setSubject(title);
-        message.setText(content);
-        mailSender.send(message);
+        ReminderType type = "BIRTHDAY".equals(todo.getCategory()) ? ReminderType.BIRTHDAY : ReminderType.TODO;
+        String remindTime = todo.getDueTime() == null ? "未设置时间"
+                : todo.getDueTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        mailDeliveryService.sendNotification(owner.getEmail(), type, remindTime, todo.getTitle());
     }
 
     private boolean allowNotify(AppUser owner, String type) {

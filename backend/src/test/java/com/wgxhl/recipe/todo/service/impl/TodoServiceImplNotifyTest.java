@@ -14,15 +14,14 @@ import com.wgxhl.recipe.todo.mapper.TodoOwnerMapper;
 import com.wgxhl.recipe.todo.mapper.TodoSendLogMapper;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
+import com.wgxhl.recipe.mail.MailDeliveryService;
+import com.wgxhl.recipe.mail.MailDeliveryService.ReminderType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -33,7 +32,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
@@ -58,7 +56,7 @@ class TodoServiceImplNotifyTest {
     @Mock
     private HouseholdMemberService householdMemberService;
     @Mock
-    private JavaMailSender mailSender;
+    private MailDeliveryService mailDeliveryService;
     @Mock
     private TodoMapper todoMapper;
 
@@ -66,10 +64,6 @@ class TodoServiceImplNotifyTest {
 
     @BeforeEach
     void setUp() {
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JavaMailSender> mailSenderProvider = mock(ObjectProvider.class);
-        when(mailSenderProvider.getIfAvailable()).thenReturn(mailSender);
-
         todoService = new TodoServiceImpl(
                 todoNoticeRuleMapper,
                 todoOwnerMapper,
@@ -78,10 +72,9 @@ class TodoServiceImplNotifyTest {
                 notificationService,
                 userPushSubscriptionService,
                 householdMemberService,
-                mailSenderProvider
+                mailDeliveryService
         );
         ReflectionTestUtils.setField(todoService, "baseMapper", todoMapper);
-        ReflectionTestUtils.setField(todoService, "mailUsername", "noreply@wgxhl.space");
     }
 
     @Test
@@ -102,26 +95,58 @@ class TodoServiceImplNotifyTest {
                 eq("TODO"),
                 eq("todo-1")
         );
-        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        verify(mailDeliveryService, never()).sendNotification(any(String.class), any(ReminderType.class), any(String.class), any(String.class));
         verify(todoSendLogMapper).insert(any(TodoSendLog.class));
     }
 
     @Test
     void sendByRule_shouldSendEmailWhenEnabled() {
         Todo todo = buildTodo(false, true, false);
-        TodoNoticeRule rule = buildRule(0);
+        todo.setDueTime(LocalDateTime.of(2026, 11, 2, 9, 5, 47));
+        TodoNoticeRule rule = buildRule(30);
         AppUser owner = buildOwner("user-1", "wang@test.com", "site,email");
 
         int sent = invokeSendByRule(todo, rule, owner);
 
         assertEquals(1, sent);
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(captor.capture());
-        SimpleMailMessage message = captor.getValue();
-        assertEquals("noreply@wgxhl.space", message.getFrom());
-        assertEquals("wang@test.com", message.getTo()[0]);
-        assertTrue(message.getSubject().contains("买豆腐"));
+        ArgumentCaptor<String> recipient = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<ReminderType> type = ArgumentCaptor.forClass(ReminderType.class);
+        ArgumentCaptor<String> remindTime = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> remindDetail = ArgumentCaptor.forClass(String.class);
+        verify(mailDeliveryService).sendNotification(recipient.capture(), type.capture(),
+                remindTime.capture(), remindDetail.capture());
+        assertEquals("wang@test.com", recipient.getValue());
+        assertEquals(ReminderType.TODO, type.getValue());
+        assertEquals("2026-11-02 09:05", remindTime.getValue());
+        assertEquals(todo.getTitle(), remindDetail.getValue());
         verify(notificationService, never()).createSiteNotice(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void sendByRule_shouldUseBirthdayTypeAndTitleOnly() {
+        Todo todo = buildTodo(false, true, false);
+        todo.setCategory("BIRTHDAY");
+        todo.setTitle("家人生日");
+        todo.setBirthdayYear(1990);
+        todo.setDueTime(LocalDateTime.of(2026, 11, 2, 11, 0));
+        AppUser owner = buildOwner("user-1", "wang@test.com", "email");
+
+        assertEquals(1, invokeSendByRule(todo, buildRule(10080), owner));
+
+        verify(mailDeliveryService).sendNotification("wang@test.com", ReminderType.BIRTHDAY,
+                "2026-11-02 11:00", "家人生日");
+    }
+
+    @Test
+    void sendEmail_shouldUseFallbackWhenDueTimeIsMissing() {
+        Todo todo = buildTodo(false, true, false);
+        todo.setDueTime(null);
+        AppUser owner = buildOwner("user-1", "wang@test.com", "email");
+
+        ReflectionTestUtils.invokeMethod(todoService, "sendEmail", owner, todo);
+
+        verify(mailDeliveryService).sendNotification("wang@test.com", ReminderType.TODO,
+                "未设置时间", "买豆腐");
     }
 
     @Test
@@ -133,7 +158,7 @@ class TodoServiceImplNotifyTest {
         int sent = invokeSendByRule(todo, rule, owner);
 
         assertEquals(0, sent);
-        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        verify(mailDeliveryService, never()).sendNotification(any(String.class), any(ReminderType.class), any(String.class), any(String.class));
         verify(notificationService, never()).createSiteNotice(any(), any(), any(), any(), any());
     }
 
@@ -155,7 +180,7 @@ class TodoServiceImplNotifyTest {
                 eq("TODO"),
                 eq("todo-1")
         );
-        verify(mailSender).send(any(SimpleMailMessage.class));
+        verify(mailDeliveryService).sendNotification(any(String.class), any(ReminderType.class), any(String.class), any(String.class));
     }
 
     @Test
@@ -172,13 +197,13 @@ class TodoServiceImplNotifyTest {
                 Collections.singletonList(siteSuccess), Collections.singletonList(emailFailure));
         when(notificationService.createSiteNotice(any(), any(), any(), any(), any())).thenReturn(new Notification());
         doThrow(new org.springframework.mail.MailSendException("temporary"))
-                .doNothing().when(mailSender).send(any(SimpleMailMessage.class));
+                .doNothing().when(mailDeliveryService).sendNotification(any(String.class), any(ReminderType.class), any(String.class), any(String.class));
 
         assertEquals(1, invokeSendByRule(todo, rule, owner));
         assertEquals(1, invokeSendByRule(todo, rule, owner));
 
         verify(notificationService, times(1)).createSiteNotice(any(), any(), any(), any(), any());
-        verify(mailSender, times(2)).send(any(SimpleMailMessage.class));
+        verify(mailDeliveryService, times(2)).sendNotification(any(String.class), any(ReminderType.class), any(String.class), any(String.class));
         ArgumentCaptor<TodoSendLog> logs = ArgumentCaptor.forClass(TodoSendLog.class);
         verify(todoSendLogMapper, times(3)).insert(logs.capture());
         assertTrue(logs.getAllValues().stream().allMatch(entry -> "user-1".equals(entry.getRecipientId())

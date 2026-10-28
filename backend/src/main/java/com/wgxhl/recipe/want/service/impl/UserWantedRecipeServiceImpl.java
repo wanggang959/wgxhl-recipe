@@ -18,12 +18,10 @@ import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
 import com.wgxhl.recipe.want.service.UserWantedRecipeService;
 import com.wgxhl.recipe.want.vo.WantNotifyPreviewVO;
+import com.wgxhl.recipe.mail.MailDeliveryService;
+import com.wgxhl.recipe.mail.MailDeliveryService.ReminderType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import java.time.LocalDate;
@@ -46,21 +44,18 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
     private final AppUserMapper appUserMapper;
     private final NotificationService notificationService;
     private final UserPushSubscriptionService userPushSubscriptionService;
-    private final JavaMailSender mailSender;
-
-    @Value("${spring.mail.username:}")
-    private String mailUsername;
+    private final MailDeliveryService mailDeliveryService;
 
     public UserWantedRecipeServiceImpl(RecipeMapper recipeMapper,
                                        AppUserMapper appUserMapper,
                                        NotificationService notificationService,
                                        UserPushSubscriptionService userPushSubscriptionService,
-                                       ObjectProvider<JavaMailSender> mailSenderProvider) {
+                                       MailDeliveryService mailDeliveryService) {
         this.recipeMapper = recipeMapper;
         this.appUserMapper = appUserMapper;
         this.notificationService = notificationService;
         this.userPushSubscriptionService = userPushSubscriptionService;
-        this.mailSender = mailSenderProvider.getIfAvailable();
+        this.mailDeliveryService = mailDeliveryService;
     }
 
     @Override
@@ -288,7 +283,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
 
             if (allowNotify(user, NOTICE_EMAIL)) {
                 try {
-                    sendEmail(user, "【王师傅生活助手】" + title, target.body);
+                    sendEmail(user, target);
                     log.info("Wanted recipe email sent, user={}, to={}", userLabel(user), maskEmail(user.getEmail()));
                     sent++;
                 } catch (Exception ex) {
@@ -342,19 +337,12 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
                 .collect(Collectors.toList());
     }
 
-    private void sendEmail(AppUser user, String title, String content) {
-        if (mailSender == null || !StringUtils.hasText(mailUsername)) {
-            throw new IllegalStateException("邮箱服务未配置");
-        }
+    private void sendEmail(AppUser user, NotifyTarget target) {
         if (user == null || !StringUtils.hasText(user.getEmail())) {
             throw new IllegalStateException("用户邮箱未配置");
         }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailUsername);
-        message.setTo(user.getEmail());
-        message.setSubject(title);
-        message.setText(content);
-        mailSender.send(message);
+        mailDeliveryService.sendNotification(user.getEmail(), ReminderType.MEAL_PREPARATION,
+                target.plannedDate.toString(), target.recipeNames);
     }
 
     private boolean allowNotify(AppUser user, String type) {
@@ -435,7 +423,8 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
                 .filter(item -> plannedDate.equals(item.getPlannedDate()))
                 .collect(Collectors.toList());
         String body = buildNotifyBody(actor, plannedDate, wantedList);
-        return new NotifyTarget(plannedDate, body);
+        String recipeNames = joinRecipeNames(wantedList);
+        return new NotifyTarget(plannedDate, body, recipeNames);
     }
 
     private String buildNotifyBody(AppUser actor, LocalDate plannedDate, List<UserWantedRecipe> wantedList) {
@@ -460,10 +449,12 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
     private static final class NotifyTarget {
         private final LocalDate plannedDate;
         private final String body;
+        private final String recipeNames;
 
-        private NotifyTarget(LocalDate plannedDate, String body) {
+        private NotifyTarget(LocalDate plannedDate, String body, String recipeNames) {
             this.plannedDate = plannedDate;
             this.body = body;
+            this.recipeNames = recipeNames;
         }
     }
 

@@ -16,13 +16,12 @@ import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.util.EmailAddress;
 import com.wgxhl.recipe.user.util.PasswordUtil;
 import com.wgxhl.recipe.user.util.SecurityTokenUtil;
+import com.wgxhl.recipe.mail.MailDeliveryService;
+import com.wgxhl.recipe.mail.MailDeliveryService.Kind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
@@ -44,22 +43,21 @@ public class AccountSecurityService {
     private final HouseholdService households;
     private final EmailSendQuotaService quotas;
     private final LoginAttemptService attempts;
-    private final JavaMailSender mailSender;
+    private final MailDeliveryService mailDeliveryService;
 
-    @Value("${spring.mail.username:}") private String sender;
     @Value("${account.security.public-url:https://recipe.wgxhl.space}") private String publicUrl;
 
     public AccountSecurityService(AppUserMapper users, AccountSecurityTicketMapper tickets,
                                   HouseholdMemberService members, HouseholdService households,
                                   EmailSendQuotaService quotas, LoginAttemptService attempts,
-                                  ObjectProvider<JavaMailSender> mailProvider) {
+                                  MailDeliveryService mailDeliveryService) {
         this.users = users;
         this.tickets = tickets;
         this.members = members;
         this.households = households;
         this.quotas = quotas;
         this.attempts = attempts;
-        this.mailSender = mailProvider.getIfAvailable();
+        this.mailDeliveryService = mailDeliveryService;
     }
 
     public ApiResponse<Map<String, Object>> status() {
@@ -71,7 +69,7 @@ public class AccountSecurityService {
     public ApiResponse<Void> requestReset(String address, String ip) {
         String target = email(address);
         if (!EmailAddress.isValid(target)) return ApiResponse.fail("请输入有效的邮箱地址");
-        if (!mailReady()) return ApiResponse.fail("邮箱服务暂不可用，请稍后重试");
+        if (!mailDeliveryService.isReady(Kind.PASSWORD_RESET)) return ApiResponse.fail("邮箱服务暂不可用，请稍后重试");
         List<AppUser> matches = users.findLoginByEmail(target);
         AppUser user = matches.size() == 1 ? matches.get(0) : null;
         // Keep public responses identical for unknown, unverified and rate-limited accounts.
@@ -98,7 +96,7 @@ public class AccountSecurityService {
         if (!Boolean.TRUE.equals(target.getEmailVerified()) || !EmailAddress.isValid(email(target.getEmail()))) {
             return ApiResponse.fail("请该成员先登录并验证自己的邮箱");
         }
-        if (!mailReady()) return ApiResponse.fail("邮箱服务暂不可用，请稍后重试");
+        if (!mailDeliveryService.isReady(Kind.PASSWORD_RESET)) return ApiResponse.fail("邮箱服务暂不可用，请稍后重试");
         error = quotas.reserve(List.of(target.getId(), UserContext.requireUserId()), List.of(email(target.getEmail())), ip);
         if (error != null) return ApiResponse.fail(error);
         return issueReset(target, UserContext.requireUserId(), TenantContext.require())
@@ -156,7 +154,7 @@ public class AccountSecurityService {
         if (users.countEmailUsedByAnotherUser(target, user.getId()) > 0) return ApiResponse.fail("该邮箱已被使用");
         boolean needsOldCode = !original.isEmpty() && !original.equals(target);
         if (needsOldCode && !EmailAddress.isValid(original)) return ApiResponse.fail("原邮箱格式异常，请联系管理员处理");
-        if (!mailReady()) return ApiResponse.fail("邮箱服务暂不可用，请稍后重试");
+        if (!mailDeliveryService.isReady(Kind.CODE)) return ApiResponse.fail("邮箱服务暂不可用，请稍后重试");
         List<String> recipients = needsOldCode ? List.of(original, target) : List.of(target);
         String error = quotas.reserve(List.of(user.getId()), recipients, ip);
         if (error != null) return ApiResponse.fail(error);
@@ -169,8 +167,8 @@ public class AccountSecurityService {
         if (needsOldCode) ticket.setCodeOldHash(PasswordUtil.hash(oldCode));
         tickets.insert(ticket);
         try {
-            if (needsOldCode) send(original, "邮箱更换确认", "你正在更换账号邮箱，原邮箱验证码：" + oldCode + "。10 分钟内有效。非本人操作请勿提供验证码。");
-            send(target, "邮箱验证", "你的邮箱验证码：" + newCode + "。10 分钟内有效。非本人操作请忽略此邮件。");
+            if (needsOldCode) mailDeliveryService.sendCode(original, "更换邮箱确认", oldCode);
+            mailDeliveryService.sendCode(target, "邮箱验证", newCode);
         } catch (Exception ex) {
             consume(ticket);
             log.warn("Account email verification delivery failed, user={}, type={}", user.getId(), ex.getClass().getSimpleName());
@@ -214,8 +212,7 @@ public class AccountSecurityService {
         ticket.setTokenHash(SecurityTokenUtil.hash(token));
         tickets.insert(ticket);
         try {
-            send(email(user.getEmail()), "重置密码", "你收到了一次密码重置申请。请在 30 分钟内打开以下链接，自行设置新密码：\n"
-                    + resetUrl(token) + "\n\n链接只能使用一次。非本人操作请忽略，不会自动修改密码。请勿转发此链接。");
+            mailDeliveryService.sendPasswordReset(email(user.getEmail()), resetUrl(token));
             return true;
         } catch (Exception ex) {
             consume(ticket);
@@ -284,7 +281,6 @@ public class AccountSecurityService {
         tickets.updateById(patch);
     }
 
-    private boolean mailReady() { return mailSender != null && StringUtils.hasText(sender); }
     private boolean active(AppUser user) { return user != null && "normal".equals(user.getStatus()); }
     private long version(AppUser user) { return user.getAuthVersion() == null ? 0L : user.getAuthVersion(); }
     private LocalDateTime now() { return LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai")); }
@@ -310,14 +306,5 @@ public class AccountSecurityService {
         if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null
                 || uri.getQuery() != null || uri.getFragment() != null) throw new IllegalStateException("Invalid account security public URL");
         return publicUrl.replaceAll("/+$", "") + "/#/reset-password?token=" + token;
-    }
-
-    private void send(String email, String title, String content) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(sender);
-        message.setTo(email);
-        message.setSubject("【家庭生活助手】" + title);
-        message.setText(content);
-        mailSender.send(message);
     }
 }

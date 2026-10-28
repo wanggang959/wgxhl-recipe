@@ -6,7 +6,7 @@ import com.wgxhl.recipe.user.entity.EmailVerificationCode;
 
 public interface EmailVerificationCodeService extends IService<EmailVerificationCode> {
 
-    ApiResponse<Void> sendRegisterCode(String email);
+    ApiResponse<Void> sendRegisterCode(String email, String clientIp);
 
     String verifyAndConsume(String email, String code);
 }

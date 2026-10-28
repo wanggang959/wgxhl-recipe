@@ -36,7 +36,10 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             "/user/register/sendCode",
             "/user/register/inviteInfo",
             "/user/register/email",
-            "/user/register/invite"
+            "/user/register/invite",
+            "/user/security/requestReset",
+            "/user/security/resetInfo",
+            "/user/security/confirmReset"
     ));
 
     private final ObjectMapper objectMapper;
@@ -82,6 +85,10 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             writeJson(response, ApiResponse.fail(403, disabledAccountMessage(currentUser)));
             return false;
         }
+        if (!jwtAuthUtil.isVersionCurrent(jwt, currentUser)) {
+            writeJson(response, ApiResponse.fail(401, "账号安全信息已变更，请重新登录"));
+            return false;
+        }
         request.setAttribute(AuthRequestAttributes.CURRENT_USER, currentUser);
 
         String path = normalizePath(request.getRequestURI());
@@ -105,7 +112,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        if (requiresSuperAdmin(path) && !UserContext.isSuperAdmin()) {
+        if (requiresSuperAdmin(path) && !UserContext.ROLE_SUPER_ADMIN.equals(currentUser.getUserRole())) {
             writeJson(response, ApiResponse.fail(403, "仅超级管理员王师傅可以禁用或启用账户"));
             return false;
         }

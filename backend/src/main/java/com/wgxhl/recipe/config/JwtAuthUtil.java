@@ -27,6 +27,7 @@ public class JwtAuthUtil {
         Map<String, Object> payload = new HashMap<>();
         payload.put(CLAIM_USER_ID, user.getId());
         payload.put(CLAIM_HOUSEHOLD_ID, householdId);
+        payload.put("authVersion", user.getAuthVersion() == null ? 0L : user.getAuthVersion());
         long expireAt = System.currentTimeMillis() + expireHours * 3600L * 1000L;
         payload.put(CLAIM_EXPIRE_AT, expireAt);
         return JWTUtil.createToken(payload, secret.getBytes(StandardCharsets.UTF_8));
@@ -62,6 +63,17 @@ public class JwtAuthUtil {
         }
         Object value = jwt.getPayload(CLAIM_USER_ID);
         return value == null ? null : String.valueOf(value);
+    }
+
+    public boolean isVersionCurrent(JWT jwt, AppUser user) {
+        if (jwt == null || user == null) return false;
+        long expected = user.getAuthVersion() == null ? 0L : user.getAuthVersion();
+        Object value = jwt.getPayload("authVersion");
+        try {
+            return (value == null ? 0L : Long.parseLong(String.valueOf(value))) == expected;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
     }
 
     public String getHouseholdId(JWT jwt) {

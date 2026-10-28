@@ -98,7 +98,7 @@ class AppUserLoginTest {
     }
 
     @Test
-    void memberCannotUseAnEmailAlreadyOwnedByAnotherAccount() {
+    void ordinaryUpdateCannotChangeEmailEvenBeforeUniquenessCheck() {
         UserContext.set(user);
         TenantContext.set("home-1");
         when(mapper.selectById("user-1")).thenReturn(user);
@@ -108,7 +108,7 @@ class AppUserLoginTest {
         edit.setId("user-1");
         edit.setEmail(" COOK@example.com ");
 
-        assertEquals(500, service.update(edit).getStatus());
+        assertEquals(403, service.update(edit).getStatus());
         verify(mapper, never()).updateById(any(AppUser.class));
     }
 
@@ -121,7 +121,7 @@ class AppUserLoginTest {
         AppUser edit = new AppUser();
         edit.setId("user-1");
         edit.setEmail("not-an-email");
-        assertEquals("请输入有效的邮箱地址", service.update(edit).getMessage());
+        assertEquals(403, service.update(edit).getStatus());
         verify(mapper, never()).countEmailUsedByAnotherUser(anyString(), anyString());
     }
 
@@ -135,7 +135,7 @@ class AppUserLoginTest {
         edit.setId("user-1");
         edit.setEmail("  ");
         assertEquals(200, service.update(edit).getStatus());
-        assertEquals("", edit.getEmail());
+        assertNull(edit.getEmail());
         verify(mapper, never()).countEmailUsedByAnotherUser(anyString(), anyString());
     }
 

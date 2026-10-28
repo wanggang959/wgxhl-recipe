@@ -328,6 +328,14 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(entity.getPassword())) {
             return ApiResponse.fail("密码不能为空");
         }
+        if (entity.getPassword().length() < 8 || entity.getPassword().length() > 64) {
+            return ApiResponse.fail("密码长度需为 8-64 位");
+        }
+        entity.setAccountOrigin("HOUSEHOLD");
+        entity.setCreatedByUserId(UserContext.requireUserId());
+        entity.setCreatedHouseholdId(TenantContext.require());
+        entity.setEmailVerified(false);
+        entity.setAuthVersion(0L);
         if (lambdaQuery().eq(AppUser::getUsername, entity.getUsername()).exists()) {
             return ApiResponse.fail("用户名已存在");
         }
@@ -390,15 +398,19 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!self && !manager) {
             return ApiResponse.fail(403, "只有家庭管理员可以修改其他家人的资料");
         }
-        if (entity.getEmail() != null) {
-            entity.setEmail(entity.getEmail().trim().toLowerCase(java.util.Locale.ROOT));
-            if (!entity.getEmail().isEmpty() && !EmailAddress.isValid(entity.getEmail())) {
-                return ApiResponse.fail("请输入有效的邮箱地址");
-            }
-            if (!entity.getEmail().isEmpty() && baseMapper.countEmailUsedByAnotherUser(entity.getEmail(), entity.getId()) > 0) {
-                return ApiResponse.fail("该邮箱已被其他账号使用");
-            }
+        if (StringUtils.hasText(entity.getPassword())) {
+            return ApiResponse.fail(403, "请通过修改密码或安全重置入口操作");
         }
+        entity.setPassword(null);
+        if (entity.getEmail() != null && !normalizeAccountEmail(entity.getEmail()).equals(normalizeAccountEmail(existing.getEmail()))) {
+            return ApiResponse.fail(403, "更换邮箱需要本人验证，请使用邮箱安全入口");
+        }
+        entity.setEmail(null);
+        entity.setEmailVerified(null);
+        entity.setAuthVersion(null);
+        entity.setAccountOrigin(null);
+        entity.setCreatedByUserId(null);
+        entity.setCreatedHouseholdId(null);
         if (!UserContext.isSuperAdmin()) {
             entity.setUserRole(existing.getUserRole());
             entity.setStatus(existing.getStatus());
@@ -453,9 +465,6 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 return ApiResponse.fail("公开昵称不能超过 20 个字符");
             }
             entity.setPublicName(publicName);
-        }
-        if (StringUtils.hasText(entity.getPassword())) {
-            entity.setPassword(PasswordUtil.hash(entity.getPassword()));
         }
         ApiResponse<Void> roleResult = applyMemberRoleChange(entity, membership, manager);
         if (roleResult != null) {
@@ -648,8 +657,9 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<Void> changePassword(String oldPassword, String newPassword) {
-        AppUser user = super.getById(UserContext.requireUserId());
+        AppUser user = baseMapper.lockById(UserContext.requireUserId());
         if (user == null) {
             return ApiResponse.fail("用户不存在");
         }
@@ -659,21 +669,27 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(oldPassword)) {
             return ApiResponse.fail("请输入原密码");
         }
-        if (!StringUtils.hasText(newPassword) || newPassword.trim().length() < 6) {
-            return ApiResponse.fail("新密码至少 6 位");
+        if (!StringUtils.hasText(newPassword) || newPassword.length() < 8 || newPassword.length() > 64) {
+            return ApiResponse.fail("新密码需为 8-64 位");
         }
-        String next = newPassword.trim();
+        String next = newPassword;
+        String attemptKey = "security:" + user.getId();
+        String locked = loginAttemptService.lockedMessage(attemptKey, "");
+        if (locked != null) return ApiResponse.fail(429, locked);
         if (!PasswordUtil.matches(oldPassword, user.getPassword())) {
+            loginAttemptService.onFailure(attemptKey, "");
             return ApiResponse.fail("原密码不正确");
         }
+        loginAttemptService.onSuccess(attemptKey, "");
         if (oldPassword.equals(next)) {
             return ApiResponse.fail("新密码不能与原密码相同");
         }
-        AppUser patch = new AppUser();
-        patch.setId(user.getId());
-        patch.setPassword(PasswordUtil.hash(next));
-        updateById(patch);
+        baseMapper.replacePassword(user.getId(), PasswordUtil.hash(next));
         return ApiResponse.success("密码已更新", null);
+    }
+
+    private String normalizeAccountEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     @Override

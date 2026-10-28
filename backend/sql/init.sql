@@ -2,6 +2,7 @@ USE recipe;
 
 -- 多租户改造后，新库初始化顺序：先执行本文件，再依次执行 add_household.sql、person_owned_recipe.sql、add_household_invite.sql、add_todo_creator.sql、add_email_verification_code.sql
 -- （add_household.sql 创建家庭表并补充 household_id；person_owned_recipe.sql 再把菜谱/基础数据改为按人归属）
+-- 完整的新库升级顺序以 backend/test/docker-compose.yml 的挂载清单为准，包含 add_account_security.sql。
 
 create table recipe_category
 (

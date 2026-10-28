@@ -63,8 +63,8 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
     }
 
     @Override
-    public ApiResponse<Void> sendRegisterCode(String email) {
-        return emailVerificationCodeService.sendRegisterCode(email);
+    public ApiResponse<Void> sendRegisterCode(String email, String clientIp) {
+        return emailVerificationCodeService.sendRegisterCode(email, clientIp);
     }
 
     @Override
@@ -153,6 +153,9 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
         user.setNickname(StringUtils.hasText(nickname) ? nickname.trim() : username);
         user.setPassword(PasswordUtil.hash(password));
         user.setEmail(email);
+        user.setEmailVerified(emailMode);
+        user.setAuthVersion(0L);
+        user.setAccountOrigin(emailMode ? "EMAIL" : "INVITE");
         user.setUserRole("user");
         user.setStatus("normal");
         user.setAvatar(DefaultAvatars.pickForSeed(username));

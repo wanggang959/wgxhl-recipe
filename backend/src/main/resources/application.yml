@@ -45,6 +45,10 @@ auth:
     secret: ${JWT_SECRET:}
     expire-hours: ${JWT_EXPIRE_HOURS:168}
 
+account:
+  security:
+    public-url: ${ACCOUNT_SECURITY_PUBLIC_URL:https://recipe.wgxhl.space}
+
 push:
   vapid:
     public-key: ${PUSH_VAPID_PUBLIC_KEY:}

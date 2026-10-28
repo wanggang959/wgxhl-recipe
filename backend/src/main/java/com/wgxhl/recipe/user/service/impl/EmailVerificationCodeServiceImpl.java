@@ -1,8 +1,6 @@
 package com.wgxhl.recipe.user.service.impl;
 
 import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.RandomUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.user.entity.AppUser;
@@ -10,6 +8,9 @@ import com.wgxhl.recipe.user.entity.EmailVerificationCode;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.mapper.EmailVerificationCodeMapper;
 import com.wgxhl.recipe.user.service.EmailVerificationCodeService;
+import com.wgxhl.recipe.user.service.EmailSendQuotaService;
+import com.wgxhl.recipe.user.util.PasswordUtil;
+import com.wgxhl.recipe.user.util.SecurityTokenUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -17,10 +18,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.regex.Pattern;
 
 @Service
 public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificationCodeMapper, EmailVerificationCode>
@@ -35,18 +36,21 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
 
     private final AppUserMapper appUserMapper;
     private final JavaMailSender mailSender;
+    private final EmailSendQuotaService quotaService;
 
     @Value("${spring.mail.username:}")
     private String mailUsername;
 
     public EmailVerificationCodeServiceImpl(AppUserMapper appUserMapper,
-                                            ObjectProvider<JavaMailSender> mailSenderProvider) {
+                                            ObjectProvider<JavaMailSender> mailSenderProvider,
+                                            EmailSendQuotaService quotaService) {
         this.appUserMapper = appUserMapper;
         this.mailSender = mailSenderProvider.getIfAvailable();
+        this.quotaService = quotaService;
     }
 
     @Override
-    public ApiResponse<Void> sendRegisterCode(String email) {
+    public ApiResponse<Void> sendRegisterCode(String email, String clientIp) {
         String target = normalizeEmail(email);
         if (!com.wgxhl.recipe.user.util.EmailAddress.isValid(target)) {
             return ApiResponse.fail("请输入有效的邮箱地址");
@@ -77,11 +81,13 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
             return ApiResponse.fail("邮箱服务未配置，暂时无法发送验证码");
         }
 
-        String code = RandomUtil.randomNumbers(6);
+        String quotaError = quotaService.reserve(java.util.Collections.emptyList(), java.util.Collections.singletonList(target), clientIp);
+        if (quotaError != null) return ApiResponse.fail(quotaError);
+        String code = SecurityTokenUtil.code();
         EmailVerificationCode entity = new EmailVerificationCode();
         entity.setId(IdUtil.simpleUUID());
         entity.setEmail(target);
-        entity.setCode(code);
+        entity.setCode(PasswordUtil.hash(code));
         entity.setPurpose(PURPOSE_REGISTER);
         entity.setExpiresAt(now.plusMinutes(CODE_EXPIRE_MINUTES));
         entity.setUsed(false);
@@ -100,7 +106,7 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
             mailSender.send(message);
         } catch (Exception ex) {
             removeById(entity.getId());
-            log.warn("Register verification email failed, email={}, reason={}", maskEmail(target), ex.getMessage());
+            log.warn("Register verification email failed, email={}, type={}", maskEmail(target), ex.getClass().getSimpleName());
             return ApiResponse.fail("验证码发送失败，请稍后重试");
         }
         log.info("Register verification email sent, email={}", maskEmail(target));
@@ -108,18 +114,13 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public String verifyAndConsume(String email, String code) {
         String target = normalizeEmail(email);
         if (!StringUtils.hasText(code)) {
             return "请输入验证码";
         }
-        EmailVerificationCode entity = lambdaQuery()
-                .eq(EmailVerificationCode::getEmail, target)
-                .eq(EmailVerificationCode::getPurpose, PURPOSE_REGISTER)
-                .eq(EmailVerificationCode::getUsed, false)
-                .orderByDesc(EmailVerificationCode::getCreateTime)
-                .last("limit 1")
-                .one();
+        EmailVerificationCode entity = baseMapper.lockLatest(target);
         if (entity == null) {
             return "验证码已失效，请重新获取";
         }
@@ -133,7 +134,7 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
             markUsed(entity.getId());
             return "验证码尝试次数过多，请重新获取";
         }
-        if (!code.trim().equals(entity.getCode())) {
+        if (!PasswordUtil.matches(code.trim(), entity.getCode())) {
             EmailVerificationCode patch = new EmailVerificationCode();
             patch.setId(entity.getId());
             patch.setAttempts(attempts + 1);
@@ -155,7 +156,7 @@ public class EmailVerificationCodeServiceImpl extends ServiceImpl<EmailVerificat
     }
 
     private String normalizeEmail(String email) {
-        return email == null ? "" : email.trim().toLowerCase();
+        return email == null ? "" : email.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private String maskEmail(String email) {

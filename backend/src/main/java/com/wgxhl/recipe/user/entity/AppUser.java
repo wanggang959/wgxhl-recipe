@@ -41,6 +41,16 @@ public class AppUser {
      */
     private String email;
 
+    private Boolean emailVerified;
+
+    private Long authVersion;
+
+    private String accountOrigin;
+
+    private String createdByUserId;
+
+    private String createdHouseholdId;
+
     /*
      * 公历生日
      */

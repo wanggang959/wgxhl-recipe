@@ -8,7 +8,7 @@ import com.wgxhl.recipe.user.vo.RegisterInviteInfoVO;
 
 public interface UserRegistrationService {
 
-    ApiResponse<Void> sendRegisterCode(String email);
+    ApiResponse<Void> sendRegisterCode(String email, String clientIp);
 
     ApiResponse<RegisterInviteInfoVO> inviteInfo(String inviteCode);
 

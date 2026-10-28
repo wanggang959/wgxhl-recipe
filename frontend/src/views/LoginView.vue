@@ -128,7 +128,7 @@ function saveRememberedUsername() {
 }
 
 function showForgotHint() {
-  showStatus('这是家里的小菜单，忘记密码可以找管理员重置。', 'error')
+  router.push('/reset-password')
 }
 
 function showStatus(message, type = 'success') {

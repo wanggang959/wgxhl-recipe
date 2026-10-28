@@ -193,7 +193,8 @@ create table user_favorite
     update_time datetime comment '更新时间',
 
     primary key (id),
-    unique key uk_user_favorite (user_id, recipe_id)
+    unique key uk_user_favorite (user_id, recipe_id),
+    key idx_user_favorite_recipe_user (recipe_id, user_id)
 )
 engine=innodb
 default charset=utf8mb4

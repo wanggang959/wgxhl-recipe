@@ -27,6 +27,7 @@ import {
   teardownPushOnLogout,
 } from '../utils/pushNotification'
 import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
+import { pushStatusText as describePushStatus } from '../utils/pushStatusText'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -58,6 +59,8 @@ const pushState = ref({
   permission: 'default',
   subscribed: false,
   configured: false,
+  configKnown: false,
+  statusUnknown: false,
   publicKey: '',
   needsStandalone: false,
 })
@@ -103,14 +106,7 @@ const canTogglePush = computed(() => (
     && pushState.value.permission !== 'denied'
 ))
 
-const pushStatusText = computed(() => {
-  if (!pushState.value.supported) return '当前浏览器不支持'
-  if (pushState.value.needsStandalone) return '添加到主屏幕后可开启'
-  if (pushState.value.loadError) return pushState.value.loadError
-  if (!pushState.value.configured) return '服务端未配置'
-  if (pushState.value.permission === 'denied') return '系统权限已关闭'
-  return pushState.value.subscribed ? '已开启' : '未开启'
-})
+const pushStatusText = computed(() => describePushStatus(pushState.value))
 
 function isBuiltinAdminUser(item) {
   return item?.id === BUILTIN_ADMIN_ID || item?.username === BUILTIN_ADMIN_USERNAME

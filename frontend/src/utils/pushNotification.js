@@ -1,4 +1,5 @@
 import { getPushStatus, subscribePush, unsubscribePush } from '../api/push'
+import { isDeviceSubscriptionUnknown } from './pushStatusText'
 
 const SW_READY_TIMEOUT_MS = 2500
 const SW_REG_TIMEOUT_MS = 1500
@@ -43,6 +44,8 @@ export async function loadPushState() {
     permission: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
     subscribed: false,
     configured: false,
+    configKnown: false,
+    statusUnknown: false,
     publicKey: '',
     needsStandalone: isIosLike() && !isStandaloneApp(),
   }
@@ -52,6 +55,7 @@ export async function loadPushState() {
   try {
     const res = await getPushStatus()
     state.configured = Boolean(res.data?.configured)
+    state.configKnown = true
     state.publicKey = res.data?.publicKey || ''
   } catch (error) {
     state.loadError = error.message || '通知状态加载失败'
@@ -65,6 +69,10 @@ export async function loadPushState() {
     if (subscription?.endpoint) {
       const res = await getPushStatus(subscription.endpoint)
       state.subscribed = Boolean(res.data?.subscribed)
+    } else {
+      state.statusUnknown = isDeviceSubscriptionUnknown({
+        hasRegistration: Boolean(registration), isIos: isIosLike(), permission: state.permission,
+      })
     }
   } catch (error) {
     state.loadError = '当前设备通知状态暂时无法确认'

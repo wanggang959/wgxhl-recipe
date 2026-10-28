@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
 import { createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
-import { getRecipeDetail, pageRecipe, toggleRecipeLike } from '../api/recipe'
+import { pageRecipe, toggleRecipeLike } from '../api/recipe'
 import { createWantedRecipe } from '../api/want'
 import CategoryTabs from '../components/CategoryTabs.vue'
 import ActionIcon from '../components/ActionIcon.vue'
@@ -425,23 +425,26 @@ async function toggleFavoriteSafe(item) {
   if (favoritePendingMap.value[item.id]) return
   favoritePendingMap.value[item.id] = true
   try {
+    let result
+    let delta
     if (favoriteMap.value[item.id]) {
-      await deleteFavoriteByRecipeId(userStore.userId, item.id)
+      result = await deleteFavoriteByRecipeId(userStore.userId, item.id)
+      delta = -1
       favoriteMap.value[item.id] = false
       markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '已取消收藏', duration: 1400 })
     } else {
-      await createFavorite({ userId: userStore.userId, recipeId: item.id })
+      result = await createFavorite({ userId: userStore.userId, recipeId: item.id })
+      delta = 1
       favoriteMap.value[item.id] = true
       markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '收藏成功', duration: 1400 })
     }
-    getRecipeDetail(item.id).then((res) => {
-      item.favoriteCount = Number(res.data?.recipe?.favoriteCount || 0)
-      saveRecipeListCache()
-    }).catch(() => {})
+    item.favoriteCount = result.data?.favoriteCount != null
+      ? Number(result.data.favoriteCount)
+      : Math.max(0, Number(item.favoriteCount || 0) + delta)
     markDataStale(DATA_SCOPE.recipes)
   } catch (error) {
     closeToast()

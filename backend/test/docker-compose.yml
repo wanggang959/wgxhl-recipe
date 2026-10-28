@@ -19,6 +19,8 @@ services:
       - ../sql/add_recipe_offline_and_active_household.sql:/docker-entrypoint-initdb.d/07-household-active.sql:ro
       - ../sql/add_recipe_like_and_public.sql:/docker-entrypoint-initdb.d/08-like.sql:ro
       - ../sql/add_user_public_name.sql:/docker-entrypoint-initdb.d/09-public-name.sql:ro
+      - ../sql/add_todo_delivery_tracking.sql:/docker-entrypoint-initdb.d/10-todo-delivery.sql:ro
+      - ../sql/add_favorite_recipe_index.sql:/docker-entrypoint-initdb.d/11-favorite-index.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u recipe_test -plocal-test-only --silent"]
       interval: 5s

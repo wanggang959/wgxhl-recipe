@@ -329,18 +329,25 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             return ApiResponse.fail("菜谱id不能为空");
         }
         Recipe recipe = super.getById(id);
-        if (recipe == null || !canView(recipe)) {
-            return ApiResponse.fail("菜谱不存在");
-        }
-        if (STATUS_OFF.equals(recipe.getStatus()) && !canViewOffline(recipe)) {
-            return ApiResponse.fail("这道菜已被下架");
-        }
+        String visibilityError = detailVisibilityError(recipe);
+        if (visibilityError != null) return ApiResponse.fail(visibilityError);
         recipe.setLiked(isLikedBy(id, UserContext.requireUserId()));
         fillFavoriteCounts(Collections.singletonList(recipe));
         if ("public".equals(recipe.getVisibility())) {
             recipe.setOwnerName(resolvePublicAuthorName(recipe.getOwnerUserId()));
         }
         return ApiResponse.success(buildDetailVO(recipe));
+    }
+
+    @Override
+    public boolean canViewRecipeDetail(Recipe recipe) {
+        return detailVisibilityError(recipe) == null;
+    }
+
+    private String detailVisibilityError(Recipe recipe) {
+        if (recipe == null || !canView(recipe)) return "菜谱不存在";
+        if (STATUS_OFF.equals(recipe.getStatus()) && !canViewOffline(recipe)) return "这道菜已被下架";
+        return null;
     }
 
     @Override

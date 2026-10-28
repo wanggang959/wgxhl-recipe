@@ -2,6 +2,7 @@ package com.wgxhl.recipe.favorite.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -33,6 +34,9 @@ public class UserFavorite {
      * 封面图片地址冗余
      */
     private String coverImage;
+
+    @TableField(exist = false)
+    private Long favoriteCount;
 
     /*
      * 创建时间

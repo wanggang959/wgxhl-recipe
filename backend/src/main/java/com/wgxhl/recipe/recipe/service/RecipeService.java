@@ -19,6 +19,8 @@ public interface RecipeService extends IService<Recipe> {
 
     ApiResponse<RecipeDetailVO> getDetailById(String id);
 
+    boolean canViewRecipeDetail(Recipe recipe);
+
     ApiResponse<RecipeDetailVO> create(RecipeSaveDTO dto, AppUser creator);
 
     ApiResponse<Void> update(RecipeSaveDTO dto);

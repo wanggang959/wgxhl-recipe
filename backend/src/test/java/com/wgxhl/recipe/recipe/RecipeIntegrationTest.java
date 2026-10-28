@@ -3,6 +3,8 @@ package com.wgxhl.recipe.recipe;
 import com.wgxhl.recipe.config.TenantContext;
 import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.recipe.entity.Recipe;
+import com.wgxhl.recipe.favorite.entity.UserFavorite;
+import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.user.entity.AppUser;
@@ -35,6 +37,7 @@ class RecipeIntegrationTest {
     private static final String USER = "admin-wangshifu";
 
     @Autowired private RecipeService recipes;
+    @Autowired private UserFavoriteService favorites;
     @Autowired private JdbcTemplate jdbc;
     private String id;
     private String privateId;
@@ -111,5 +114,23 @@ class RecipeIntegrationTest {
         assertTrue(listed.getFavorite());
         assertTrue(listed.getWanted());
         assertEquals(2L, listed.getFavoriteCount());
+    }
+
+    @Test
+    void favoriteCountsAndPermissionsMatchDetailVisibility() {
+        UserFavorite favorite = new UserFavorite();
+        favorite.setRecipeId(privateId);
+        assertNotEquals(200, favorites.create(favorite).getStatus());
+        assertNotEquals(200, recipes.getDetailById(privateId).getStatus());
+
+        jdbc.update("update recipe set owner_user_id='other-user', status='下架' where id=?", id);
+        favorite.setRecipeId(id);
+        assertNotEquals(200, favorites.create(favorite).getStatus());
+        assertNotEquals(200, recipes.getDetailById(id).getStatus());
+
+        jdbc.update("update recipe set owner_user_id=?, status='下架' where id=?", USER, id);
+        assertEquals(200, recipes.getDetailById(id).getStatus());
+        assertEquals(1L, favorites.create(favorite).getData().getFavoriteCount());
+        assertEquals(0L, favorites.deleteByRecipeId(USER, id).getData().getFavoriteCount());
     }
 }

@@ -53,6 +53,7 @@ app:
   mail:
     provider: ${MAIL_PROVIDER:smtp}
     from: ${MAIL_FROM:}
+    callback-token: ${SES_CALLBACK_TOKEN:}
     ses:
       secret-id: ${SES_SECRET_ID:}
       secret-key: ${SES_SECRET_KEY:}

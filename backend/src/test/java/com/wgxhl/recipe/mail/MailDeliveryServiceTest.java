@@ -185,6 +185,7 @@ class MailDeliveryServiceTest {
         ObjectProvider<SesClient> sesProvider = mock(ObjectProvider.class);
         when(smtpProvider.getIfAvailable()).thenReturn(smtpSender);
         when(sesProvider.getIfAvailable()).thenReturn(sesClient);
-        return new MailDeliveryService(properties, smtpProvider, sesProvider, json, "smtp@example.test");
+        return new MailDeliveryService(properties, smtpProvider, sesProvider, json,
+                mock(com.wgxhl.recipe.mail.mapper.MailMessageLogMapper.class), "smtp@example.test");
     }
 }

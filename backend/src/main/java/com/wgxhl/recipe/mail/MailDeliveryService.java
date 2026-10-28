@@ -2,10 +2,14 @@ package com.wgxhl.recipe.mail;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cn.hutool.core.util.IdUtil;
 import com.tencentcloudapi.common.exception.TencentCloudSDKException;
 import com.tencentcloudapi.ses.v20201002.SesClient;
 import com.tencentcloudapi.ses.v20201002.models.SendEmailRequest;
+import com.tencentcloudapi.ses.v20201002.models.SendEmailResponse;
 import com.tencentcloudapi.ses.v20201002.models.Template;
+import com.wgxhl.recipe.mail.entity.MailMessageLog;
+import com.wgxhl.recipe.mail.mapper.MailMessageLogMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -39,15 +43,18 @@ public class MailDeliveryService {
     private final JavaMailSender smtp;
     private final SesClient ses;
     private final ObjectMapper json;
+    private final MailMessageLogMapper messageLog;
     private final String smtpUsername;
 
     public MailDeliveryService(MailProperties properties, ObjectProvider<JavaMailSender> smtp,
                                ObjectProvider<SesClient> ses, ObjectMapper json,
+                               MailMessageLogMapper messageLog,
                                @Value("${spring.mail.username:}") String smtpUsername) {
         this.properties = properties;
         this.smtp = smtp.getIfAvailable();
         this.ses = ses.getIfAvailable();
         this.json = json;
+        this.messageLog = messageLog;
         this.smtpUsername = smtpUsername;
     }
 
@@ -118,13 +125,33 @@ public class MailDeliveryService {
         try {
             template.setTemplateData(json.writeValueAsString(variables));
             request.setTemplate(template);
-            ses.SendEmail(request);
+            SendEmailResponse response = ses.SendEmail(request);
+            recordMessage(recipient, kind, response == null ? null : response.getMessageId());
         } catch (JsonProcessingException ex) {
             throw new MailSendException("邮件模板参数生成失败");
         } catch (TencentCloudSDKException ex) {
             // SDK messages may include template data containing verification codes or reset links.
             log.warn("SES delivery failed, kind={}, code={}, requestId={}", kind, ex.getErrorCode(), ex.getRequestId());
             throw new MailSendException("邮件发送失败，请稍后重试");
+        }
+    }
+
+    private void recordMessage(String recipient, Kind kind, String messageId) {
+        if (!StringUtils.hasText(messageId)) {
+            return;
+        }
+        try {
+            MailMessageLog entry = new MailMessageLog();
+            entry.setId(IdUtil.simpleUUID());
+            entry.setMessageId(messageId);
+            entry.setRecipient(recipient);
+            entry.setMailKind(kind.name());
+            entry.setTemplateId(templateId(kind));
+            entry.setCreateTime(java.time.LocalDateTime.now());
+            messageLog.insert(entry);
+        } catch (Exception ex) {
+            // 关联记录失败不应让已受理的邮件失败；回调只能少一条来源信息
+            log.warn("Mail message log failed, kind={}, type={}", kind, ex.getClass().getSimpleName());
         }
     }
 

@@ -19,6 +19,8 @@ public class HouseholdTenantLineHandler implements TenantLineHandler {
             "email_verification_code",
             "account_security_ticket",
             "email_send_quota",
+            "mail_message_log",
+            "mail_delivery_event",
             "recipe",
             "recipe_image",
             "recipe_step",

@@ -14,6 +14,7 @@ public class MailProperties {
 
     private Provider provider = Provider.SMTP;
     private String from = "";
+    private String callbackToken = "";
     private final Ses ses = new Ses();
 
     @Getter

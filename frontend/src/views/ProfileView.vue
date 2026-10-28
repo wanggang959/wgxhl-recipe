@@ -50,6 +50,7 @@ const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
 const showMemberForm = ref(false)
+const memberFormError = ref('')
 const pushLoading = ref(false)
 const loggingOut = ref(false)
 const pushState = ref({
@@ -105,6 +106,7 @@ const canTogglePush = computed(() => (
 const pushStatusText = computed(() => {
   if (!pushState.value.supported) return '当前浏览器不支持'
   if (pushState.value.needsStandalone) return '添加到主屏幕后可开启'
+  if (pushState.value.loadError) return pushState.value.loadError
   if (!pushState.value.configured) return '服务端未配置'
   if (pushState.value.permission === 'denied') return '系统权限已关闭'
   return pushState.value.subscribed ? '已开启' : '未开启'
@@ -239,6 +241,7 @@ async function togglePushNotification() {
 }
 
 function resetUserForm() {
+  memberFormError.value = ''
   userForm.id = ''
   userForm.username = ''
   userForm.nickname = ''
@@ -260,6 +263,7 @@ function resetUserForm() {
 }
 
 function beginAddUser() {
+  memberFormError.value = ''
   userForm.id = ''
   userForm.username = ''
   userForm.nickname = ''
@@ -281,12 +285,13 @@ function beginAddUser() {
 }
 
 function editUser(item) {
+  memberFormError.value = ''
   userForm.id = item.id
   userForm.username = item.username
   userForm.nickname = item.nickname || ''
   userForm.publicName = item.publicName || ''
   userForm.password = ''
-  userForm.memberRole = item.memberRole === 'admin' ? 'admin' : 'member'
+  userForm.memberRole = item.memberRole || 'member'
   userForm.avatar = item.avatar || pickDefaultAvatar(item.id)
   userForm.email = item.email || ''
   userForm.birthday = item.birthday || ''
@@ -318,21 +323,22 @@ function syncCurrentUserAfterSave(payload) {
 }
 
 async function saveUser() {
+  memberFormError.value = ''
   if (userForm.id !== userStore.userId && !userStore.canManageMembers) {
-    showActionStatus('只有家庭管理员可以管理家人', 'error')
+    memberFormError.value = '只有家庭管理员可以管理家人'
     return
   }
   if (!userForm.username.trim()) {
-    showActionStatus('请输入用户名', 'error')
+    memberFormError.value = '请输入用户名'
     return
   }
   const email = userForm.email.trim()
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    showActionStatus('请输入有效的邮箱地址', 'error')
+    memberFormError.value = '请输入有效的邮箱地址'
     return
   }
   if (!isEditingUser.value && !userForm.password.trim()) {
-    showActionStatus('新增用户需要设置密码', 'error')
+    memberFormError.value = '新增用户需要设置密码'
     return
   }
 
@@ -372,7 +378,7 @@ async function saveUser() {
     resetUserForm()
     await loadUsers()
   } catch (error) {
-    showActionStatus(error.message || '成员保存失败', 'error')
+    memberFormError.value = error.message || '成员保存失败'
   } finally {
     savingUser.value = false
   }
@@ -912,6 +918,7 @@ onMounted(() => {
             v-model="userForm.memberRole"
             :disabled="editingBuiltinAdmin || editingMemberIsOwner || !isHouseholdOwner"
           >
+            <option v-if="editingMemberIsOwner" value="owner">家庭所有者</option>
             <option value="member">家人（记录菜谱、收藏、待办）</option>
             <option value="admin">家庭管理员（可管理家人与邀请）</option>
           </select>
@@ -945,6 +952,7 @@ onMounted(() => {
             </button>
           </div>
         </div>
+        <p v-if="memberFormError" class="member-form-error" role="alert">{{ memberFormError }}</p>
         <div class="form-actions">
           <van-button type="warning" round size="small" :loading="savingUser" @click="saveUser">
             {{ isEditingUser ? '保存成员' : '新增成员' }}
@@ -1401,6 +1409,13 @@ h2 {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.member-form-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .member-panel {

@@ -53,7 +53,6 @@ export async function loadPushState() {
     const res = await getPushStatus()
     state.configured = Boolean(res.data?.configured)
     state.publicKey = res.data?.publicKey || ''
-    state.subscribed = Boolean(res.data?.subscribed)
   } catch (error) {
     state.loadError = error.message || '通知状态加载失败'
     state.configured = false
@@ -63,10 +62,12 @@ export async function loadPushState() {
     await withTimeout(navigator.serviceWorker.ready, SW_READY_TIMEOUT_MS)
     const registration = await getServiceWorkerRegistration()
     const subscription = await registration?.pushManager?.getSubscription?.()
-    // 服务端记录为准；iOS 上 getSubscription 有时为空但推送仍有效
-    state.subscribed = state.subscribed || Boolean(subscription)
+    if (subscription?.endpoint) {
+      const res = await getPushStatus(subscription.endpoint)
+      state.subscribed = Boolean(res.data?.subscribed)
+    }
   } catch (error) {
-    // 保留服务端已返回的 subscribed，避免误判为未开启
+    state.loadError = '当前设备通知状态暂时无法确认'
   }
 
   return state
@@ -94,13 +95,25 @@ export async function enablePushNotification() {
   const registration = await ensureServiceWorkerRegistration()
   let subscription = await registration.pushManager.getSubscription()
   if (subscription) {
+    const currentStatus = await getPushStatus(subscription.endpoint)
+    if (currentStatus.data?.subscribed) return loadPushState()
     await subscription.unsubscribe()
     subscription = null
   }
-  subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey),
-  })
+  try {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError' || /push service error/i.test(error?.message || '')) {
+      throw new Error('系统已授权，但浏览器推送服务注册失败。可能与手机系统、浏览器或网络有关；站内通知仍可使用。')
+    }
+    if (error?.name === 'NotAllowedError') {
+      throw new Error('浏览器未允许通知，请检查浏览器和系统通知设置。')
+    }
+    throw new Error('浏览器通知订阅失败，请检查网络和通知设置后重试。')
+  }
 
   const payload = subscriptionToPayload(subscription)
   await subscribePush(payload)
@@ -137,7 +150,7 @@ export async function disablePushNotification() {
   const payload = subscription ? subscriptionToPayload(subscription) : {}
 
   try {
-    await withTimeout(unsubscribePush(payload), 8000)
+    if (payload.endpoint) await withTimeout(unsubscribePush(payload), 8000)
   } catch (error) {
     // 服务端失败时仍尝试本地退订
   } finally {

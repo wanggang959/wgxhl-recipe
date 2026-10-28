@@ -166,4 +166,23 @@ class AppUserLoginTest {
         assertEquals(500, service.update(edit).getStatus());
         verify(members, never()).updateById(any(HouseholdMember.class));
     }
+
+    @Test
+    void ownerCanSaveOwnNotificationPreference() {
+        UserContext.set(user, UserContext.MEMBER_OWNER);
+        TenantContext.set("home-1");
+        HouseholdMember member = new HouseholdMember();
+        member.setUserId("user-1");
+        member.setMemberRole("owner");
+        when(mapper.selectById("user-1")).thenReturn(user);
+        when(members.find("home-1", "user-1")).thenReturn(member);
+        AppUser edit = new AppUser();
+        edit.setId("user-1");
+        edit.setMemberRole("owner");
+        edit.setNotificationPreference("site,push");
+
+        assertEquals(200, service.update(edit).getStatus());
+        verify(mapper).updateById(argThat((AppUser saved) -> "site,push".equals(saved.getNotificationPreference())));
+        verify(members, never()).updateById(any(HouseholdMember.class));
+    }
 }

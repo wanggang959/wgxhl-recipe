@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface UserPushSubscriptionService extends IService<UserPushSubscription> {
 
-    ApiResponse<PushSubscriptionStatusVO> status(String userId);
+    ApiResponse<PushSubscriptionStatusVO> status(String userId, String endpoint);
 
     ApiResponse<PushSubscriptionStatusVO> subscribe(String userId, PushSubscriptionDTO dto);
 

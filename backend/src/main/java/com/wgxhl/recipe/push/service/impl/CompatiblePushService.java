@@ -4,6 +4,7 @@ import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.Header;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpPost;
 import org.jose4j.lang.JoseException;
 
@@ -27,6 +28,11 @@ class CompatiblePushService extends PushService {
     public HttpPost preparePost(Notification notification, Encoding encoding)
             throws GeneralSecurityException, IOException, JoseException {
         HttpPost post = super.preparePost(notification, encoding);
+        post.setConfig(RequestConfig.custom()
+                .setConnectTimeout(10000)
+                .setConnectionRequestTimeout(10000)
+                .setSocketTimeout(10000)
+                .build());
         if ("fcm.googleapis.com".equalsIgnoreCase(post.getURI().getHost())) {
             Header header = post.getFirstHeader("Crypto-Key");
             if (header != null) {

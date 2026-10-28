@@ -68,6 +68,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private static final String NOTICE_PUSH = "push";
     private static final LocalTime BIRTHDAY_ON_TIME = LocalTime.of(11, 0);
     private static final long NOTIFY_SCAN_WINDOW_MINUTES = 6L;
+    private static final int MAX_NOTIFY_ATTEMPTS = 3;
 
     private final TodoNoticeRuleMapper todoNoticeRuleMapper;
     private final TodoOwnerMapper todoOwnerMapper;
@@ -440,10 +441,14 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             List<TodoNoticeRule> rules = selectRules(todo.getId());
             for (TodoNoticeRule rule : rules) {
                 LocalDateTime targetTime = todo.getDueTime().minusMinutes(rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes());
-                if (!isInNotifyWindow(targetTime, now) || hasSent(todo.getId(), rule.getId(), targetTime)) {
+                if (!isInNotifyWindow(targetTime, now) || hasLegacySuccess(todo.getId(), rule.getId(), targetTime)) {
                     continue;
                 }
-                count += sendByRule(todo, rule, targetTime);
+                try {
+                    count += sendByRule(todo, rule, targetTime);
+                } catch (Exception ex) {
+                    log.error("Todo notify failed, todoId={}, ruleId={}", todo.getId(), rule.getId(), ex);
+                }
             }
         }
         return count;
@@ -487,12 +492,17 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             } else if (!allowNotify(owner, NOTICE_SITE)) {
                 log.info("Todo site notice skipped, todoId={}, owner={}, preference={}, reason=preference",
                         todo.getId(), ownerLabel(owner), owner == null ? null : owner.getNotificationPreference());
-            } else {
+            } else if (shouldAttempt(todo, rule, targetTime, NOTICE_SITE, owner)) {
                 String userId = owner == null ? null : owner.getId();
-                notificationService.createSiteNotice(userId, todo.getTitle(), content, "TODO", todo.getId());
-                logSend(todo, rule, NOTICE_SITE, "SUCCESS", null);
-                log.info("Todo site notice sent, todoId={}, owner={}, userId={}", todo.getId(), ownerLabel(owner), userId);
-                sent++;
+                try {
+                    notificationService.createSiteNotice(userId, todo.getTitle(), content, "TODO", todo.getId());
+                    logSend(todo, rule, targetTime, owner, NOTICE_SITE, "SUCCESS", null);
+                    log.info("Todo site notice sent, todoId={}, owner={}, userId={}", todo.getId(), ownerLabel(owner), userId);
+                    sent++;
+                } catch (Exception ex) {
+                    log.warn("Todo site notice failed, todoId={}, owner={}", todo.getId(), ownerLabel(owner), ex);
+                    logSend(todo, rule, targetTime, owner, NOTICE_SITE, "FAIL", ex.getMessage());
+                }
             }
 
             if (!Boolean.TRUE.equals(todo.getNotifyEmail())) {
@@ -500,52 +510,47 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             } else if (!allowNotify(owner, NOTICE_EMAIL)) {
                 log.info("Todo email skipped, todoId={}, owner={}, preference={}, reason=preference",
                         todo.getId(), ownerLabel(owner), owner == null ? null : owner.getNotificationPreference());
-            } else {
+            } else if (shouldAttempt(todo, rule, targetTime, NOTICE_EMAIL, owner)) {
                 try {
                     sendEmail(owner, title, content);
-                    logSend(todo, rule, NOTICE_EMAIL, "SUCCESS", null);
+                    logSend(todo, rule, targetTime, owner, NOTICE_EMAIL, "SUCCESS", null);
                     log.info("Todo email sent, todoId={}, owner={}, to={}", todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()));
                     sent++;
                 } catch (Exception ex) {
                     log.warn("Todo email failed, todoId={}, owner={}, to={}, reason={}",
                             todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()), ex.getMessage(), ex);
-                    logSend(todo, rule, NOTICE_EMAIL, "FAIL", ex.getMessage());
+                    logSend(todo, rule, targetTime, owner, NOTICE_EMAIL, "FAIL", ex.getMessage());
                 }
             }
         }
         if (!Boolean.TRUE.equals(todo.getNotifyPush())) {
             log.info("Todo push skipped, todoId={}, reason=disabled", todo.getId());
         } else {
-            List<String> pushUserIds = owners.stream()
-                    .filter(owner -> allowNotify(owner, NOTICE_PUSH))
-                    .map(owner -> owner == null ? null : owner.getId())
-                    .filter(StringUtils::hasText)
-                    .distinct()
-                    .collect(Collectors.toList());
-            List<String> skippedPushOwners = owners.stream()
-                    .filter(owner -> !allowNotify(owner, NOTICE_PUSH))
-                    .map(this::ownerLabel)
-                    .collect(Collectors.toList());
-            if (!skippedPushOwners.isEmpty()) {
-                log.info("Todo push preference skipped, todoId={}, owners={}", todo.getId(), skippedPushOwners);
-            }
-            if (pushUserIds.isEmpty()) {
-                log.info("Todo push skipped, todoId={}, reason=no_allowed_owner", todo.getId());
-            } else {
-                int delivered = userPushSubscriptionService.sendToUserIds(
-                        pushUserIds,
+            for (AppUser owner : owners) {
+                if (owner == null || !StringUtils.hasText(owner.getId()) || !allowNotify(owner, NOTICE_PUSH)) {
+                    log.info("Todo push preference skipped, todoId={}, owner={}", todo.getId(), ownerLabel(owner));
+                    continue;
+                }
+                if (!shouldAttempt(todo, rule, targetTime, NOTICE_PUSH, owner)) continue;
+                try {
+                    int delivered = userPushSubscriptionService.sendToUserIds(
+                        Collections.singletonList(owner.getId()),
                         todo.getTitle(),
                         content,
                         "/#/todo/" + todo.getId(),
                         "todo-" + todo.getId() + "-" + rule.getId()
-                );
-                if (delivered > 0) {
-                    logSend(todo, rule, NOTICE_PUSH, "SUCCESS", "delivered=" + delivered);
-                    log.info("Todo push sent, todoId={}, targetUserIds={}, delivered={}", todo.getId(), pushUserIds, delivered);
-                    sent += delivered;
-                } else {
-                    logSend(todo, rule, NOTICE_PUSH, "SKIP", "客户端未开启PWA通知或服务端未配置");
-                    log.info("Todo push skipped, todoId={}, targetUserIds={}, delivered=0", todo.getId(), pushUserIds);
+                    );
+                    if (delivered > 0) {
+                        logSend(todo, rule, targetTime, owner, NOTICE_PUSH, "SUCCESS", "delivered=" + delivered);
+                        log.info("Todo push sent, todoId={}, owner={}, delivered={}", todo.getId(), ownerLabel(owner), delivered);
+                        sent += delivered;
+                    } else {
+                        logSend(todo, rule, targetTime, owner, NOTICE_PUSH, "FAIL", "未送达任何设备");
+                        log.info("Todo push not accepted, todoId={}, owner={}", todo.getId(), ownerLabel(owner));
+                    }
+                } catch (Exception ex) {
+                    log.warn("Todo push failed, todoId={}, owner={}", todo.getId(), ownerLabel(owner), ex);
+                    logSend(todo, rule, targetTime, owner, NOTICE_PUSH, "FAIL", ex.getMessage());
                 }
             }
         }
@@ -553,7 +558,9 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                 && !Boolean.TRUE.equals(todo.getNotifyEmail())
                 && !Boolean.TRUE.equals(todo.getNotifySite())
                 && !Boolean.TRUE.equals(todo.getNotifyPush())) {
-            logSend(todo, rule, "none", "SKIP", "未开启通知方式");
+            if (shouldAttempt(todo, rule, targetTime, "none", null)) {
+                logSend(todo, rule, targetTime, null, "none", "SKIP", "未开启通知方式");
+            }
         }
         return sent;
     }
@@ -634,15 +641,40 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                 .ge(TodoSendLog::getSendTime, targetTime)) > 0;
     }
 
-    private void logSend(Todo todo, TodoNoticeRule rule, String type, String status, String errorMsg) {
+    private boolean hasLegacySuccess(String todoId, String ruleId, LocalDateTime targetTime) {
+        return todoSendLogMapper.selectCount(new LambdaQueryWrapper<TodoSendLog>()
+                .eq(TodoSendLog::getTodoId, todoId)
+                .eq(TodoSendLog::getRuleId, ruleId)
+                .isNull(TodoSendLog::getTargetTime)
+                .eq(TodoSendLog::getSendStatus, "SUCCESS")
+                .ge(TodoSendLog::getSendTime, targetTime)) > 0;
+    }
+
+    private boolean shouldAttempt(Todo todo, TodoNoticeRule rule, LocalDateTime targetTime, String type, AppUser owner) {
+        String recipientId = owner == null ? null : owner.getId();
+        LambdaQueryWrapper<TodoSendLog> query = new LambdaQueryWrapper<TodoSendLog>()
+                .eq(TodoSendLog::getTodoId, todo.getId())
+                .eq(TodoSendLog::getRuleId, rule.getId())
+                .eq(TodoSendLog::getTargetTime, targetTime)
+                .eq(TodoSendLog::getNotifyType, type);
+        if (recipientId == null) query.isNull(TodoSendLog::getRecipientId);
+        else query.eq(TodoSendLog::getRecipientId, recipientId);
+        List<TodoSendLog> attempts = todoSendLogMapper.selectList(query);
+        return attempts.stream().noneMatch(a -> "SUCCESS".equals(a.getSendStatus()) || "SKIP".equals(a.getSendStatus()))
+                && attempts.stream().filter(a -> "FAIL".equals(a.getSendStatus())).count() < MAX_NOTIFY_ATTEMPTS;
+    }
+
+    private void logSend(Todo todo, TodoNoticeRule rule, LocalDateTime targetTime, AppUser owner, String type, String status, String errorMsg) {
         TodoSendLog log = new TodoSendLog();
         log.setId(IdUtil.simpleUUID());
         log.setTodoId(todo.getId());
         log.setRuleId(rule.getId());
+        log.setTargetTime(targetTime);
+        log.setRecipientId(owner == null ? null : owner.getId());
         log.setNotifyType(type);
         log.setSendTime(LocalDateTime.now());
         log.setSendStatus(status);
-        log.setErrorMsg(errorMsg);
+        log.setErrorMsg(errorMsg == null ? null : errorMsg.substring(0, Math.min(errorMsg.length(), 500)));
         log.setCreateTime(LocalDateTime.now());
         log.setUpdateTime(LocalDateTime.now());
         todoSendLogMapper.insert(log);
@@ -772,8 +804,17 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     private void replaceRules(String todoId, List<Integer> minutes) {
-        todoNoticeRuleMapper.delete(new LambdaQueryWrapper<TodoNoticeRule>().eq(TodoNoticeRule::getTodoId, todoId));
-        for (Integer minute : uniqueMinutes(minutes)) {
+        List<Integer> desired = uniqueMinutes(minutes);
+        Set<Integer> keep = new HashSet<>(desired);
+        Set<Integer> existing = new HashSet<>();
+        for (TodoNoticeRule rule : selectRules(todoId)) {
+            int minute = Math.max(rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes(), 0);
+            if (!keep.contains(minute) || !existing.add(minute)) {
+                todoNoticeRuleMapper.deleteById(rule.getId());
+            }
+        }
+        for (Integer minute : desired) {
+            if (existing.contains(minute)) continue;
             TodoNoticeRule rule = new TodoNoticeRule();
             rule.setId(IdUtil.simpleUUID());
             rule.setTodoId(todoId);
@@ -824,8 +865,14 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     }
 
     private void replaceOwners(String todoId, List<String> ownerIds) {
+        List<String> desired = uniqueOwnerIds(ownerIds);
+        List<String> current = todoOwnerMapper.selectList(new LambdaQueryWrapper<TodoOwner>()
+                .eq(TodoOwner::getTodoId, todoId)).stream()
+                .map(TodoOwner::getOwnerId)
+                .collect(Collectors.toList());
+        if (current.size() == desired.size() && new HashSet<>(current).equals(new HashSet<>(desired))) return;
         todoOwnerMapper.delete(new LambdaQueryWrapper<TodoOwner>().eq(TodoOwner::getTodoId, todoId));
-        for (String ownerId : uniqueOwnerIds(ownerIds)) {
+        for (String ownerId : desired) {
             TodoOwner owner = new TodoOwner();
             owner.setId(IdUtil.simpleUUID());
             owner.setTodoId(todoId);

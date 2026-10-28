@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Component
 public class TodoNotifyTask {
 
@@ -16,20 +18,31 @@ public class TodoNotifyTask {
 
     private final TodoService todoService;
     private final HouseholdService householdService;
+    private final AtomicBoolean running = new AtomicBoolean();
 
     public TodoNotifyTask(TodoService todoService, HouseholdService householdService) {
         this.todoService = todoService;
         this.householdService = householdService;
     }
 
-    @Scheduled(cron = "0 */5 * * * ?")
+    @Scheduled(cron = "0 * * * * ?")
     public void scan() {
-        int count = 0;
-        for (Household household : householdService.listActive()) {
-            count += TenantContext.callWith(household.getId(), todoService::scanAndNotify);
+        if (!running.compareAndSet(false, true)) {
+            log.warn("Todo notify scan skipped because a previous scan is still running");
+            return;
         }
-        if (count > 0) {
-            log.info("Todo notify task sent {} notice(s)", count);
+        try {
+            int count = 0;
+            for (Household household : householdService.listActive()) {
+                try {
+                    count += TenantContext.callWith(household.getId(), todoService::scanAndNotify);
+                } catch (Exception ex) {
+                    log.error("Todo notify scan failed for household={}", household.getId(), ex);
+                }
+            }
+            if (count > 0) log.info("Todo notify task sent {} notice(s)", count);
+        } finally {
+            running.set(false);
         }
     }
 }

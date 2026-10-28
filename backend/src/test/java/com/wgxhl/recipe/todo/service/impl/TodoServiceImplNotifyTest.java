@@ -6,6 +6,7 @@ import com.wgxhl.recipe.notification.service.NotificationService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.todo.entity.TodoNoticeRule;
+import com.wgxhl.recipe.todo.entity.TodoOwner;
 import com.wgxhl.recipe.todo.entity.TodoSendLog;
 import com.wgxhl.recipe.todo.mapper.TodoMapper;
 import com.wgxhl.recipe.todo.mapper.TodoNoticeRuleMapper;
@@ -34,6 +35,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -153,6 +156,107 @@ class TodoServiceImplNotifyTest {
                 eq("todo-1")
         );
         verify(mailSender).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void retryFailedChannelWithoutRepeatingSuccessfulChannel() {
+        Todo todo = buildTodo(true, true, false);
+        TodoNoticeRule rule = buildRule(0);
+        AppUser owner = buildOwner("user-1", "wang@test.com", "site,email");
+        TodoSendLog siteSuccess = new TodoSendLog();
+        siteSuccess.setSendStatus("SUCCESS");
+        TodoSendLog emailFailure = new TodoSendLog();
+        emailFailure.setSendStatus("FAIL");
+        when(todoSendLogMapper.selectList(any())).thenReturn(
+                Collections.emptyList(), Collections.emptyList(),
+                Collections.singletonList(siteSuccess), Collections.singletonList(emailFailure));
+        when(notificationService.createSiteNotice(any(), any(), any(), any(), any())).thenReturn(new Notification());
+        doThrow(new org.springframework.mail.MailSendException("temporary"))
+                .doNothing().when(mailSender).send(any(SimpleMailMessage.class));
+
+        assertEquals(1, invokeSendByRule(todo, rule, owner));
+        assertEquals(1, invokeSendByRule(todo, rule, owner));
+
+        verify(notificationService, times(1)).createSiteNotice(any(), any(), any(), any(), any());
+        verify(mailSender, times(2)).send(any(SimpleMailMessage.class));
+        ArgumentCaptor<TodoSendLog> logs = ArgumentCaptor.forClass(TodoSendLog.class);
+        verify(todoSendLogMapper, times(3)).insert(logs.capture());
+        assertTrue(logs.getAllValues().stream().allMatch(entry -> "user-1".equals(entry.getRecipientId())
+                && todo.getDueTime().equals(entry.getTargetTime())));
+    }
+
+    @Test
+    void stopRetryingAfterThreeFailures() {
+        TodoSendLog failed = new TodoSendLog();
+        failed.setSendStatus("FAIL");
+        when(todoSendLogMapper.selectList(any())).thenReturn(Arrays.asList(failed, failed, failed));
+        boolean result = ReflectionTestUtils.invokeMethod(todoService, "shouldAttempt", buildTodo(false, true, false),
+                buildRule(0), LocalDateTime.now(), "email", buildOwner("user-1", "wang@test.com", "email"));
+        assertEquals(false, result);
+    }
+
+    @Test
+    void successfulRecipientDoesNotSuppressAnotherRecipient() {
+        Todo todo = buildTodo(true, false, false);
+        TodoNoticeRule rule = buildRule(0);
+        TodoOwner first = new TodoOwner();
+        first.setOwnerId("user-1");
+        TodoOwner second = new TodoOwner();
+        second.setOwnerId("user-2");
+        when(todoOwnerMapper.selectList(any())).thenReturn(Arrays.asList(first, second));
+        when(appUserMapper.selectById("user-1")).thenReturn(buildOwner("user-1", "one@test.com", "site"));
+        when(appUserMapper.selectById("user-2")).thenReturn(buildOwner("user-2", "two@test.com", "site"));
+        TodoSendLog success = new TodoSendLog();
+        success.setSendStatus("SUCCESS");
+        when(todoSendLogMapper.selectList(any())).thenReturn(Collections.singletonList(success), Collections.emptyList());
+        when(notificationService.createSiteNotice(any(), any(), any(), any(), any())).thenReturn(new Notification());
+
+        Integer sent = ReflectionTestUtils.invokeMethod(todoService, "sendByRule", todo, rule, todo.getDueTime());
+        assertEquals(1, sent.intValue());
+
+        verify(notificationService, never()).createSiteNotice(eq("user-1"), any(), any(), any(), any());
+        verify(notificationService).createSiteNotice(eq("user-2"), any(), any(), any(), any());
+    }
+
+    @Test
+    void scanWindowDoesNotSendEarlyOrOldRules() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 28, 10, 0);
+        assertEquals(true, ReflectionTestUtils.invokeMethod(todoService, "isInNotifyWindow", now.minusMinutes(6), now));
+        assertEquals(false, ReflectionTestUtils.invokeMethod(todoService, "isInNotifyWindow", now.minusMinutes(6).minusSeconds(1), now));
+        assertEquals(false, ReflectionTestUtils.invokeMethod(todoService, "isInNotifyWindow", now.plusSeconds(1), now));
+    }
+
+    @Test
+    void unchangedBirthdayRulesKeepTheirIds() {
+        TodoNoticeRule sevenDays = buildRule(10080);
+        sevenDays.setId("seven-days");
+        TodoNoticeRule threeDays = buildRule(4320);
+        threeDays.setId("three-days");
+        TodoNoticeRule onTime = buildRule(0);
+        onTime.setId("on-time");
+        when(todoNoticeRuleMapper.selectList(any())).thenReturn(Arrays.asList(sevenDays, threeDays, onTime));
+
+        ReflectionTestUtils.invokeMethod(todoService, "replaceRules", "todo-1", Arrays.asList(10080, 4320, 0));
+
+        verify(todoNoticeRuleMapper, never()).deleteById(any(String.class));
+        verify(todoNoticeRuleMapper, never()).insert(any(TodoNoticeRule.class));
+    }
+
+    @Test
+    void changedRulesRetainMatchingIds() {
+        TodoNoticeRule existing = buildRule(10);
+        existing.setId("existing");
+        TodoNoticeRule removed = buildRule(60);
+        removed.setId("removed");
+        when(todoNoticeRuleMapper.selectList(any())).thenReturn(Arrays.asList(existing, removed));
+
+        ReflectionTestUtils.invokeMethod(todoService, "replaceRules", "todo-1", Arrays.asList(10, 0));
+
+        verify(todoNoticeRuleMapper).deleteById("removed");
+        verify(todoNoticeRuleMapper, never()).deleteById("existing");
+        ArgumentCaptor<TodoNoticeRule> inserted = ArgumentCaptor.forClass(TodoNoticeRule.class);
+        verify(todoNoticeRuleMapper).insert(inserted.capture());
+        assertEquals(0, inserted.getValue().getBeforeMinutes());
     }
 
     @Test

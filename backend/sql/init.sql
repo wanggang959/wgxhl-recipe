@@ -375,6 +375,8 @@ create table todo_send_log
 
     todo_id varchar(36) not null comment '待办id',
     rule_id varchar(36) not null comment '提醒规则id',
+    recipient_id varchar(36) default null comment '接收人id',
+    target_time datetime default null comment '本次提醒计划时间',
     notify_type varchar(32) not null comment '通知类型',
     send_time datetime comment '发送时间',
     send_status varchar(32) comment '发送状态',

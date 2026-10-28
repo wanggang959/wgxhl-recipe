@@ -19,6 +19,13 @@ spring:
           ssl:
             enable: true
           auth: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+        smtps:
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
 
 server:
   port: ${APP_PORT:9001}

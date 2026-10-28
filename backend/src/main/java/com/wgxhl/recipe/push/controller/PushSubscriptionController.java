@@ -24,9 +24,11 @@ public class PushSubscriptionController {
     }
 
     @PostMapping("/status")
-    public ApiResponse<PushSubscriptionStatusVO> status(HttpServletRequest request) {
+    public ApiResponse<PushSubscriptionStatusVO> status(@RequestBody(required = false) PushSubscriptionDTO dto,
+                                                        HttpServletRequest request) {
         AppUser currentUser = currentUser(request);
-        return userPushSubscriptionService.status(currentUser == null ? null : currentUser.getId());
+        return userPushSubscriptionService.status(currentUser == null ? null : currentUser.getId(),
+                dto == null ? null : dto.getEndpoint());
     }
 
     @PostMapping("/subscribe")

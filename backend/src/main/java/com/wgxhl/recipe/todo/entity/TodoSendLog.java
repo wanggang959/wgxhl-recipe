@@ -18,6 +18,10 @@ public class TodoSendLog {
 
     private String ruleId;
 
+    private String recipientId;
+
+    private LocalDateTime targetTime;
+
     private String notifyType;
 
     private LocalDateTime sendTime;

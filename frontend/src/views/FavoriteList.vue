@@ -3,8 +3,8 @@ import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { deleteFavorite, pageFavorite } from '../api/favorite'
-import { getRecipeDetail, toggleRecipeLike } from '../api/recipe'
-import { checkWantedRecipe, createWantedRecipe } from '../api/want'
+import { getRecipesBatch, toggleRecipeLike } from '../api/recipe'
+import { createWantedRecipe } from '../api/want'
 import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RecipeCard from '../components/RecipeCard.vue'
@@ -77,7 +77,7 @@ async function loadFavorite(options = {}) {
       favoriteId: item.id,
     }))
     list.value = await enrichFavoriteRecipes(favorites)
-    await syncWantedState(list.value)
+    list.value.forEach((item) => { wantedMap.value[item.id] = Boolean(item.wanted) })
     saveFavoriteCache()
     rememberDataVersions(watchedDataScopes, seenDataVersions)
   } catch (error) {
@@ -106,29 +106,15 @@ function saveFavoriteCache() {
 }
 
 async function enrichFavoriteRecipes(records) {
-  const results = await Promise.allSettled(
-    records.map((item) =>
-      getRecipeDetail(item.recipeId).then((res) => ({
-        ...item,
-        ...(res.data?.recipe || {}),
-        id: item.recipeId,
-        favoriteId: item.favoriteId,
-      })),
-    ),
-  )
-  return records.map((item, index) => (
-    results[index].status === 'fulfilled' ? results[index].value : item
-  ))
-}
-
-async function syncWantedState(records) {
-  if (!userStore.userId || records.length === 0) return
-  const tasks = records.map((item) =>
-    checkWantedRecipe(userStore.userId, item.id).then((res) => {
-      wantedMap.value[item.id] = Boolean(res.data)
-    }),
-  )
-  await Promise.allSettled(tasks)
+  if (!records.length) return []
+  const res = await getRecipesBatch(records.map((item) => item.recipeId))
+  const byId = new Map((res.data || []).map((recipe) => [recipe.id, recipe]))
+  return records.map((item) => ({
+    ...item,
+    ...(byId.get(item.recipeId) || {}),
+    id: item.recipeId,
+    favoriteId: item.favoriteId,
+  }))
 }
 
 async function remove(item) {

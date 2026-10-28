@@ -1,7 +1,7 @@
 import { post } from './request'
 
-export function getPushStatus() {
-  return post('/push/status')
+export function getPushStatus(endpoint = '') {
+  return post('/push/status', endpoint ? { endpoint } : {})
 }
 
 export function subscribePush(payload) {

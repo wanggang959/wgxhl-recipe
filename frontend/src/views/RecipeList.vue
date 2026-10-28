@@ -3,9 +3,9 @@ import { computed, onActivated, onBeforeUnmount, onMounted, reactive, ref, watch
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
-import { checkFavorite, createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
+import { createFavorite, deleteFavoriteByRecipeId } from '../api/favorite'
 import { pageRecipe, toggleRecipeLike } from '../api/recipe'
-import { checkWantedRecipe, createWantedRecipe } from '../api/want'
+import { createWantedRecipe } from '../api/want'
 import CategoryTabs from '../components/CategoryTabs.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -217,7 +217,10 @@ async function loadMore(options = {}) {
     if (list.value.length >= total.value || records.length === 0) {
       finished.value = true
     }
-    await Promise.all([syncFavoriteState(records), syncWantedState(records)])
+    records.forEach((item) => {
+      favoriteMap.value[item.id] = Boolean(item.favorite)
+      wantedMap.value[item.id] = Boolean(item.wanted)
+    })
     if (suggestRecipe.value?.status === '下架') {
       suggestRecipe.value = null
     }
@@ -261,26 +264,6 @@ function saveRecipeListCache() {
   recipeListCache.query = { ...query }
   recipeListCache.filter = { ...filter }
   recipeListCache.savedAt = Date.now()
-}
-
-async function syncFavoriteState(records) {
-  if (!userStore.userId || records.length === 0) return
-  const tasks = records.map((item) =>
-    checkFavorite(userStore.userId, item.id).then((res) => {
-      favoriteMap.value[item.id] = Boolean(res.data)
-    }),
-  )
-  await Promise.allSettled(tasks)
-}
-
-async function syncWantedState(records) {
-  if (!userStore.userId || records.length === 0) return
-  const tasks = records.map((item) =>
-    checkWantedRecipe(userStore.userId, item.id).then((res) => {
-      wantedMap.value[item.id] = Boolean(res.data)
-    }),
-  )
-  await Promise.allSettled(tasks)
 }
 
 function applySearch() {
@@ -442,19 +425,27 @@ async function toggleFavoriteSafe(item) {
   if (favoritePendingMap.value[item.id]) return
   favoritePendingMap.value[item.id] = true
   try {
+    let result
+    let delta
     if (favoriteMap.value[item.id]) {
-      await deleteFavoriteByRecipeId(userStore.userId, item.id)
+      result = await deleteFavoriteByRecipeId(userStore.userId, item.id)
+      delta = -1
       favoriteMap.value[item.id] = false
       markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '已取消收藏', duration: 1400 })
     } else {
-      await createFavorite({ userId: userStore.userId, recipeId: item.id })
+      result = await createFavorite({ userId: userStore.userId, recipeId: item.id })
+      delta = 1
       favoriteMap.value[item.id] = true
       markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '收藏成功', duration: 1400 })
     }
+    item.favoriteCount = result.data?.favoriteCount != null
+      ? Number(result.data.favoriteCount)
+      : Math.max(0, Number(item.favoriteCount || 0) + delta)
+    markDataStale(DATA_SCOPE.recipes)
   } catch (error) {
     closeToast()
     showFailToast({ message: error.message || '收藏操作失败', duration: 1800 })
@@ -684,7 +675,7 @@ function submitCustomWantDate() {
 
     <form v-if="!isTodayMode" class="search-card" @submit.prevent="applySearch">
       <van-icon name="search" size="18" />
-      <input v-model="filter.recipeName" placeholder="搜索菜名、作者用户名" />
+      <input v-model="filter.recipeName" :placeholder="isPublicScope ? '搜索菜名' : '搜索菜名、作者用户名'" />
       <button type="submit">搜索</button>
     </form>
 

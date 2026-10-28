@@ -2,6 +2,18 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
   {
+    path: '/reset-password',
+    component: () => import('../views/ResetPasswordView.vue'),
+  },
+  {
+    path: '/account/email',
+    component: () => import('../views/EmailSecurityView.vue'),
+  },
+  {
+    path: '/account/member-password/:id',
+    component: () => import('../views/MemberPasswordResetView.vue'),
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/LoginView.vue'),
@@ -125,6 +137,7 @@ function getCurrentUser() {
 }
 
 router.beforeEach((to) => {
+  if (to.path === '/reset-password') return true
   const user = getCurrentUser()
   const isLogin = Boolean(user?.id && user?.token && user?.userRole)
 
@@ -145,9 +158,12 @@ router.beforeEach((to) => {
     }
   }
 
+  if (to.path.startsWith('/account/member-password/') && user.memberRole !== 'owner') return '/profile'
+
   const isGuest = user.id === 'guest' || user.username === 'guest'
   if (isGuest) {
     const guestWriteBlocked = to.path === '/todo/create'
+      || to.path === '/account/email'
       || to.path === '/todo/summary'
       || to.path === '/recipe/create'
       || to.path === '/expenses/create'

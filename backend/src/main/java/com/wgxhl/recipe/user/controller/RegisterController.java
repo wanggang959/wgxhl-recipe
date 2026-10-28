@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.wgxhl.recipe.config.ClientIpResolver;
+import javax.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/user/register")
@@ -24,8 +26,8 @@ public class RegisterController {
     }
 
     @PostMapping("/sendCode")
-    public ApiResponse<Void> sendCode(@RequestBody RegisterCodeDTO dto) {
-        return userRegistrationService.sendRegisterCode(dto == null ? null : dto.getEmail());
+    public ApiResponse<Void> sendCode(@RequestBody RegisterCodeDTO dto, HttpServletRequest request) {
+        return userRegistrationService.sendRegisterCode(dto == null ? null : dto.getEmail(), ClientIpResolver.resolve(request));
     }
 
     @PostMapping("/inviteInfo")

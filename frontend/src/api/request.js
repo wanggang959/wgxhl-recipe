@@ -7,7 +7,10 @@ const request = axios.create({
 
 const STORAGE_KEY = 'wgxhl_recipe_user'
 
-const PUBLIC_API_PATHS = ['/user/login', '/user/guestLogin', '/user/preview']
+const PUBLIC_API_PATHS = [
+  '/user/login', '/user/guestLogin', '/user/preview',
+  '/user/security/requestReset', '/user/security/resetInfo', '/user/security/confirmReset',
+]
 
 function isPublicApi(url) {
   if (!url) return false

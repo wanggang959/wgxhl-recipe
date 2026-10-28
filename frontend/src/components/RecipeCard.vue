@@ -62,12 +62,17 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
       <button
         v-if="showFavoriteButton"
         class="favorite"
-        :class="{ active: favorite }"
+        :class="{ active: favorite, 'has-count': recipe.favoriteCount > 0 }"
         type="button"
         @click.stop="emit('favorite', recipe)"
       >
         <ActionIcon name="heart" :filled="favorite" :size="20" />
+        <span v-if="recipe.favoriteCount > 0">{{ recipe.favoriteCount }}</span>
       </button>
+      <span v-else-if="recipe.favoriteCount > 0" class="favorite has-count">
+        <ActionIcon name="heart" :size="20" />
+        <span>{{ recipe.favoriteCount }}</span>
+      </span>
       <button
         v-if="showWantButton"
         class="want-cart"
@@ -175,6 +180,16 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
 
 .favorite.active {
   color: #ef4444;
+}
+
+.favorite.has-count {
+  width: auto;
+  min-width: 34px;
+  padding: 0 9px;
+  gap: 4px;
+  border-radius: 17px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .want-cart {

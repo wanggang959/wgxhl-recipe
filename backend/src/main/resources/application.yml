@@ -19,6 +19,13 @@ spring:
           ssl:
             enable: true
           auth: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+        smtps:
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
 
 server:
   port: ${APP_PORT:9001}
@@ -37,6 +44,22 @@ auth:
   jwt:
     secret: ${JWT_SECRET:}
     expire-hours: ${JWT_EXPIRE_HOURS:168}
+
+account:
+  security:
+    public-url: ${ACCOUNT_SECURITY_PUBLIC_URL:https://recipe.wgxhl.space}
+
+app:
+  mail:
+    provider: ${MAIL_PROVIDER:smtp}
+    from: ${MAIL_FROM:}
+    ses:
+      secret-id: ${SES_SECRET_ID:}
+      secret-key: ${SES_SECRET_KEY:}
+      region: ${SES_REGION:ap-guangzhou}
+      code-template-id: ${SES_CODE_TEMPLATE_ID:0}
+      reset-template-id: ${SES_RESET_TEMPLATE_ID:0}
+      notification-template-id: ${SES_NOTIFICATION_TEMPLATE_ID:0}
 
 push:
   vapid:

@@ -6,6 +6,7 @@ import com.wgxhl.recipe.common.dto.IdDTO;
 import com.wgxhl.recipe.favorite.dto.FavoritePageDTO;
 import com.wgxhl.recipe.favorite.dto.FavoriteUserRecipeDTO;
 import com.wgxhl.recipe.favorite.entity.UserFavorite;
+import com.wgxhl.recipe.favorite.mapper.FavoriteCount;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,7 +59,7 @@ public class UserFavoriteController {
      * @Author wg
      **/
     @PostMapping("/deleteByRecipeId")
-    public ApiResponse<Void> deleteByRecipeId(@RequestBody FavoriteUserRecipeDTO dto) {
+    public ApiResponse<FavoriteCount> deleteByRecipeId(@RequestBody FavoriteUserRecipeDTO dto) {
         return userFavoriteService.deleteByRecipeId(dto.getUserId(), dto.getRecipeId());
     }
 

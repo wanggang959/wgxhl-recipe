@@ -2,6 +2,7 @@ USE recipe;
 
 -- 多租户改造后，新库初始化顺序：先执行本文件，再依次执行 add_household.sql、person_owned_recipe.sql、add_household_invite.sql、add_todo_creator.sql、add_email_verification_code.sql
 -- （add_household.sql 创建家庭表并补充 household_id；person_owned_recipe.sql 再把菜谱/基础数据改为按人归属）
+-- 完整的新库升级顺序以 backend/test/docker-compose.yml 的挂载清单为准，包含 add_account_security.sql。
 
 create table recipe_category
 (
@@ -193,7 +194,8 @@ create table user_favorite
     update_time datetime comment '更新时间',
 
     primary key (id),
-    unique key uk_user_favorite (user_id, recipe_id)
+    unique key uk_user_favorite (user_id, recipe_id),
+    key idx_user_favorite_recipe_user (recipe_id, user_id)
 )
 engine=innodb
 default charset=utf8mb4
@@ -288,7 +290,8 @@ create table app_user
     update_time datetime comment '更新时间',
 
     primary key (id),
-    unique key uk_app_user_username (username)
+    unique key uk_app_user_username (username),
+    unique key uk_app_user_email ((nullif(lower(trim(email)), '')))
 )
 engine=innodb
 default charset=utf8mb4
@@ -374,6 +377,8 @@ create table todo_send_log
 
     todo_id varchar(36) not null comment '待办id',
     rule_id varchar(36) not null comment '提醒规则id',
+    recipient_id varchar(36) default null comment '接收人id',
+    target_time datetime default null comment '本次提醒计划时间',
     notify_type varchar(32) not null comment '通知类型',
     send_time datetime comment '发送时间',
     send_status varchar(32) comment '发送状态',

@@ -27,6 +27,7 @@ import {
   teardownPushOnLogout,
 } from '../utils/pushNotification'
 import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
+import { pushStatusText as describePushStatus } from '../utils/pushStatusText'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -50,6 +51,7 @@ const users = ref([])
 const actionStatus = ref('')
 const actionStatusType = ref('success')
 const showMemberForm = ref(false)
+const memberFormError = ref('')
 const pushLoading = ref(false)
 const loggingOut = ref(false)
 const pushState = ref({
@@ -57,6 +59,8 @@ const pushState = ref({
   permission: 'default',
   subscribed: false,
   configured: false,
+  configKnown: false,
+  statusUnknown: false,
   publicKey: '',
   needsStandalone: false,
 })
@@ -102,13 +106,7 @@ const canTogglePush = computed(() => (
     && pushState.value.permission !== 'denied'
 ))
 
-const pushStatusText = computed(() => {
-  if (!pushState.value.supported) return '当前浏览器不支持'
-  if (pushState.value.needsStandalone) return '添加到主屏幕后可开启'
-  if (!pushState.value.configured) return '服务端未配置'
-  if (pushState.value.permission === 'denied') return '系统权限已关闭'
-  return pushState.value.subscribed ? '已开启' : '未开启'
-})
+const pushStatusText = computed(() => describePushStatus(pushState.value))
 
 function isBuiltinAdminUser(item) {
   return item?.id === BUILTIN_ADMIN_ID || item?.username === BUILTIN_ADMIN_USERNAME
@@ -191,8 +189,8 @@ async function submitPassword() {
     showFailToast('请输入原密码')
     return
   }
-  if (passwordForm.newPassword.trim().length < 6) {
-    showFailToast('新密码至少 6 位')
+  if (passwordForm.newPassword.length < 8 || passwordForm.newPassword.length > 64) {
+    showFailToast('新密码长度须为 8 至 64 位')
     return
   }
   if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -206,7 +204,9 @@ async function submitPassword() {
       newPassword: passwordForm.newPassword,
     })
     passwordVisible.value = false
-    showSuccessToast('密码已更新')
+    userStore.logout()
+    showSuccessToast('密码已更新，请重新登录')
+    router.replace('/login')
   } catch (error) {
     showFailToast(error.message || '密码修改失败')
   } finally {
@@ -239,6 +239,7 @@ async function togglePushNotification() {
 }
 
 function resetUserForm() {
+  memberFormError.value = ''
   userForm.id = ''
   userForm.username = ''
   userForm.nickname = ''
@@ -260,6 +261,7 @@ function resetUserForm() {
 }
 
 function beginAddUser() {
+  memberFormError.value = ''
   userForm.id = ''
   userForm.username = ''
   userForm.nickname = ''
@@ -281,12 +283,13 @@ function beginAddUser() {
 }
 
 function editUser(item) {
+  memberFormError.value = ''
   userForm.id = item.id
   userForm.username = item.username
   userForm.nickname = item.nickname || ''
   userForm.publicName = item.publicName || ''
   userForm.password = ''
-  userForm.memberRole = item.memberRole === 'admin' ? 'admin' : 'member'
+  userForm.memberRole = item.memberRole || 'member'
   userForm.avatar = item.avatar || pickDefaultAvatar(item.id)
   userForm.email = item.email || ''
   userForm.birthday = item.birthday || ''
@@ -318,16 +321,26 @@ function syncCurrentUserAfterSave(payload) {
 }
 
 async function saveUser() {
+  memberFormError.value = ''
   if (userForm.id !== userStore.userId && !userStore.canManageMembers) {
-    showActionStatus('只有家庭管理员可以管理家人', 'error')
+    memberFormError.value = '只有家庭管理员可以管理家人'
     return
   }
   if (!userForm.username.trim()) {
-    showActionStatus('请输入用户名', 'error')
+    memberFormError.value = '请输入用户名'
+    return
+  }
+  const email = userForm.email.trim()
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    memberFormError.value = '请输入有效的邮箱地址'
     return
   }
   if (!isEditingUser.value && !userForm.password.trim()) {
-    showActionStatus('新增用户需要设置密码', 'error')
+    memberFormError.value = '新增用户需要设置密码'
+    return
+  }
+  if (!isEditingUser.value && (userForm.password.length < 8 || userForm.password.length > 64)) {
+    memberFormError.value = '密码长度须为 8 至 64 位'
     return
   }
 
@@ -355,6 +368,8 @@ async function saveUser() {
       delete payload.password
     }
     if (isEditingUser.value) {
+      delete payload.email
+      delete payload.password
       await updateUser(payload)
       markDataStale([DATA_SCOPE.users, DATA_SCOPE.todos])
       showActionStatus('成员已更新')
@@ -367,7 +382,7 @@ async function saveUser() {
     resetUserForm()
     await loadUsers()
   } catch (error) {
-    showActionStatus(error.message || '成员保存失败', 'error')
+    memberFormError.value = error.message || '成员保存失败'
   } finally {
     savingUser.value = false
   }
@@ -765,6 +780,7 @@ onMounted(() => {
       <h2>账号</h2>
       <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
       <van-cell title="权限" :value="userStore.roleText" />
+      <van-cell v-if="!userStore.isGuest" title="邮箱安全" is-link @click="router.push('/account/email')" />
       <van-cell
         v-if="userStore.isLogin && !userStore.isGuest"
         title="修改密码"
@@ -808,7 +824,7 @@ onMounted(() => {
           <h3>修改密码</h3>
           <button type="button" @click="passwordVisible = false">关闭</button>
         </div>
-        <p class="password-hint">修改后请用新密码重新登录。忘记原密码请联系家庭管理员重置。</p>
+        <p class="password-hint">修改后需要重新登录。忘记密码可在登录页通过已验证邮箱找回。</p>
         <van-field
           v-model="passwordForm.oldPassword"
           class="form-field"
@@ -821,7 +837,8 @@ onMounted(() => {
           class="form-field"
           label="新密码"
           type="password"
-          placeholder="至少 6 位"
+          placeholder="8 至 64 位"
+          maxlength="64"
         />
         <van-field
           v-model="passwordForm.confirmPassword"
@@ -861,7 +878,8 @@ onMounted(() => {
           maxlength="20"
           placeholder="公共菜谱里的作者名，留空显示厨友XXXX"
         />
-        <van-field v-model="userForm.email" class="form-field" label="邮箱" placeholder="用于邮箱提醒" />
+        <van-field v-model="userForm.email" class="form-field" type="email" label="邮箱" maxlength="200" :disabled="isEditingUser" placeholder="选填，用于登录和提醒" />
+        <p v-if="isEditingUser" class="builtin-hint">邮箱由成员本人在「邮箱安全」中验证或更换。</p>
         <label class="role-field">
           <span>生日历法</span>
           <select v-model="userForm.birthdayCalendar">
@@ -895,11 +913,13 @@ onMounted(() => {
           </label>
         </div>
         <van-field
+          v-if="!isEditingUser"
           v-model="userForm.password"
           class="form-field"
           label="密码"
           type="password"
-          :placeholder="isEditingUser ? '不填则不修改密码' : '请输入密码'"
+          placeholder="8 至 64 位"
+          maxlength="64"
         />
         <label class="role-field">
           <span>家庭角色</span>
@@ -907,6 +927,7 @@ onMounted(() => {
             v-model="userForm.memberRole"
             :disabled="editingBuiltinAdmin || editingMemberIsOwner || !isHouseholdOwner"
           >
+            <option v-if="editingMemberIsOwner" value="owner">家庭所有者</option>
             <option value="member">家人（记录菜谱、收藏、待办）</option>
             <option value="admin">家庭管理员（可管理家人与邀请）</option>
           </select>
@@ -940,6 +961,7 @@ onMounted(() => {
             </button>
           </div>
         </div>
+        <p v-if="memberFormError" class="member-form-error" role="alert">{{ memberFormError }}</p>
         <div class="form-actions">
           <van-button type="warning" round size="small" :loading="savingUser" @click="saveUser">
             {{ isEditingUser ? '保存成员' : '新增成员' }}
@@ -1045,6 +1067,10 @@ onMounted(() => {
                     </button>
                   </div>
                   <div v-else class="member-actions member-actions--icons">
+                    <button v-if="isHouseholdOwner && u.id !== userStore.userId && u.userRole !== 'super_admin'" type="button" class="action-item" @click="router.push(`/account/member-password/${u.id}`)">
+                      <span class="action-icon lock"><van-icon name="lock" size="18" /></span>
+                      <span>重置密码</span>
+                    </button>
                     <button v-if="canEditUser(u)" type="button" class="action-item" @click="editUser(u)">
                       <span class="action-icon edit"><van-icon name="edit" size="18" /></span>
                       <span>编辑</span>
@@ -1398,6 +1424,13 @@ h2 {
   margin-bottom: 8px;
 }
 
+.member-form-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .member-panel {
   flex: 0 1 auto;
   max-height: min(58vh, 520px);
@@ -1746,6 +1779,8 @@ h2 {
 
 .member-actions--icons {
   gap: 14px;
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .action-item {

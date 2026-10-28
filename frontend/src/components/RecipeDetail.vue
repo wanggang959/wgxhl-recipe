@@ -69,12 +69,16 @@ const isOffline = computed(() => recipe.value.status === '下架')
         <button
           v-if="showFavorite"
           class="favorite-action"
-          :class="{ active: favorite }"
+          :class="{ active: favorite, 'has-count': recipe.favoriteCount > 0 }"
           type="button"
           @click="emit('favorite')"
         >
           <ActionIcon name="heart" :filled="favorite" :size="21" />
+          <span v-if="recipe.favoriteCount > 0">{{ recipe.favoriteCount }}</span>
         </button>
+        <span v-else-if="recipe.favoriteCount > 0" class="favorite-count-static">
+          <ActionIcon name="heart" :size="21" /> {{ recipe.favoriteCount }}
+        </span>
       </div>
     </div>
 
@@ -268,6 +272,25 @@ const isOffline = computed(() => recipe.value.status === '下架')
 .favorite-action.active {
   color: #ef4444;
 }
+
+.hero-actions .favorite-action.has-count,
+.favorite-count-static {
+  width: auto;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(47, 38, 31, 0.38);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hero-actions .favorite-action.active { color: #ef4444; }
 
 .hero-actions button :deep(.action-svg-icon) {
   display: inline-flex;

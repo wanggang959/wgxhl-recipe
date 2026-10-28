@@ -5,25 +5,34 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.favorite.dto.FavoritePageDTO;
 import com.wgxhl.recipe.favorite.entity.UserFavorite;
 import com.wgxhl.recipe.favorite.mapper.UserFavoriteMapper;
+import com.wgxhl.recipe.favorite.mapper.FavoriteCount;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
+import com.wgxhl.recipe.recipe.service.RecipeService;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 
 @Service
 public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, UserFavorite>
         implements UserFavoriteService {
 
     private final RecipeMapper recipeMapper;
+    private final RecipeService recipeService;
 
-    public UserFavoriteServiceImpl(RecipeMapper recipeMapper) {
+    public UserFavoriteServiceImpl(RecipeMapper recipeMapper, RecipeService recipeService) {
         this.recipeMapper = recipeMapper;
+        this.recipeService = recipeService;
     }
 
     @Override
@@ -41,7 +50,7 @@ public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, Use
     public ApiResponse<Page<UserFavorite>> page(FavoritePageDTO dto) {
         Page<UserFavorite> page = new Page<>(dto.getCurrent(), dto.getSize());
         Page<UserFavorite> result = lambdaQuery()
-                .eq(StringUtils.hasText(dto.getUserId()), UserFavorite::getUserId, dto.getUserId())
+                .eq(UserFavorite::getUserId, UserContext.requireUserId())
                 .like(StringUtils.hasText(dto.getRecipeName()), UserFavorite::getRecipeName, dto.getRecipeName())
                 .orderByDesc(UserFavorite::getCreateTime)
                 .page(page);
@@ -49,10 +58,10 @@ public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, Use
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<UserFavorite> create(UserFavorite entity) {
-        if (!StringUtils.hasText(entity.getUserId())) {
-            return ApiResponse.fail("用户id不能为空");
-        }
+        entity.setUserId(UserContext.requireUserId());
+        entity.setId(null);
         if (!StringUtils.hasText(entity.getRecipeId())) {
             return ApiResponse.fail("菜谱id不能为空");
         }
@@ -63,12 +72,17 @@ public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, Use
             return ApiResponse.fail("已收藏该菜谱");
         }
         Recipe recipe = recipeMapper.selectById(entity.getRecipeId());
-        if (recipe == null) {
+        if (!recipeService.canViewRecipeDetail(recipe)) {
             return ApiResponse.fail("菜谱不存在");
         }
         entity.setRecipeName(recipe.getRecipeName());
         entity.setCoverImage(recipe.getCoverImage());
-        save(entity);
+        try {
+            save(entity);
+        } catch (DuplicateKeyException ex) {
+            return ApiResponse.fail("已收藏该菜谱");
+        }
+        entity.setFavoriteCount(favoriteCount(entity.getRecipeId()).getFavoriteCount());
         return ApiResponse.success("收藏成功", entity);
     }
 
@@ -77,7 +91,8 @@ public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, Use
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("收藏id不能为空");
         }
-        if (super.getById(id) == null) {
+        UserFavorite favorite = super.getById(id);
+        if (favorite == null || !UserContext.requireUserId().equals(favorite.getUserId())) {
             return ApiResponse.fail("收藏记录不存在");
         }
         removeById(id);
@@ -85,10 +100,9 @@ public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, Use
     }
 
     @Override
-    public ApiResponse<Void> deleteByRecipeId(String userId, String recipeId) {
-        if (!StringUtils.hasText(userId)) {
-            return ApiResponse.fail("用户id不能为空");
-        }
+    @Transactional(rollbackFor = Exception.class)
+    public ApiResponse<FavoriteCount> deleteByRecipeId(String userId, String recipeId) {
+        userId = UserContext.requireUserId();
         if (!StringUtils.hasText(recipeId)) {
             return ApiResponse.fail("菜谱id不能为空");
         }
@@ -98,11 +112,21 @@ public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, Use
         if (!removed) {
             return ApiResponse.fail("收藏记录不存在");
         }
-        return ApiResponse.success("取消收藏成功", null);
+        return ApiResponse.success("取消收藏成功", favoriteCount(recipeId));
+    }
+
+    private FavoriteCount favoriteCount(String recipeId) {
+        List<FavoriteCount> counts = baseMapper.countByRecipeIds(Collections.singletonList(recipeId));
+        if (!counts.isEmpty()) return counts.get(0);
+        FavoriteCount result = new FavoriteCount();
+        result.setRecipeId(recipeId);
+        result.setFavoriteCount(0L);
+        return result;
     }
 
     @Override
     public ApiResponse<Boolean> check(String userId, String recipeId) {
+        userId = UserContext.requireUserId();
         if (!StringUtils.hasText(userId) || !StringUtils.hasText(recipeId)) {
             return ApiResponse.success(false);
         }

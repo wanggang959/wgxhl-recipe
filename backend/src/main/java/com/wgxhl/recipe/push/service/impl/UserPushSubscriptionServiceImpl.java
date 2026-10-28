@@ -20,11 +20,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -50,7 +52,7 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
             return;
         }
         try {
-            pushService = new PushService(
+            pushService = new CompatiblePushService(
                     pushProperties.getVapid().getPublicKey(),
                     pushProperties.getVapid().getPrivateKey(),
                     pushProperties.getVapid().getSubject()
@@ -81,9 +83,9 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
     }
 
     @Override
-    public ApiResponse<PushSubscriptionStatusVO> status(String userId) {
+    public ApiResponse<PushSubscriptionStatusVO> status(String userId, String endpoint) {
         PushSubscriptionStatusVO vo = baseStatus();
-        vo.setSubscribed(isSubscribed(userId));
+        vo.setSubscribed(isSubscribed(userId, endpoint));
         return ApiResponse.success(vo);
     }
 
@@ -225,8 +227,8 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
                 return false;
             }
             if (code < 200 || code >= 300) {
-                log.warn("Web Push delivery failed, status={}, host={}",
-                        code, endpointHost(subscription.getEndpoint()));
+                log.warn("Web Push delivery failed, status={}, host={}, reason={}",
+                        code, endpointHost(subscription.getEndpoint()), classifyError(response));
                 return false;
             }
             log.info("Web Push delivered, userId={}, host={}", subscription.getUserId(), endpointHost(subscription.getEndpoint()));
@@ -237,9 +239,27 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
         }
     }
 
-    /** 订阅失效或 VAPID 与 endpoint 不匹配（常见于换密钥后遗留的旧订阅） */
-    private boolean isInvalidSubscriptionStatus(int code) {
-        return code == 401 || code == 403 || code == 404 || code == 410;
+    static boolean isInvalidSubscriptionStatus(int code) {
+        return code == 404 || code == 410;
+    }
+
+    private String classifyError(HttpResponse response) {
+        if (response.getEntity() == null) return "unknown";
+        try (InputStream stream = response.getEntity().getContent()) {
+            byte[] bytes = new byte[4096];
+            int count = stream.read(bytes);
+            return count <= 0 ? "unknown" : classifyErrorText(new String(bytes, 0, count, StandardCharsets.UTF_8));
+        } catch (Exception ex) {
+            return "unreadable";
+        }
+    }
+
+    static String classifyErrorText(String body) {
+        String text = body.toLowerCase(Locale.ROOT);
+        if (text.contains("crypto-key") && text.contains("format")) return "invalid_crypto_key_format";
+        if (text.contains("invalid jwt") || text.contains("badjwttoken")) return "invalid_vapid_jwt";
+        if (text.contains("authorization") && (text.contains("correspond") || text.contains("match"))) return "vapid_key_mismatch";
+        return "unclassified";
     }
 
     private String endpointHost(String endpoint) {
@@ -262,11 +282,16 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
     }
 
     private boolean isSubscribed(String userId) {
+        return isSubscribed(userId, null);
+    }
+
+    private boolean isSubscribed(String userId, String endpoint) {
         if (!StringUtils.hasText(userId)) {
             return false;
         }
         return lambdaQuery()
                 .eq(UserPushSubscription::getUserId, userId)
+                .eq(StringUtils.hasText(endpoint), UserPushSubscription::getEndpoint, endpoint)
                 .eq(UserPushSubscription::getEnabled, true)
                 .exists();
     }

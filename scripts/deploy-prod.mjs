@@ -19,6 +19,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { restoreBackup } from './deploy-rollback.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -246,8 +247,9 @@ if (skipBuild) {
   console.log('跳过构建（--skip-build）')
 } else {
   setupLocalBuildTools()
+  runArgs(process.execPath, [path.join(root, 'scripts', 'deploy-rollback.test.mjs')], { cwd: root })
   if (doBackend) {
-    run('mvn clean package -DskipTests', { cwd: path.join(root, 'backend') })
+    run('mvn clean package', { cwd: path.join(root, 'backend') })
   }
   if (doFrontend) {
     run('npm run build', { cwd: path.join(root, 'frontend') })
@@ -303,26 +305,36 @@ if (dryRun) {
 
 step('5/6 替换线上文件')
 syncProdScripts()
-if (doBackend) {
-  ssh(`mv '${REMOTE_STAGING_DIR}/recipe-backend.jar.new' '${REMOTE_BACKEND_DIR}/${REMOTE_JAR_NAME}' && chmod 644 '${REMOTE_BACKEND_DIR}/${REMOTE_JAR_NAME}'`)
-  console.log('后端 jar 已替换')
-}
-if (doFrontend) {
-  ssh(`tar -xzf '${REMOTE_STAGING_DIR}/frontend-dist.tar.gz' -C '${REMOTE_FRONTEND_DIR}' && chown -R root:root '${REMOTE_FRONTEND_DIR}' && rm -f '${REMOTE_STAGING_DIR}/frontend-dist.tar.gz'`)
-  console.log('前端静态文件已覆盖')
-}
-if (doBackend) {
-  ssh(`cd '${REMOTE_BACKEND_DIR}' && docker compose up -d --force-recreate`)
-}
-
-step('6/6 健康检查')
-if (doBackend) {
-  console.log('等待后端启动（最多 90 秒）...')
-  const healthy = sshTry(`for i in $(seq 1 45); do if curl -fsS -m 2 '${HEALTH_URL}' >/dev/null 2>&1; then echo '后端健康检查通过'; exit 0; fi; sleep 2; done; echo '后端健康检查失败，最近日志：'; docker logs --tail 80 wgxhl-recipe-backend; exit 1`)
-  if (!healthy) {
-    console.error(`\n回滚命令：\n${rollbackHint(ts)}`)
-    fail('后端未能通过健康检查，请根据日志排查后回滚')
+try {
+  if (doBackend && !sshTry(`mv '${REMOTE_STAGING_DIR}/recipe-backend.jar.new' '${REMOTE_BACKEND_DIR}/${REMOTE_JAR_NAME}' && chmod 644 '${REMOTE_BACKEND_DIR}/${REMOTE_JAR_NAME}'`)) {
+    throw new Error('替换后端失败')
   }
+  if (doFrontend && !sshTry(`tar -xzf '${REMOTE_STAGING_DIR}/frontend-dist.tar.gz' -C '${REMOTE_FRONTEND_DIR}' && chown -R root:root '${REMOTE_FRONTEND_DIR}' && rm -f '${REMOTE_STAGING_DIR}/frontend-dist.tar.gz'`)) {
+    throw new Error('替换前端失败')
+  }
+  if (doBackend && !sshTry(`cd '${REMOTE_BACKEND_DIR}' && docker compose up -d --force-recreate`)) {
+    throw new Error('后端重启失败')
+  }
+  step('6/6 健康检查')
+  if (doBackend) {
+    console.log('等待后端启动（最多 90 秒）...')
+    if (!sshTry(`for i in $(seq 1 45); do if curl -fsS -m 2 '${HEALTH_URL}' >/dev/null 2>&1; then echo '后端健康检查通过'; exit 0; fi; sleep 2; done; docker logs --tail 80 wgxhl-recipe-backend; exit 1`)) {
+      throw new Error('后端健康检查失败')
+    }
+  }
+} catch (error) {
+  console.error(`部署失败：${error.message}，正在恢复备份...`)
+  const result = restoreBackup({
+    restoreBackend: doBackend ? () => sshTry(`cp '${REMOTE_BACKUP_ROOT}/${ts}/${REMOTE_JAR_NAME}' '${REMOTE_BACKEND_DIR}/${REMOTE_JAR_NAME}'`) : null,
+    restoreFrontend: doFrontend ? () => sshTry(`tar -xzf '${REMOTE_BACKUP_ROOT}/${ts}/frontend-dist.tar.gz' -C '${REMOTE_FRONTEND_DIR}'`) : null,
+    restartBackend: () => sshTry(`cd '${REMOTE_BACKEND_DIR}' && docker compose up -d --force-recreate`),
+    checkBackend: () => sshTry(`for i in $(seq 1 45); do curl -fsS -m 2 '${HEALTH_URL}' >/dev/null 2>&1 && exit 0; sleep 2; done; exit 1`),
+  })
+  if (!result.backend || !result.frontend || !result.healthy) {
+    console.error(`自动回滚未完全成功，请立即检查并按需手动执行：\n${rollbackHint(ts)}`)
+    fail('自动回滚未完全成功')
+  }
+  fail('已恢复备份')
 }
 const publicCheck = spawnSync('curl', ['-fsS', '-m', '10', PUBLIC_URL], { encoding: 'utf8' })
 if (publicCheck.status === 0) {

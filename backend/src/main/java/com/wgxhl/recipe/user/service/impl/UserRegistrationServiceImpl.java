@@ -16,9 +16,11 @@ import com.wgxhl.recipe.user.service.AppUserService;
 import com.wgxhl.recipe.user.service.EmailVerificationCodeService;
 import com.wgxhl.recipe.user.service.UserRegistrationService;
 import com.wgxhl.recipe.user.util.DefaultAvatars;
+import com.wgxhl.recipe.user.util.EmailAddress;
 import com.wgxhl.recipe.user.util.PasswordUtil;
 import com.wgxhl.recipe.user.vo.RegisterInviteInfoVO;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
@@ -31,7 +33,6 @@ import java.util.regex.Pattern;
 @Service
 public class UserRegistrationServiceImpl implements UserRegistrationService {
 
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final Pattern USERNAME_PATTERN = Pattern.compile("^[\\p{L}\\p{N}_-]{2,32}$");
     private static final Set<String> RESERVED_USERNAMES = new HashSet<>(Arrays.asList(
             "guest", "王师傅", "admin-wangshifu"
@@ -62,8 +63,8 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
     }
 
     @Override
-    public ApiResponse<Void> sendRegisterCode(String email) {
-        return emailVerificationCodeService.sendRegisterCode(email);
+    public ApiResponse<Void> sendRegisterCode(String email, String clientIp) {
+        return emailVerificationCodeService.sendRegisterCode(email, clientIp);
     }
 
     @Override
@@ -92,7 +93,7 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
             return ApiResponse.fail("注册信息不能为空");
         }
         String email = normalizeEmail(dto.getEmail());
-        if (!EMAIL_PATTERN.matcher(email).matches()) {
+        if (!EmailAddress.isValid(email)) {
             return ApiResponse.fail("请输入有效的邮箱地址");
         }
         String username = normalizeText(dto.getUsername());
@@ -100,7 +101,7 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
         if (validationError != null) {
             return ApiResponse.fail(validationError);
         }
-        if (appUserService.lambdaQuery().eq(AppUser::getEmail, email).exists()) {
+        if (appUserMapper.countEmailUsedByAnotherUser(email, null) > 0) {
             return ApiResponse.fail("该邮箱已注册，请直接登录");
         }
         if (appUserService.lambdaQuery().eq(AppUser::getUsername, username).exists()) {
@@ -152,13 +153,21 @@ public class UserRegistrationServiceImpl implements UserRegistrationService {
         user.setNickname(StringUtils.hasText(nickname) ? nickname.trim() : username);
         user.setPassword(PasswordUtil.hash(password));
         user.setEmail(email);
+        user.setEmailVerified(emailMode);
+        user.setAuthVersion(0L);
+        user.setAccountOrigin(emailMode ? "EMAIL" : "INVITE");
         user.setUserRole("user");
         user.setStatus("normal");
         user.setAvatar(DefaultAvatars.pickForSeed(username));
         user.setNotificationPreference(emailMode ? "site,email" : "site");
-        if (!appUserService.save(user)) {
+        try {
+            if (!appUserService.save(user)) {
+                markRollback();
+                return ApiResponse.fail("注册失败，请稍后重试");
+            }
+        } catch (DuplicateKeyException ex) {
             markRollback();
-            return ApiResponse.fail("注册失败，请稍后重试");
+            return ApiResponse.fail("用户名或邮箱已被使用");
         }
 
         if (invite != null) {

@@ -8,6 +8,10 @@ export function getRecipeDetail(id) {
   return post('/recipe/getById', { id })
 }
 
+export function getRecipesBatch(ids) {
+  return post('/recipe/batch', { ids })
+}
+
 export function createRecipe(payload) {
   return post('/recipe/create', payload)
 }

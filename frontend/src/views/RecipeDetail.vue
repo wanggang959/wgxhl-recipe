@@ -87,19 +87,29 @@ async function toggleFavoriteSafe() {
   if (favoritePending.value) return
   favoritePending.value = true
   try {
+    let result
+    let delta
     if (isFavorite.value) {
-      await deleteFavoriteByRecipeId(userStore.userId, route.params.id)
+      result = await deleteFavoriteByRecipeId(userStore.userId, route.params.id)
+      delta = -1
       isFavorite.value = false
       markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '已取消收藏', duration: 1400 })
     } else {
-      await createFavorite({ userId: userStore.userId, recipeId: route.params.id })
+      result = await createFavorite({ userId: userStore.userId, recipeId: route.params.id })
+      delta = 1
       isFavorite.value = true
       markDataStale(DATA_SCOPE.favorites)
       closeToast()
       showSuccessToast({ message: '收藏成功', duration: 1400 })
     }
+    if (detail.value?.recipe) {
+      detail.value.recipe.favoriteCount = result.data?.favoriteCount != null
+        ? Number(result.data.favoriteCount)
+        : Math.max(0, Number(detail.value.recipe.favoriteCount || 0) + delta)
+    }
+    markDataStale(DATA_SCOPE.recipes)
   } catch (error) {
     closeToast()
     showFailToast({ message: error.message || '收藏操作失败', duration: 1800 })

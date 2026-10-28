@@ -10,13 +10,12 @@ import com.wgxhl.recipe.todo.mapper.TodoOwnerMapper;
 import com.wgxhl.recipe.todo.mapper.TodoSendLogMapper;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.impl.AppUserServiceImpl;
+import com.wgxhl.recipe.mail.MailDeliveryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
@@ -26,8 +25,6 @@ import java.time.LocalTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TodoBirthdayCompleteTest {
@@ -47,7 +44,7 @@ class TodoBirthdayCompleteTest {
     @Mock
     private HouseholdMemberService householdMemberService;
     @Mock
-    private JavaMailSender mailSender;
+    private MailDeliveryService mailDeliveryService;
     @Mock
     private TodoMapper todoMapper;
 
@@ -55,10 +52,6 @@ class TodoBirthdayCompleteTest {
 
     @BeforeEach
     void setUp() {
-        @SuppressWarnings("unchecked")
-        ObjectProvider<JavaMailSender> mailSenderProvider = mock(ObjectProvider.class);
-        when(mailSenderProvider.getIfAvailable()).thenReturn(mailSender);
-
         todoService = new TodoServiceImpl(
                 todoNoticeRuleMapper,
                 todoOwnerMapper,
@@ -67,7 +60,7 @@ class TodoBirthdayCompleteTest {
                 notificationService,
                 userPushSubscriptionService,
                 householdMemberService,
-                mailSenderProvider
+                mailDeliveryService
         );
         ReflectionTestUtils.setField(todoService, "baseMapper", todoMapper);
     }

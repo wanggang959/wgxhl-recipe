@@ -3,6 +3,7 @@ node_modules/
 frontend/node_modules/
 
 # Build
+/tmp/
 frontend/dist/
 backend/target/
 backend/scripts/node_modules/

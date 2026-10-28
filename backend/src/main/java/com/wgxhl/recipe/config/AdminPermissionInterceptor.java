@@ -197,7 +197,9 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
 
     private boolean isPublicPath(String uri) {
         String path = normalizePath(uri);
-        return "/health".equals(path) || PUBLIC_USER_PATHS.contains(path);
+        // SES 事件回调不带登录态，靠路径中的随机令牌校验来源
+        return "/health".equals(path) || PUBLIC_USER_PATHS.contains(path)
+                || path.startsWith("/mail/ses/callback/");
     }
 
     private String normalizePath(String uri) {

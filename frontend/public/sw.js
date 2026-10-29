@@ -49,8 +49,24 @@ self.addEventListener('push', (event) => {
     },
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    notifyOpenPages(),
+  ]))
 })
+
+async function notifyOpenPages() {
+  try {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    for (const client of clients) {
+      if (new URL(client.url).origin === self.location.origin) {
+        client.postMessage({ type: 'notification-received' })
+      }
+    }
+  } catch (error) {
+    // A page messaging failure must not prevent the system notification.
+  }
+}
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()

@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.time.LocalDateTime;
 
 @Component
 public class TodoNotifyTask {
@@ -19,6 +20,8 @@ public class TodoNotifyTask {
     private final TodoService todoService;
     private final HouseholdService householdService;
     private final AtomicBoolean running = new AtomicBoolean();
+    private volatile LocalDateTime lastStartedAt;
+    private volatile LocalDateTime lastFinishedAt;
 
     public TodoNotifyTask(TodoService todoService, HouseholdService householdService) {
         this.todoService = todoService;
@@ -31,6 +34,7 @@ public class TodoNotifyTask {
             log.warn("Todo notify scan skipped because a previous scan is still running");
             return;
         }
+        lastStartedAt = LocalDateTime.now();
         try {
             int count = 0;
             for (Household household : householdService.listActive()) {
@@ -42,7 +46,12 @@ public class TodoNotifyTask {
             }
             if (count > 0) log.info("Todo notify task sent {} notice(s)", count);
         } finally {
+            lastFinishedAt = LocalDateTime.now();
             running.set(false);
         }
     }
+
+    public LocalDateTime getLastStartedAt() { return lastStartedAt; }
+    public LocalDateTime getLastFinishedAt() { return lastFinishedAt; }
+    public boolean isRunning() { return running.get(); }
 }

@@ -16,6 +16,7 @@ import {
   transferHousehold,
 } from '../api/household'
 import { createUser, changePassword, deleteUser, listMembers, pageUser, setUserStatus, updateUser } from '../api/user'
+import request from '../api/request'
 import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
@@ -31,6 +32,7 @@ import { pushStatusText as describePushStatus } from '../utils/pushStatusText'
 
 const router = useRouter()
 const userStore = useUserStore()
+const canAccessAdmin = ref(false)
 const savingUser = ref(false)
 const householdPanelVisible = ref(false)
 const householdList = ref([])
@@ -726,6 +728,9 @@ if (userStore.canViewMembers) {
 }
 
 onMounted(() => {
+  if (userStore.isSuperAdmin) {
+    request.get('/platform-admin/access').then(() => { canAccessAdmin.value = true }).catch(() => {})
+  }
   refreshPushState()
 })
 </script>
@@ -780,6 +785,7 @@ onMounted(() => {
       <h2>账号</h2>
       <van-cell title="当前用户" :value="userStore.user?.nickname || userStore.user?.username" />
       <van-cell title="权限" :value="userStore.roleText" />
+      <van-cell v-if="userStore.isSuperAdmin && canAccessAdmin" title="系统管理" is-link url="/admin" />
       <van-cell v-if="!userStore.isGuest" title="邮箱安全" is-link @click="router.push('/account/email')" />
       <van-cell
         v-if="userStore.isLogin && !userStore.isGuest"

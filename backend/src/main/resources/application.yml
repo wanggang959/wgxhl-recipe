@@ -50,6 +50,7 @@ account:
     public-url: ${ACCOUNT_SECURITY_PUBLIC_URL:https://recipe.wgxhl.space}
 
 app:
+  platform-admin-user-id: ${PLATFORM_ADMIN_USER_ID:}
   mail:
     provider: ${MAIL_PROVIDER:smtp}
     from: ${MAIL_FROM:}

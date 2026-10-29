@@ -61,6 +61,7 @@ app:
       code-template-id: ${SES_CODE_TEMPLATE_ID:0}
       reset-template-id: ${SES_RESET_TEMPLATE_ID:0}
       notification-template-id: ${SES_NOTIFICATION_TEMPLATE_ID:0}
+      html-templates: ${SES_HTML_TEMPLATES:false}
 
 push:
   vapid:

@@ -40,8 +40,10 @@ class SesConfigurationTest {
     @Test
     void configuredSesUsesGuangzhouHttpsAndBoundedTimeouts() {
         credentials().withPropertyValues("app.mail.ses.code-template-id=101",
-                "app.mail.ses.reset-template-id=102", "app.mail.ses.notification-template-id=103").run(app -> {
+                "app.mail.ses.reset-template-id=102", "app.mail.ses.notification-template-id=103",
+                "app.mail.ses.html-templates=true").run(app -> {
             assertNull(app.getStartupFailure());
+            assertTrue(app.getBean(MailProperties.class).getSes().isHtmlTemplates());
             SesClient client = app.getBean(SesClient.class);
             assertEquals("ap-guangzhou", client.getRegion());
             assertEquals("ses.tencentcloudapi.com", client.getClientProfile().getHttpProfile().getEndpoint());

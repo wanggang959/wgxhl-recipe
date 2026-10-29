@@ -586,7 +586,36 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         ReminderType type = "BIRTHDAY".equals(todo.getCategory()) ? ReminderType.BIRTHDAY : ReminderType.TODO;
         String remindTime = todo.getDueTime() == null ? "未设置时间"
                 : todo.getDueTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-        mailDeliveryService.sendNotification(owner.getEmail(), type, remindTime, todo.getTitle());
+        mailDeliveryService.sendNotification(owner.getEmail(), type, remindTime,
+                buildEmailReminderDetail(todo, LocalDateTime.now()));
+    }
+
+    private String buildEmailReminderDetail(Todo todo, LocalDateTime now) {
+        boolean birthday = "BIRTHDAY".equals(todo.getCategory());
+        String title = birthday ? birthdayDisplayText(todo) : todo.getTitle();
+        LocalDateTime dueTime = todo.getDueTime();
+        if (dueTime == null) {
+            return title;
+        }
+        if (!dueTime.isAfter(now)) {
+            String prefix = birthday && dueTime.toLocalDate().equals(now.toLocalDate()) ? "今天是" : "现已到期";
+            return prefix + "：" + title;
+        }
+
+        long seconds = Duration.between(now, dueTime).getSeconds();
+        long minutes = (seconds + 59) / 60;
+        String remaining;
+        if (minutes >= 24 * 60) {
+            long hours = (minutes + 59) / 60;
+            long days = hours / 24;
+            hours %= 24;
+            remaining = days + "天" + (hours > 0 ? hours + "小时" : "");
+        } else if (minutes >= 60) {
+            remaining = minutes / 60 + "小时" + (minutes % 60 > 0 ? minutes % 60 + "分钟" : "");
+        } else {
+            remaining = Math.max(1, minutes) + "分钟";
+        }
+        return "还有" + remaining + (birthday ? "" : "到期") + "：" + title;
     }
 
     private boolean allowNotify(AppUser owner, String type) {

@@ -19,10 +19,12 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.util.HtmlUtils;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class MailDeliveryService {
@@ -123,7 +125,7 @@ public class MailDeliveryService {
         Template template = new Template();
         template.setTemplateID(templateId(kind));
         try {
-            template.setTemplateData(json.writeValueAsString(variables));
+            template.setTemplateData(templateData(kind, variables));
             request.setTemplate(template);
             SendEmailResponse response = ses.SendEmail(request);
             recordMessage(recipient, kind, response == null ? null : response.getMessageId());
@@ -134,6 +136,27 @@ public class MailDeliveryService {
             log.warn("SES delivery failed, kind={}, code={}, requestId={}", kind, ex.getErrorCode(), ex.getRequestId());
             throw new MailSendException("邮件发送失败，请稍后重试");
         }
+    }
+
+    private String templateData(Kind kind, Map<String, String> variables) throws JsonProcessingException {
+        if (!properties.getSes().isHtmlTemplates()) return json.writeValueAsString(variables);
+        Map<String, String> escaped = new LinkedHashMap<>();
+        variables.forEach((key, value) -> escaped.put(key, value == null ? "" : HtmlUtils.htmlEscape(value, "UTF-8")));
+        String result = json.writeValueAsString(escaped);
+        String detail = variables.get("remindDetail");
+        if (kind == Kind.NOTIFICATION && detail != null) {
+            int length = detail.codePointCount(0, detail.length());
+            while (result.getBytes(StandardCharsets.UTF_8).length > 800 && length > 0) {
+                length--;
+                String shortened = detail.substring(0, detail.offsetByCodePoints(0, length)) + "…";
+                escaped.put("remindDetail", HtmlUtils.htmlEscape(shortened, "UTF-8"));
+                result = json.writeValueAsString(escaped);
+            }
+        }
+        if (result.getBytes(StandardCharsets.UTF_8).length > 800) {
+            throw new MailSendException("邮件模板参数过长");
+        }
+        return result;
     }
 
     private void recordMessage(String recipient, Kind kind, String messageId) {

@@ -102,7 +102,7 @@ class TodoServiceImplNotifyTest {
     @Test
     void sendByRule_shouldSendEmailWhenEnabled() {
         Todo todo = buildTodo(false, true, false);
-        todo.setDueTime(LocalDateTime.of(2026, 11, 2, 9, 5, 47));
+        todo.setDueTime(LocalDateTime.now().plusMinutes(30));
         TodoNoticeRule rule = buildRule(30);
         AppUser owner = buildOwner("user-1", "wang@test.com", "site,email");
 
@@ -117,24 +117,54 @@ class TodoServiceImplNotifyTest {
                 remindTime.capture(), remindDetail.capture());
         assertEquals("wang@test.com", recipient.getValue());
         assertEquals(ReminderType.TODO, type.getValue());
-        assertEquals("2026-11-02 09:05", remindTime.getValue());
-        assertEquals(todo.getTitle(), remindDetail.getValue());
+        assertEquals(todo.getDueTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), remindTime.getValue());
+        assertTrue(remindDetail.getValue().startsWith("还有"));
+        assertTrue(remindDetail.getValue().endsWith("到期：买豆腐"));
         verify(notificationService, never()).createSiteNotice(any(), any(), any(), any(), any());
     }
 
     @Test
-    void sendByRule_shouldUseBirthdayTypeAndTitleOnly() {
+    void sendByRule_shouldIncludeBirthdayAgeAndRemainingTime() {
         Todo todo = buildTodo(false, true, false);
         todo.setCategory("BIRTHDAY");
         todo.setTitle("家人生日");
         todo.setBirthdayYear(1990);
-        todo.setDueTime(LocalDateTime.of(2026, 11, 2, 11, 0));
+        todo.setDueTime(LocalDateTime.now().plusDays(7));
         AppUser owner = buildOwner("user-1", "wang@test.com", "email");
 
         assertEquals(1, invokeSendByRule(todo, buildRule(10080), owner));
 
-        verify(mailDeliveryService).sendNotification("wang@test.com", ReminderType.BIRTHDAY,
-                "2026-11-02 11:00", "家人生日");
+        ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+        verify(mailDeliveryService).sendNotification(eq("wang@test.com"), eq(ReminderType.BIRTHDAY),
+                any(String.class), detail.capture());
+        assertTrue(detail.getValue().startsWith("还有"));
+        assertTrue(detail.getValue().contains("家人生日（" + (todo.getDueTime().getYear() - 1990) + "岁）"));
+    }
+
+    @Test
+    void emailReminderDetail_shouldReflectActualTimeAndBirthday() {
+        LocalDateTime now = LocalDateTime.of(2026, 11, 2, 11, 0);
+        Todo todo = buildTodo(false, true, false);
+        todo.setCategory("BIRTHDAY");
+        todo.setTitle("王师傅生日");
+        todo.setBirthdayYear(1999);
+        todo.setDueTime(now.plusDays(3).minusMinutes(4));
+        assertEquals("还有3天：王师傅生日（27岁）", emailDetail(todo, now));
+        todo.setDueTime(now);
+        assertEquals("今天是：王师傅生日（27岁）", emailDetail(todo, now));
+
+        todo.setCategory("OTHER");
+        todo.setTitle("服务器续费");
+        todo.setDueTime(now.plusMinutes(5));
+        assertEquals("还有5分钟到期：服务器续费", emailDetail(todo, now));
+        todo.setDueTime(now.plusDays(1).plusMinutes(1));
+        assertEquals("还有1天1小时到期：服务器续费", emailDetail(todo, now));
+        todo.setDueTime(now.minusMinutes(1));
+        assertEquals("现已到期：服务器续费", emailDetail(todo, now));
+    }
+
+    private String emailDetail(Todo todo, LocalDateTime now) {
+        return ReflectionTestUtils.invokeMethod(todoService, "buildEmailReminderDetail", todo, now);
     }
 
     @Test

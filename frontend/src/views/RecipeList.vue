@@ -1,4 +1,5 @@
 <script setup>
+import { loadAllPages } from '../utils/pagination'
 import { computed, onActivated, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
@@ -179,7 +180,7 @@ watch(
 
 async function loadCategory() {
   try {
-    const res = await pageCategory({ current: 1, size: 100 })
+    const res = await loadAllPages(pageCategory)
     categories.value = res.data.records || []
     saveRecipeListCache()
   } catch (error) {

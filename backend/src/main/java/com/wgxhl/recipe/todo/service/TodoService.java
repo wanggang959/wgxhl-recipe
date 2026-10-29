@@ -9,6 +9,7 @@ import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.user.entity.AppUser;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 public interface TodoService extends IService<Todo> {
 
@@ -31,4 +32,6 @@ public interface TodoService extends IService<Todo> {
     void syncBirthdayTodo(AppUser user);
 
     int scanAndNotify();
+
+    int scanAndNotify(LocalDateTime from, LocalDateTime now);
 }

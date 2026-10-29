@@ -75,6 +75,7 @@ public class SpecialExpenseProjectServiceImpl extends ServiceImpl<SpecialExpense
                 .eq(dto.getArchived() != null, SpecialExpenseProject::getArchived, dto.getArchived())
                 .orderByAsc(SpecialExpenseProject::getArchived)
                 .orderByDesc(SpecialExpenseProject::getCreateTime)
+                .orderByDesc(SpecialExpenseProject::getId)
                 .page(page);
         enrich(result.getRecords());
         return ApiResponse.success(result);

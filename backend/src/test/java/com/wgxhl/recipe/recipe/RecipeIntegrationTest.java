@@ -133,4 +133,27 @@ class RecipeIntegrationTest {
         assertEquals(1L, favorites.create(favorite).getData().getFavoriteCount());
         assertEquals(0L, favorites.deleteByRecipeId(USER, id).getData().getFavoriteCount());
     }
+
+    @Test
+    void pagingIsBoundedAndStableWhenTimestampsMatch() {
+        String prefix = UUID.randomUUID().toString();
+        try {
+            for (int i = 0; i < 60; i++) {
+                jdbc.update("insert into recipe (id, recipe_name, recipe_version, owner_user_id, visibility, status, like_count, create_time) values (?, ?, '1.0', ?, 'public', '上架', 0, '2026-01-01 12:00:00')",
+                        UUID.randomUUID().toString(), prefix + i, USER);
+            }
+            RecipePageDTO query = new RecipePageDTO();
+            query.setScope("public"); query.setRecipeName(prefix); query.setCurrent(1L); query.setSize(100_000L);
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<Recipe> first = recipes.page(query).getData();
+            assertEquals(50, first.getRecords().size());
+            assertEquals(60, first.getTotal());
+            query.setCurrent(2L);
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<Recipe> second = recipes.page(query).getData();
+            assertEquals(10, second.getRecords().size());
+            assertEquals(60, java.util.stream.Stream.concat(first.getRecords().stream(), second.getRecords().stream())
+                    .map(Recipe::getId).distinct().count());
+        } finally {
+            jdbc.update("delete from recipe where recipe_name like ?", prefix + "%");
+        }
+    }
 }

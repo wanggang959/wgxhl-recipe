@@ -5,6 +5,7 @@ import com.wgxhl.recipe.notification.service.NotificationService;
 import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.todo.mapper.TodoMapper;
+import com.wgxhl.recipe.todo.task.ReminderDeliveryGuard;
 import com.wgxhl.recipe.todo.mapper.TodoNoticeRuleMapper;
 import com.wgxhl.recipe.todo.mapper.TodoOwnerMapper;
 import com.wgxhl.recipe.todo.mapper.TodoSendLogMapper;
@@ -47,6 +48,8 @@ class TodoBirthdayCompleteTest {
     private MailDeliveryService mailDeliveryService;
     @Mock
     private TodoMapper todoMapper;
+    @Mock
+    private ReminderDeliveryGuard deliveryGuard;
 
     private TodoServiceImpl todoService;
 
@@ -60,7 +63,8 @@ class TodoBirthdayCompleteTest {
                 notificationService,
                 userPushSubscriptionService,
                 householdMemberService,
-                mailDeliveryService
+                mailDeliveryService,
+                deliveryGuard
         );
         ReflectionTestUtils.setField(todoService, "baseMapper", todoMapper);
     }

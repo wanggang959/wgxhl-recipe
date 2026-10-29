@@ -134,6 +134,9 @@ public class MailDeliveryService {
         } catch (TencentCloudSDKException ex) {
             // SDK messages may include template data containing verification codes or reset links.
             log.warn("SES delivery failed, kind={}, code={}, requestId={}", kind, ex.getErrorCode(), ex.getRequestId());
+            if (StringUtils.hasText(ex.getRequestId()) && "RequestLimitExceeded".equals(ex.getErrorCode())) {
+                throw new RetryableMailException("邮件服务暂时拒绝请求，请稍后重试");
+            }
             throw new MailSendException("邮件发送失败，请稍后重试");
         }
     }

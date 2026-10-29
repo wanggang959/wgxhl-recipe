@@ -57,10 +57,13 @@ public class SeasoningServiceImpl extends ServiceImpl<SeasoningMapper, Seasoning
                                 .eq(Seasoning::getScope, "personal")
                                 .eq(Seasoning::getOwnerUserId, userId)))
                 .like(StringUtils.hasText(dto.getSeasoningName()), Seasoning::getSeasoningName, dto.getSeasoningName())
+                .and(StringUtils.hasText(dto.getKeyword()), wrapper -> wrapper
+                        .like(Seasoning::getSeasoningName, dto.getKeyword())
+                        .or().like(Seasoning::getSeasoningDesc, dto.getKeyword()))
+                .orderByAsc(Seasoning::getScope)
                 .orderByDesc(Seasoning::getCreateTime)
+                .orderByDesc(Seasoning::getId)
                 .page(page);
-        List<Seasoning> records = result.getRecords();
-        records.sort(Comparator.comparingInt((Seasoning item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 

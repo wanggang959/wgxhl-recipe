@@ -82,9 +82,7 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
                         .like(SpecialExpenseItem::getRemark, dto.getKeyword()))
                 .eq(StringUtils.hasText(dto.getCategory()), SpecialExpenseItem::getCategory, dto.getCategory())
                 .eq(StringUtils.hasText(dto.getStatus()), SpecialExpenseItem::getStatus, dto.getStatus())
-                .orderByAsc(SpecialExpenseItem::getStatus)
-                .orderByAsc(SpecialExpenseItem::getPlannedTime)
-                .orderByDesc(SpecialExpenseItem::getCreateTime)
+                .last("ORDER BY CASE WHEN status = 'DONE' THEN 1 ELSE 0 END, planned_time ASC, create_time DESC, id DESC")
                 .page(page);
         enrich(result.getRecords());
         return ApiResponse.success(result);

@@ -154,6 +154,13 @@ class MailDeliveryServiceTest {
     }
 
     @Test
+    void providerExplicitRateLimitIsRetryable() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("rate limit", "request-id", "RequestLimitExceeded"));
+        assertThrows(RetryableMailException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+        verify(ses, times(1)).SendEmail(any());
+    }
+
+    @Test
     void explicitSmtpRetainsPlaintextCodeAndSender() {
         properties.setProvider(MailProperties.Provider.SMTP);
         properties.setFrom("");

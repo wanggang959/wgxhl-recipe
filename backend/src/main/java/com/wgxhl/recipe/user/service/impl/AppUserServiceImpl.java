@@ -275,6 +275,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 .eq(StringUtils.hasText(dto.getUserRole()), AppUser::getUserRole, dto.getUserRole())
                 .eq(StringUtils.hasText(dto.getStatus()), AppUser::getStatus, dto.getStatus())
                 .orderByDesc(AppUser::getCreateTime)
+                .orderByDesc(AppUser::getId)
                 .page(page);
         Map<String, String> roleByUser = householdMemberService.listByHousehold(householdId).stream()
                 .filter(member -> StringUtils.hasText(member.getUserId()))

@@ -58,11 +58,11 @@ public class RecipeCategoryServiceImpl extends ServiceImpl<RecipeCategoryMapper,
                                 .eq(RecipeCategory::getOwnerUserId, userId)))
                 .like(StringUtils.hasText(dto.getCategoryName()), RecipeCategory::getCategoryName, dto.getCategoryName())
                 .eq(StringUtils.hasText(dto.getCategoryCode()), RecipeCategory::getCategoryCode, dto.getCategoryCode())
+                .orderByAsc(RecipeCategory::getScope)
                 .orderByAsc(RecipeCategory::getSortNo)
                 .orderByDesc(RecipeCategory::getCreateTime)
+                .orderByDesc(RecipeCategory::getId)
                 .page(page);
-        List<RecipeCategory> records = result.getRecords();
-        records.sort(Comparator.comparingInt((RecipeCategory item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 

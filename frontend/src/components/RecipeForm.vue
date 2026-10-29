@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { pageCategory } from '../api/category'
@@ -9,10 +9,12 @@ import { createRecipe, getRecipeDetail, updateRecipe } from '../api/recipe'
 import { createSeasoning, pageSeasoning } from '../api/seasoning'
 import { DATA_SCOPE, markDataChanged, markDataStale } from '../utils/dataRefresh'
 import { transcodeImageToWebp } from '../utils/image'
+import { loadAllPages } from '../utils/pagination'
 import { getImageUrl, toObjectPath } from '../utils/imageUrl'
 import { DEFAULT_RECIPE_VERSION, isValidRecipeVersion, normalizeRecipeVersion } from '../utils/recipeVersion'
 import ImageCropper from './ImageCropper.vue'
 import ImageUploader from './ImageUploader.vue'
+import LoadMoreSentinel from './LoadMoreSentinel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,6 +34,11 @@ const basePickerVisible = ref(false)
 const basePickerType = ref('ingredient')
 const basePickerRow = ref(null)
 const basePickerKeyword = ref('')
+const pickerResults = ref([])
+const pickerPage = ref(0)
+const pickerTotal = ref(0)
+const pickerLoading = ref(false)
+let pickerVersion = 0
 let stepUid = 0
 
 const form = reactive({
@@ -77,23 +84,46 @@ const basePickerTitle = computed(() => (basePickerType.value === 'ingredient' ? 
 const basePickerPlaceholder = computed(() =>
   basePickerType.value === 'ingredient' ? '搜索食材名称或描述' : '搜索调料名称或描述',
 )
-const basePickerOptions = computed(() => {
-  const keyword = normalizeKeyword(basePickerKeyword.value)
-  const list = basePickerType.value === 'ingredient' ? ingredients.value : seasonings.value
-  if (!keyword) return list
-  return list.filter((item) => {
-    const text = normalizeKeyword(`${getBaseName(item)} ${getBaseDesc(item)}`)
-    return text.includes(keyword)
-  })
+const basePickerOptions = computed(() => pickerResults.value)
+
+watch([basePickerKeyword, basePickerVisible, basePickerType], ([keyword, visible], old, onCleanup) => {
+  pickerVersion += 1
+  if (!visible) { pickerLoading.value = false; return }
+  pickerResults.value = []
+  pickerPage.value = 0
+  pickerTotal.value = 0
+  pickerLoading.value = true
+  const timer = setTimeout(() => loadPicker(false, keyword), 250)
+  onCleanup(() => clearTimeout(timer))
 })
+
+async function loadPicker(append = false, keyword = basePickerKeyword.value) {
+  if (append && pickerLoading.value) return
+  const version = ++pickerVersion
+  const current = append ? pickerPage.value + 1 : 1
+  const fetchPage = basePickerType.value === 'ingredient' ? pageIngredient : pageSeasoning
+  pickerLoading.value = true
+  try {
+    const res = await fetchPage({ current, size: 50, keyword: keyword.trim() })
+    if (version !== pickerVersion) return
+    const records = res.data.records || []
+    pickerResults.value = append ? [...pickerResults.value, ...records] : records
+    pickerPage.value = current
+    pickerTotal.value = Number(res.data.total || 0)
+  } catch (error) {
+    if (version === pickerVersion) showFailToast(error.message || '加载失败')
+  } finally {
+    if (version === pickerVersion) pickerLoading.value = false
+  }
+}
 
 async function bootstrap() {
   loading.value = true
   try {
     const [categoryRes, ingredientRes, seasoningRes] = await Promise.all([
-      pageCategory({ current: 1, size: 200 }),
-      pageIngredient({ current: 1, size: 500 }),
-      pageSeasoning({ current: 1, size: 500 }),
+      loadAllPages(pageCategory),
+      pageIngredient({ current: 1, size: 50 }),
+      pageSeasoning({ current: 1, size: 50 }),
     ])
     categories.value = categoryRes.data.records || []
     ingredients.value = ingredientRes.data.records || []
@@ -786,7 +816,9 @@ bootstrap()
             </span>
             <van-icon v-if="isSelectedBaseOption(option)" name="success" />
           </button>
-          <div v-if="basePickerOptions.length === 0" class="base-option-empty">
+          <LoadMoreSentinel v-if="basePickerOptions.length < pickerTotal" :loading="pickerLoading" @load="loadPicker(true)" />
+          <van-loading v-if="pickerLoading && basePickerOptions.length === 0" size="18px" class="base-option-empty">加载中...</van-loading>
+          <div v-else-if="!pickerLoading && basePickerOptions.length === 0" class="base-option-empty">
             没有匹配的{{ basePickerType === 'ingredient' ? '食材' : '调料' }}
           </div>
         </div>

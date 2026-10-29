@@ -22,10 +22,13 @@ import com.wgxhl.recipe.todo.mapper.TodoNoticeRuleMapper;
 import com.wgxhl.recipe.todo.mapper.TodoOwnerMapper;
 import com.wgxhl.recipe.todo.mapper.TodoSendLogMapper;
 import com.wgxhl.recipe.todo.service.TodoService;
+import com.wgxhl.recipe.todo.task.ReminderDeliveryGuard;
+import com.wgxhl.recipe.todo.task.ReminderWindow;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.impl.AppUserServiceImpl;
 import com.wgxhl.recipe.mail.MailDeliveryService;
+import com.wgxhl.recipe.mail.RetryableMailException;
 import com.wgxhl.recipe.mail.MailDeliveryService.ReminderType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +80,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private final UserPushSubscriptionService userPushSubscriptionService;
     private final HouseholdMemberService householdMemberService;
     private final MailDeliveryService mailDeliveryService;
+    private final ReminderDeliveryGuard deliveryGuard;
 
     public TodoServiceImpl(TodoNoticeRuleMapper todoNoticeRuleMapper,
                            TodoOwnerMapper todoOwnerMapper,
@@ -85,7 +89,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                            NotificationService notificationService,
                            UserPushSubscriptionService userPushSubscriptionService,
                            HouseholdMemberService householdMemberService,
-                           MailDeliveryService mailDeliveryService) {
+                           MailDeliveryService mailDeliveryService,
+                           ReminderDeliveryGuard deliveryGuard) {
         this.todoNoticeRuleMapper = todoNoticeRuleMapper;
         this.todoOwnerMapper = todoOwnerMapper;
         this.todoSendLogMapper = todoSendLogMapper;
@@ -94,6 +99,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         this.userPushSubscriptionService = userPushSubscriptionService;
         this.householdMemberService = householdMemberService;
         this.mailDeliveryService = mailDeliveryService;
+        this.deliveryGuard = deliveryGuard;
     }
 
     @Override
@@ -136,6 +142,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                 .orderByAsc(Todo::getStatus)
                 .orderByAsc(Todo::getDueTime)
                 .orderByDesc(Todo::getCreateTime)
+                .orderByDesc(Todo::getId)
                 .page(page);
         enrich(result.getRecords());
         return ApiResponse.success(result);
@@ -422,10 +429,12 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     @Override
     public int scanAndNotify() {
-        syncAllBirthdayTodos();
-        syncSolarYearlyBirthdayTodos();
-        syncLunarYearlyTodos();
         LocalDateTime now = LocalDateTime.now();
+        return scanAndNotify(now.minusMinutes(NOTIFY_SCAN_WINDOW_MINUTES), now);
+    }
+
+    @Override
+    public int scanAndNotify(LocalDateTime from, LocalDateTime now) {
         List<Todo> todos = lambdaQuery()
                 .eq(Todo::getStatus, STATUS_TODO)
                 .isNotNull(Todo::getDueTime)
@@ -433,25 +442,26 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                 .le(Todo::getDueTime, now.plusDays(31))
                 .list();
         int count = 0;
+        boolean retryPending = false;
+        boolean scanFailed = false;
         for (Todo todo : todos) {
-            List<TodoNoticeRule> rules = selectRules(todo.getId());
-            for (TodoNoticeRule rule : rules) {
-                LocalDateTime targetTime = todo.getDueTime().minusMinutes(rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes());
-                if (!isInNotifyWindow(targetTime, now) || hasLegacySuccess(todo.getId(), rule.getId(), targetTime)) {
-                    continue;
-                }
-                try {
-                    count += sendByRule(todo, rule, targetTime);
-                } catch (Exception ex) {
-                    log.error("Todo notify failed, todoId={}, ruleId={}", todo.getId(), rule.getId(), ex);
-                }
+            try {
+                TodoNoticeRule rule = ReminderWindow.latestEligible(todo, selectRules(todo.getId()), from, now);
+                if (rule == null) continue;
+                LocalDateTime targetTime = todo.getDueTime().minusMinutes(Math.max(0, rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes()));
+                if (hasLegacySuccess(todo.getId(), rule.getId(), targetTime)) continue;
+                count += sendByRule(todo, rule, targetTime);
+                retryPending |= deliveryGuard.hasRetryable(todo, rule, targetTime);
+            } catch (Exception ex) {
+                scanFailed = true;
+                log.error("Todo notify scan failed, todoId={}", todo.getId(), ex);
             }
         }
+        if (retryPending || scanFailed) throw new IllegalStateException("Reminder scan has unfinished deliveries");
+        syncAllBirthdayTodos();
+        syncSolarYearlyBirthdayTodos();
+        syncLunarYearlyTodos();
         return count;
-    }
-
-    private boolean isInNotifyWindow(LocalDateTime targetTime, LocalDateTime now) {
-        return !now.isBefore(targetTime) && !targetTime.isBefore(now.minusMinutes(NOTIFY_SCAN_WINDOW_MINUTES));
     }
 
     private void syncAllBirthdayTodos() {
@@ -473,7 +483,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     private int sendByRule(Todo todo, TodoNoticeRule rule, LocalDateTime targetTime) {
         int sent = 0;
-        String content = buildNoticeContent(todo, rule);
+        String content = buildNoticeContent(todo);
         List<AppUser> owners = resolveOwners(todo);
         if (owners.isEmpty()) {
             owners = Collections.singletonList(null);
@@ -483,35 +493,46 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                 todo.getNotifySite(), todo.getNotifyEmail(), todo.getNotifyPush());
         for (AppUser owner : owners) {
             if (!Boolean.TRUE.equals(todo.getNotifySite())) {
+                markSkipped(todo, rule, targetTime, NOTICE_SITE, owner);
                 log.info("Todo site notice skipped, todoId={}, owner={}, reason=disabled", todo.getId(), ownerLabel(owner));
             } else if (!allowNotify(owner, NOTICE_SITE)) {
+                markSkipped(todo, rule, targetTime, NOTICE_SITE, owner);
                 log.info("Todo site notice skipped, todoId={}, owner={}, preference={}, reason=preference",
                         todo.getId(), ownerLabel(owner), owner == null ? null : owner.getNotificationPreference());
-            } else if (shouldAttempt(todo, rule, targetTime, NOTICE_SITE, owner)) {
+            } else if (shouldAttempt(todo, rule, targetTime, NOTICE_SITE, owner)
+                    && deliveryGuard.claim(todo, rule, targetTime, NOTICE_SITE, owner)) {
                 String userId = owner == null ? null : owner.getId();
                 try {
                     notificationService.createSiteNotice(userId, todo.getTitle(), content, "TODO", todo.getId());
+                    deliveryGuard.finish(todo, rule, targetTime, NOTICE_SITE, owner, "SUCCESS");
                     logSend(todo, rule, targetTime, owner, NOTICE_SITE, "SUCCESS", null);
                     log.info("Todo site notice sent, todoId={}, owner={}, userId={}", todo.getId(), ownerLabel(owner), userId);
                     sent++;
                 } catch (Exception ex) {
+                    deliveryGuard.finish(todo, rule, targetTime, NOTICE_SITE, owner, "UNKNOWN");
                     log.warn("Todo site notice failed, todoId={}, owner={}", todo.getId(), ownerLabel(owner), ex);
                     logSend(todo, rule, targetTime, owner, NOTICE_SITE, "FAIL", ex.getMessage());
                 }
             }
 
             if (!Boolean.TRUE.equals(todo.getNotifyEmail())) {
+                markSkipped(todo, rule, targetTime, NOTICE_EMAIL, owner);
                 log.info("Todo email skipped, todoId={}, owner={}, reason=disabled", todo.getId(), ownerLabel(owner));
             } else if (!allowNotify(owner, NOTICE_EMAIL)) {
+                markSkipped(todo, rule, targetTime, NOTICE_EMAIL, owner);
                 log.info("Todo email skipped, todoId={}, owner={}, preference={}, reason=preference",
                         todo.getId(), ownerLabel(owner), owner == null ? null : owner.getNotificationPreference());
-            } else if (shouldAttempt(todo, rule, targetTime, NOTICE_EMAIL, owner)) {
+            } else if (shouldAttempt(todo, rule, targetTime, NOTICE_EMAIL, owner)
+                    && deliveryGuard.claim(todo, rule, targetTime, NOTICE_EMAIL, owner)) {
                 try {
                     sendEmail(owner, todo);
+                    deliveryGuard.finish(todo, rule, targetTime, NOTICE_EMAIL, owner, "SUCCESS");
                     logSend(todo, rule, targetTime, owner, NOTICE_EMAIL, "SUCCESS", null);
                     log.info("Todo email sent, todoId={}, owner={}, to={}", todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()));
                     sent++;
                 } catch (Exception ex) {
+                    deliveryGuard.finish(todo, rule, targetTime, NOTICE_EMAIL, owner,
+                            ex instanceof RetryableMailException || owner == null || !StringUtils.hasText(owner.getEmail()) ? "FAILED" : "UNKNOWN");
                     log.warn("Todo email failed, todoId={}, owner={}, to={}, reason={}",
                             todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()), ex.getMessage(), ex);
                     logSend(todo, rule, targetTime, owner, NOTICE_EMAIL, "FAIL", ex.getMessage());
@@ -519,14 +540,17 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             }
         }
         if (!Boolean.TRUE.equals(todo.getNotifyPush())) {
+            for (AppUser owner : owners) markSkipped(todo, rule, targetTime, NOTICE_PUSH, owner);
             log.info("Todo push skipped, todoId={}, reason=disabled", todo.getId());
         } else {
             for (AppUser owner : owners) {
                 if (owner == null || !StringUtils.hasText(owner.getId()) || !allowNotify(owner, NOTICE_PUSH)) {
+                    markSkipped(todo, rule, targetTime, NOTICE_PUSH, owner);
                     log.info("Todo push preference skipped, todoId={}, owner={}", todo.getId(), ownerLabel(owner));
                     continue;
                 }
-                if (!shouldAttempt(todo, rule, targetTime, NOTICE_PUSH, owner)) continue;
+                if (!shouldAttempt(todo, rule, targetTime, NOTICE_PUSH, owner)
+                        || !deliveryGuard.claim(todo, rule, targetTime, NOTICE_PUSH, owner)) continue;
                 try {
                     int delivered = userPushSubscriptionService.sendToUserIds(
                         Collections.singletonList(owner.getId()),
@@ -536,14 +560,17 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                         "todo-" + todo.getId() + "-" + rule.getId()
                     );
                     if (delivered > 0) {
+                        deliveryGuard.finish(todo, rule, targetTime, NOTICE_PUSH, owner, "SUCCESS");
                         logSend(todo, rule, targetTime, owner, NOTICE_PUSH, "SUCCESS", "delivered=" + delivered);
                         log.info("Todo push sent, todoId={}, owner={}, delivered={}", todo.getId(), ownerLabel(owner), delivered);
                         sent += delivered;
                     } else {
+                        deliveryGuard.finish(todo, rule, targetTime, NOTICE_PUSH, owner, "UNKNOWN");
                         logSend(todo, rule, targetTime, owner, NOTICE_PUSH, "FAIL", "未送达任何设备");
                         log.info("Todo push not accepted, todoId={}, owner={}", todo.getId(), ownerLabel(owner));
                     }
                 } catch (Exception ex) {
+                    deliveryGuard.finish(todo, rule, targetTime, NOTICE_PUSH, owner, "UNKNOWN");
                     log.warn("Todo push failed, todoId={}, owner={}", todo.getId(), ownerLabel(owner), ex);
                     logSend(todo, rule, targetTime, owner, NOTICE_PUSH, "FAIL", ex.getMessage());
                 }
@@ -558,6 +585,12 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             }
         }
         return sent;
+    }
+
+    private void markSkipped(Todo todo, TodoNoticeRule rule, LocalDateTime target, String channel, AppUser owner) {
+        if (deliveryGuard.claim(todo, rule, target, channel, owner)) {
+            deliveryGuard.finish(todo, rule, target, channel, owner, "SKIP");
+        }
     }
 
     private String ownerLabel(AppUser owner) {
@@ -629,27 +662,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         return prefs.contains(type);
     }
 
-    private String buildNoticeContent(Todo todo, TodoNoticeRule rule) {
-        int minutes = rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes();
-        String remain = minutes == 0 ? "现在到点啦。" : "还有" + humanDuration(minutes) + "。";
-        if ("BIRTHDAY".equals(todo.getCategory())) {
-            String birthdayText = birthdayDisplayText(todo);
-            String desc = StringUtils.hasText(todo.getDescription()) ? "\n" + todo.getDescription() : "";
-            return birthdayText + remain + desc;
-        }
+    private String buildNoticeContent(Todo todo) {
         String due = todo.getDueTime() == null ? "" : "\n到期时间：" + todo.getDueTime().toString().replace('T', ' ');
         String desc = StringUtils.hasText(todo.getDescription()) ? "\n" + todo.getDescription() : "";
-        return todo.getTitle() + remain + due + desc;
-    }
-
-    private String humanDuration(int minutes) {
-        if (minutes >= 1440) {
-            return (minutes / 1440) + "天";
-        }
-        if (minutes >= 60) {
-            return (minutes / 60) + "小时";
-        }
-        return minutes + "分钟";
+        return buildEmailReminderDetail(todo, LocalDateTime.now()) + due + desc;
     }
 
     private boolean hasSent(String todoId, String ruleId, LocalDateTime targetTime) {

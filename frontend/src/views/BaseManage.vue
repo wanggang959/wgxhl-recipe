@@ -12,6 +12,7 @@ import ImageUploader from '../components/ImageUploader.vue'
 import { useUserStore } from '../stores/user'
 import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
 import { transcodeImageToWebp } from '../utils/image'
+import LoadMoreSentinel from '../components/LoadMoreSentinel.vue'
 import { getImageUrl, toObjectPath } from '../utils/imageUrl'
 
 const router = useRouter()
@@ -26,6 +27,11 @@ let actionStatusTimer = null
 const categoryList = ref([])
 const ingredientList = ref([])
 const seasoningList = ref([])
+const paging = reactive({
+  category: { page: 0, total: 0, loading: false, version: 0 },
+  ingredient: { page: 0, total: 0, loading: false, version: 0 },
+  seasoning: { page: 0, total: 0, loading: false, version: 0 },
+})
 
 const categoryForm = reactive({
   id: '',
@@ -236,30 +242,45 @@ function showActionStatus(message) {
   }, 2000)
 }
 
-async function loadCategory() {
-  const res = await pageCategory({ current: 1, size: 200 })
-  categoryList.value = res.data.records || []
+async function loadBasePage(kind, fetchPage, target, params, append) {
+  const state = paging[kind]
+  if (append && state.loading) return
+  const version = ++state.version
+  const current = append ? state.page + 1 : 1
+  state.loading = true
+  try {
+    const res = await fetchPage({ ...params, current, size: 50 })
+    if (version !== state.version) return
+    const records = res.data.records || []
+    target.value = append ? [...target.value, ...records] : records
+    state.page = current
+    state.total = Number(res.data.total || 0)
+  } finally {
+    if (version === state.version) state.loading = false
+  }
 }
 
-async function loadIngredient() {
-  const keyword = ingredientKeyword.value.trim()
-  const res = await pageIngredient({
-    current: 1,
-    size: 200,
+async function loadCategory(append = false) {
+  return loadBasePage('category', pageCategory, categoryList, {}, append)
+}
+
+async function loadIngredient(append = false) {
+  const keyword = append ? paging.ingredient.keyword : ingredientKeyword.value.trim()
+  if (!append) paging.ingredient.keyword = keyword
+  return loadBasePage('ingredient', pageIngredient, ingredientList, {
     ...(keyword ? { ingredientName: keyword } : {}),
-  })
-  ingredientList.value = res.data.records || []
+  }, append)
 }
 
-async function loadSeasoning() {
-  const keyword = seasoningKeyword.value.trim()
-  const res = await pageSeasoning({
-    current: 1,
-    size: 200,
+async function loadSeasoning(append = false) {
+  const keyword = append ? paging.seasoning.keyword : seasoningKeyword.value.trim()
+  if (!append) paging.seasoning.keyword = keyword
+  return loadBasePage('seasoning', pageSeasoning, seasoningList, {
     ...(keyword ? { seasoningName: keyword } : {}),
-  })
-  seasoningList.value = res.data.records || []
+  }, append)
 }
+
+function loadMore(loader) { loader(true).catch((e) => showFailToast(e.message || '加载失败')) }
 
 async function searchIngredient() {
   await loadIngredient()
@@ -458,6 +479,7 @@ if (userStore.isLogin && !userStore.isGuest) {
               </template>
             </van-cell>
           </van-cell-group>
+          <LoadMoreSentinel v-if="categoryList.length < paging.category.total" :loading="paging.category.loading" @load="loadMore(loadCategory)" />
         </van-tab>
         <van-tab title="食材管理" name="ingredient">
           <div class="form-panel">
@@ -533,6 +555,7 @@ if (userStore.isLogin && !userStore.isGuest) {
               </div>
             </article>
           </div>
+          <LoadMoreSentinel v-if="ingredientList.length < paging.ingredient.total" :loading="paging.ingredient.loading" @load="loadMore(loadIngredient)" />
         </van-tab>
         <van-tab title="调料管理" name="seasoning">
           <div class="form-panel">
@@ -608,6 +631,7 @@ if (userStore.isLogin && !userStore.isGuest) {
               </div>
             </article>
           </div>
+          <LoadMoreSentinel v-if="seasoningList.length < paging.seasoning.total" :loading="paging.seasoning.loading" @load="loadMore(loadSeasoning)" />
         </van-tab>
       </van-tabs>
     </section>

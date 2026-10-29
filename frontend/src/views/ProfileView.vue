@@ -17,6 +17,7 @@ import {
 } from '../api/household'
 import { createUser, changePassword, deleteUser, listMembers, pageUser, setUserStatus, updateUser } from '../api/user'
 import request from '../api/request'
+import { loadAllPages } from '../utils/pagination'
 import MemberBirthdayCard from '../components/MemberBirthdayCard.vue'
 import { DEFAULT_AVATARS } from '../constants/defaultAvatars'
 import { useUserStore } from '../stores/user'
@@ -138,7 +139,7 @@ async function loadUsers() {
     return
   }
   try {
-    const res = await pageUser({ current: 1, size: 50 })
+    const res = await loadAllPages(pageUser)
     users.value = res.data.records || []
     syncStoreFromUsersList()
   } catch (error) {

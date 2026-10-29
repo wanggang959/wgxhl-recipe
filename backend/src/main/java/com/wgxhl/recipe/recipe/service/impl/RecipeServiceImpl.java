@@ -201,6 +201,13 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
 
     private void fillPersonalStates(List<Recipe> records, String userId) {
         if (records == null || records.isEmpty()) return;
+        if (!StringUtils.hasText(userId) || "guest".equals(userId)) {
+            records.forEach(recipe -> {
+                recipe.setFavorite(false);
+                recipe.setWanted(false);
+            });
+            return;
+        }
         List<String> ids = records.stream().map(Recipe::getId).filter(StringUtils::hasText).collect(Collectors.toList());
         if (ids.isEmpty()) return;
         Set<String> favorites = userFavoriteMapper.selectList(new LambdaQueryWrapper<UserFavorite>()
@@ -218,13 +225,13 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private void applySort(LambdaQueryWrapper<Recipe> wrapper, String sort) {
         String value = StringUtils.hasText(sort) ? sort : "latest";
         if ("likes_desc".equals(value)) {
-            wrapper.orderByDesc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime);
+            wrapper.orderByDesc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         } else if ("likes_asc".equals(value)) {
-            wrapper.orderByAsc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime);
+            wrapper.orderByAsc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         } else if ("random".equals(value)) {
             wrapper.last("order by rand()");
         } else {
-            wrapper.orderByDesc(Recipe::getCreateTime);
+            wrapper.orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         }
     }
 

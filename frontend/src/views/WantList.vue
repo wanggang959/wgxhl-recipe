@@ -1,4 +1,5 @@
 <script setup>
+import { loadAllPages } from '../utils/pagination'
 import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
@@ -12,6 +13,7 @@ import {
   updateWantedDate,
 } from '../api/want'
 import EmptyState from '../components/EmptyState.vue'
+import LoadMoreSentinel from '../components/LoadMoreSentinel.vue'
 import { useUserStore } from '../stores/user'
 import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markDataStale, rememberDataVersions } from '../utils/dataRefresh'
 import { getRecipeImage } from '../utils/imageUrl'
@@ -21,6 +23,8 @@ const CACHE_MAX_AGE = 60 * 1000
 const wantListCache = {
   userId: '',
   list: [],
+  page: 0,
+  total: 0,
   dateList: [],
   selectedDate: '',
   notifyPreviewText: '',
@@ -32,6 +36,10 @@ const userStore = useUserStore()
 const loading = ref(false)
 const cacheMatchesUser = wantListCache.userId === userStore.userId
 const list = ref(cacheMatchesUser ? [...wantListCache.list] : [])
+const page = ref(cacheMatchesUser ? wantListCache.page : 0)
+const total = ref(cacheMatchesUser ? wantListCache.total : 0)
+const loadingMore = ref(false)
+let wantedRequestVersion = 0
 const dateList = ref(cacheMatchesUser ? [...wantListCache.dateList] : [])
 const selectedDate = ref(cacheMatchesUser && wantListCache.selectedDate ? wantListCache.selectedDate : formatDate(new Date()))
 const editVisible = ref(false)
@@ -115,6 +123,8 @@ async function loadDateList(options = {}) {
 }
 
 async function loadWanted(options = {}) {
+  if (options.append && loadingMore.value) return
+  const version = ++wantedRequestVersion
   if (!userStore.userId) {
     list.value = []
     saveWantCache()
@@ -122,21 +132,27 @@ async function loadWanted(options = {}) {
   }
   const showLoading = !options.keepExisting && list.value.length === 0
   if (showLoading) loading.value = true
+  if (options.append) loadingMore.value = true
   try {
+    const nextPage = options.append ? page.value + 1 : 1
     const res = await pageWantedRecipe({
-      current: 1,
-      size: 200,
+      current: nextPage,
+      size: 50,
       userId: userStore.userId,
       plannedDate: selectedDate.value,
     })
-    list.value = res.data.records || []
+    if (version !== wantedRequestVersion) return
+    const records = res.data.records || []
+    list.value = options.append ? [...list.value, ...records] : records
+    page.value = nextPage
+    total.value = Number(res.data.total || 0)
     saveWantCache()
   } catch (error) {
     if (!options.silent || list.value.length === 0) {
       showFailToast(error.message || '想吃列表加载失败')
     }
   } finally {
-    if (showLoading) loading.value = false
+    if (version === wantedRequestVersion) { loading.value = false; loadingMore.value = false }
   }
 }
 
@@ -154,6 +170,8 @@ function isCacheStale() {
 function saveWantCache() {
   wantListCache.userId = userStore.userId || ''
   wantListCache.list = [...list.value]
+  wantListCache.page = page.value
+  wantListCache.total = total.value
   wantListCache.dateList = [...dateList.value]
   wantListCache.selectedDate = selectedDate.value
   wantListCache.notifyPreviewText = notifyPreviewText.value
@@ -205,6 +223,7 @@ async function remove(item) {
     list.value = list.value.filter((entry) => entry.id !== item.id)
     saveWantCache()
     markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
+    await loadWanted({ keepExisting: true, silent: true })
     closeToast()
     showSuccessToast({ message: '已删除', duration: 1400 })
   } catch (error) {
@@ -263,7 +282,7 @@ async function loadNotifyPreview(options = {}) {
 
 async function buildNotifyPreviewFallback() {
   try {
-    const res = await pageWantedRecipe({
+    const res = await loadAllPages(pageWantedRecipe, {
       current: 1,
       size: 200,
       userId: userStore.userId,
@@ -432,6 +451,7 @@ async function submitNotify() {
             </button>
           </div>
         </article>
+        <LoadMoreSentinel v-if="list.length < total" :loading="loadingMore" @load="loadWanted({ append: true, keepExisting: true })" />
       </div>
     </template>
 

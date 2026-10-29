@@ -12,4 +12,5 @@ public class IngredientPageDTO extends PageDTO {
      * 食材名称
      */
     private String ingredientName;
+    private String keyword;
 }

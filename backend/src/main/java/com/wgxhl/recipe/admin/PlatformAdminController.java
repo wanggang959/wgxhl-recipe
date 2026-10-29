@@ -63,7 +63,8 @@ public class PlatformAdminController {
                 + "(select group_concat(h.household_name order by h.household_name separator ', ') from household_member hm "
                 + "join household h on h.id = hm.household_id where hm.user_id = u.id and hm.status = 'normal') households "
                 + "from app_user u" + where + " order by u.create_time desc, u.id limit 20 offset ?", like, like, like, (safePage - 1) * 20);
-        return ApiResponse.success(page(rows, total, safePage));
+        Map<String, Object> result = page(rows, total, safePage);
+        return ApiResponse.success(result);
     }
 
     @PostMapping("/users/status")
@@ -111,6 +112,19 @@ public class PlatformAdminController {
                 + "l.send_time, l.target_time, l.error_msg, u.nickname recipient_name "
                 + join + where + " order by l.send_time desc, l.id limit 20 offset ?", params.toArray());
         return ApiResponse.success(page(rows, total, safePage));
+    }
+
+    @GetMapping("/notices/uncertain")
+    public ApiResponse<Map<String, Object>> uncertain(@RequestParam(defaultValue = "1") int page) {
+        int safePage = Math.max(1, Math.min(page, 100000));
+        String where = " where (g.status='UNKNOWN' or (g.status='IN_FLIGHT' and g.update_time < now() - interval 5 minute))";
+        Long total = db.queryForObject("select count(*) from todo_delivery_guard g" + where, Long.class);
+        List<Map<String, Object>> rows = db.queryForList("select g.todo_id, g.recipient_key, g.notify_type, g.status, g.target_time, g.update_time, u.nickname recipient_name "
+                + "from todo_delivery_guard g left join app_user u on u.id=g.recipient_key" + where
+                + " order by g.update_time desc, g.todo_id limit 20 offset ?", (safePage - 1) * 20);
+        Map<String, Object> result = page(rows, total, safePage);
+        result.put("gaps", db.queryForList("select c.household_id, h.household_name, c.last_gap_start, c.last_gap_end from todo_scan_checkpoint c left join household h on h.id=c.household_id where c.last_gap_start is not null order by c.last_gap_end desc limit 20"));
+        return ApiResponse.success(result);
     }
 
     private long count(String sql) { return Objects.requireNonNull(db.queryForObject(sql, Long.class)); }

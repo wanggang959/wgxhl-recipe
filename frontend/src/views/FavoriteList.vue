@@ -7,6 +7,7 @@ import { getRecipesBatch, toggleRecipeLike } from '../api/recipe'
 import { createWantedRecipe } from '../api/want'
 import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
+import LoadMoreSentinel from '../components/LoadMoreSentinel.vue'
 import RecipeCard from '../components/RecipeCard.vue'
 import { useUserStore } from '../stores/user'
 import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markDataStale, rememberDataVersions } from '../utils/dataRefresh'
@@ -16,12 +17,18 @@ const favoriteListCache = {
   userId: '',
   list: [],
   wantedMap: {},
+  page: 0,
+  total: 0,
   savedAt: 0,
 }
 
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
+const loadingMore = ref(false)
+const page = ref(favoriteListCache.userId === userStore.userId ? favoriteListCache.page : 0)
+const total = ref(favoriteListCache.userId === userStore.userId ? favoriteListCache.total : 0)
+let requestVersion = 0
 const list = ref(favoriteListCache.userId === userStore.userId ? [...favoriteListCache.list] : [])
 const wantedMap = ref(favoriteListCache.userId === userStore.userId ? { ...favoriteListCache.wantedMap } : {})
 const wantedPendingMap = ref({})
@@ -58,6 +65,8 @@ onBeforeUnmount(() => {
 })
 
 async function loadFavorite(options = {}) {
+  if (options.append && loadingMore.value) return
+  const version = ++requestVersion
   if (!userStore.userId) {
     list.value = []
     saveFavoriteCache()
@@ -65,10 +74,12 @@ async function loadFavorite(options = {}) {
   }
   const showLoading = !options.keepExisting && list.value.length === 0
   if (showLoading) loading.value = true
+  if (options.append) loadingMore.value = true
   try {
+    const nextPage = options.append ? page.value + 1 : 1
     const res = await pageFavorite({
-      current: 1,
-      size: 200,
+      current: nextPage,
+      size: 50,
       userId: userStore.userId,
     })
     const favorites = (res.data.records || []).map((item) => ({
@@ -76,7 +87,11 @@ async function loadFavorite(options = {}) {
       id: item.recipeId,
       favoriteId: item.id,
     }))
-    list.value = await enrichFavoriteRecipes(favorites)
+    const enriched = await enrichFavoriteRecipes(favorites)
+    if (version !== requestVersion) return
+    list.value = options.append ? [...list.value, ...enriched] : enriched
+    page.value = nextPage
+    total.value = Number(res.data.total || 0)
     list.value.forEach((item) => { wantedMap.value[item.id] = Boolean(item.wanted) })
     saveFavoriteCache()
     rememberDataVersions(watchedDataScopes, seenDataVersions)
@@ -85,7 +100,7 @@ async function loadFavorite(options = {}) {
       showFailToast(error.message || '收藏加载失败')
     }
   } finally {
-    if (showLoading) loading.value = false
+    if (version === requestVersion) { loading.value = false; loadingMore.value = false }
   }
 }
 
@@ -102,6 +117,8 @@ function saveFavoriteCache() {
   favoriteListCache.userId = userStore.userId || ''
   favoriteListCache.list = [...list.value]
   favoriteListCache.wantedMap = { ...wantedMap.value }
+  favoriteListCache.page = page.value
+  favoriteListCache.total = total.value
   favoriteListCache.savedAt = Date.now()
 }
 
@@ -123,6 +140,7 @@ async function remove(item) {
     list.value = list.value.filter((entry) => entry.favoriteId !== item.favoriteId)
     saveFavoriteCache()
     markDataStale(DATA_SCOPE.favorites)
+    await loadFavorite({ keepExisting: true, silent: true })
     showSuccessToast('已取消收藏')
   } catch (error) {
     showFailToast(error.message || '操作失败')
@@ -135,6 +153,7 @@ async function removeSafe(item) {
     list.value = list.value.filter((entry) => entry.favoriteId !== item.favoriteId)
     saveFavoriteCache()
     markDataStale(DATA_SCOPE.favorites)
+    await loadFavorite({ keepExisting: true, silent: true })
     closeToast()
     showSuccessToast({ message: '已取消收藏', duration: 1400 })
   } catch (error) {
@@ -244,7 +263,7 @@ function submitCustomWantDate() {
         <p>我的菜单</p>
         <h1>收藏</h1>
       </div>
-      <span v-if="userStore.userId">{{ list.length }} 道</span>
+      <span v-if="userStore.userId">{{ total }} 道</span>
     </div>
 
     <EmptyState
@@ -277,6 +296,7 @@ function submitCustomWantDate() {
         @want="openWantAction"
         @like="toggleLikeOnCard"
       />
+      <LoadMoreSentinel v-if="list.length < total" :loading="loadingMore" @load="loadFavorite({ append: true, keepExisting: true })" />
     </div>
 
     <van-popup v-model:show="wantActionVisible" position="bottom" round>

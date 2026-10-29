@@ -17,6 +17,7 @@ import org.apache.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Service
+@DependsOn("securityProviderConfig")
 public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscriptionMapper, UserPushSubscription>
         implements UserPushSubscriptionService {
 

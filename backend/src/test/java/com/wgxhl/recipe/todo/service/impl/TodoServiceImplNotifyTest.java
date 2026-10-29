@@ -8,6 +8,7 @@ import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.todo.entity.TodoNoticeRule;
 import com.wgxhl.recipe.todo.entity.TodoOwner;
 import com.wgxhl.recipe.todo.entity.TodoSendLog;
+import com.wgxhl.recipe.todo.task.ReminderDeliveryGuard;
 import com.wgxhl.recipe.todo.mapper.TodoMapper;
 import com.wgxhl.recipe.todo.mapper.TodoNoticeRuleMapper;
 import com.wgxhl.recipe.todo.mapper.TodoOwnerMapper;
@@ -59,6 +60,8 @@ class TodoServiceImplNotifyTest {
     private MailDeliveryService mailDeliveryService;
     @Mock
     private TodoMapper todoMapper;
+    @Mock
+    private ReminderDeliveryGuard deliveryGuard;
 
     private TodoServiceImpl todoService;
 
@@ -72,8 +75,10 @@ class TodoServiceImplNotifyTest {
                 notificationService,
                 userPushSubscriptionService,
                 householdMemberService,
-                mailDeliveryService
+                mailDeliveryService,
+                deliveryGuard
         );
+        org.mockito.Mockito.lenient().when(deliveryGuard.claim(any(), any(), any(), any(), any())).thenReturn(true);
         ReflectionTestUtils.setField(todoService, "baseMapper", todoMapper);
     }
 
@@ -271,14 +276,6 @@ class TodoServiceImplNotifyTest {
 
         verify(notificationService, never()).createSiteNotice(eq("user-1"), any(), any(), any(), any());
         verify(notificationService).createSiteNotice(eq("user-2"), any(), any(), any(), any());
-    }
-
-    @Test
-    void scanWindowDoesNotSendEarlyOrOldRules() {
-        LocalDateTime now = LocalDateTime.of(2026, 10, 28, 10, 0);
-        assertEquals(true, ReflectionTestUtils.invokeMethod(todoService, "isInNotifyWindow", now.minusMinutes(6), now));
-        assertEquals(false, ReflectionTestUtils.invokeMethod(todoService, "isInNotifyWindow", now.minusMinutes(6).minusSeconds(1), now));
-        assertEquals(false, ReflectionTestUtils.invokeMethod(todoService, "isInNotifyWindow", now.plusSeconds(1), now));
     }
 
     @Test

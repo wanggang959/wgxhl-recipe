@@ -48,6 +48,8 @@ public class RecipeImageServiceImpl extends ServiceImpl<RecipeImageMapper, Recip
         if (!StringUtils.hasText(recipeId)) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkReadable(recipeId);
+        if (denied != null) return ApiResponse.fail(403, denied);
         List<RecipeImage> list = lambdaQuery()
                 .eq(RecipeImage::getRecipeId, recipeId)
                 .orderByAsc(RecipeImage::getSortNo)
@@ -88,6 +90,10 @@ public class RecipeImageServiceImpl extends ServiceImpl<RecipeImageMapper, Recip
         if (denied != null) {
             return ApiResponse.fail(403, denied);
         }
+        if (StringUtils.hasText(entity.getRecipeId()) && !existing.getRecipeId().equals(entity.getRecipeId())) {
+            return ApiResponse.fail(403, "不能更换所属菜谱");
+        }
+        entity.setRecipeId(existing.getRecipeId());
         updateById(entity);
         return ApiResponse.success("更新成功", null);
     }

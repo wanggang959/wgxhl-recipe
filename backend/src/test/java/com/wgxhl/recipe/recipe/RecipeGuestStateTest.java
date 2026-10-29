@@ -16,7 +16,7 @@ class RecipeGuestStateTest {
         UserFavoriteMapper favorites = mock(UserFavoriteMapper.class);
         UserWantedRecipeMapper wanted = mock(UserWantedRecipeMapper.class);
         RecipeServiceImpl service = new RecipeServiceImpl(null, null, null, null, null, favorites,
-                null, wanted, null, null, null, null, null);
+                null, wanted, null, null, null, null, null, null);
         Recipe recipe = new Recipe(); recipe.setId("recipe");
         recipe.setFavorite(true); recipe.setWanted(true);
         ReflectionTestUtils.invokeMethod(service, "fillPersonalStates", Collections.singletonList(recipe), "guest");

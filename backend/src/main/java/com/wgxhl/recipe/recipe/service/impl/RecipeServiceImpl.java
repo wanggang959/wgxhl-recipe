@@ -24,6 +24,7 @@ import com.wgxhl.recipe.recipe.entity.RecipeLike;
 import com.wgxhl.recipe.recipe.mapper.RecipeLikeMapper;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
 import com.wgxhl.recipe.recipe.service.RecipeService;
+import com.wgxhl.recipe.recipe.service.RecipeOwnershipGuard;
 import com.wgxhl.recipe.recipe.util.RecipeVersionUtil;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
 import com.wgxhl.recipe.recipe.vo.RecipeLikeStateVO;
@@ -45,6 +46,7 @@ import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
 import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -78,6 +80,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private final IngredientMapper ingredientMapper;
     private final SeasoningMapper seasoningMapper;
     private final RecipeLikeMapper recipeLikeMapper;
+    private final RecipeOwnershipGuard ownershipGuard;
 
     public RecipeServiceImpl(RecipeCategoryService recipeCategoryService,
                              RecipeStepService recipeStepService,
@@ -91,7 +94,8 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                              HouseholdMemberService householdMemberService,
                              IngredientMapper ingredientMapper,
                              SeasoningMapper seasoningMapper,
-                             RecipeLikeMapper recipeLikeMapper) {
+                             RecipeLikeMapper recipeLikeMapper,
+                             RecipeOwnershipGuard ownershipGuard) {
         this.recipeCategoryService = recipeCategoryService;
         this.recipeStepService = recipeStepService;
         this.recipeImageService = recipeImageService;
@@ -105,6 +109,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         this.ingredientMapper = ingredientMapper;
         this.seasoningMapper = seasoningMapper;
         this.recipeLikeMapper = recipeLikeMapper;
+        this.ownershipGuard = ownershipGuard;
     }
 
     @Override
@@ -380,9 +385,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     }
 
     private String detailVisibilityError(Recipe recipe) {
-        if (recipe == null || !canView(recipe)) return "菜谱不存在";
-        if (STATUS_OFF.equals(recipe.getStatus()) && !canViewOffline(recipe)) return "这道菜已被下架";
-        return null;
+        return ownershipGuard.checkReadable(recipe);
     }
 
     @Override
@@ -473,8 +476,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
      * 已下架的菜谱：作者本人仍可打开查看，超管也可以。
      */
     private boolean canViewOffline(Recipe recipe) {
-        return UserContext.isSuperAdmin()
-                || UserContext.requireUserId().equals(recipe.getOwnerUserId());
+        return ownershipGuard.canViewOffline(recipe);
     }
 
     @Override
@@ -495,6 +497,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         save(recipe);
         ApiResponse<Void> saveChildrenResult = saveChildren(recipe.getId(), dto);
         if (saveChildrenResult.getStatus() != 200) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return ApiResponse.fail(saveChildrenResult.getMessage());
         }
         return ApiResponse.success("保存成功", buildDetailVO(recipe));
@@ -533,6 +536,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         updateById(recipe);
         ApiResponse<Void> saveChildrenResult = saveChildren(recipe.getId(), dto);
         if (saveChildrenResult.getStatus() != 200) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return ApiResponse.fail(saveChildrenResult.getMessage());
         }
         return ApiResponse.success("更新成功", null);
@@ -599,18 +603,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     }
 
     private boolean canView(Recipe recipe) {
-        String currentUserId = UserContext.requireUserId();
-        if (currentUserId.equals(recipe.getOwnerUserId())) {
-            return true;
-        }
-        if ("public".equals(recipe.getVisibility())) {
-            return true;
-        }
-        if (!"family".equals(recipe.getVisibility())) {
-            return false;
-        }
-        return householdMemberService.listUserIds(TenantContext.require())
-                .contains(recipe.getOwnerUserId());
+        return ownershipGuard.canView(recipe);
     }
 
     private ApiResponse<Void> validateRecipe(Recipe recipe, String excludeId, List<RecipeStep> stepList) {

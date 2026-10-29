@@ -55,6 +55,8 @@ public class RecipeSeasoningRelServiceImpl extends ServiceImpl<RecipeSeasoningRe
         if (!StringUtils.hasText(recipeId)) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkReadable(recipeId);
+        if (denied != null) return ApiResponse.fail(403, denied);
         List<RecipeSeasoningRel> list = lambdaQuery()
                 .eq(RecipeSeasoningRel::getRecipeId, recipeId)
                 .orderByAsc(RecipeSeasoningRel::getSortNo)
@@ -103,6 +105,10 @@ public class RecipeSeasoningRelServiceImpl extends ServiceImpl<RecipeSeasoningRe
         if (denied != null) {
             return ApiResponse.fail(403, denied);
         }
+        if (StringUtils.hasText(entity.getRecipeId()) && !existing.getRecipeId().equals(entity.getRecipeId())) {
+            return ApiResponse.fail(403, "不能更换所属菜谱");
+        }
+        entity.setRecipeId(existing.getRecipeId());
         if (StringUtils.hasText(entity.getSeasoningId())
                 && !entity.getSeasoningId().equals(existing.getSeasoningId())) {
             ApiResponse<Void> fillResult = fillSeasoningName(entity);

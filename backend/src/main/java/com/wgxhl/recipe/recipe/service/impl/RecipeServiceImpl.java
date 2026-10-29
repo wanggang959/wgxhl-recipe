@@ -519,6 +519,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         }
         recipe.setOwnerUserId(existing.getOwnerUserId());
         recipe.setOwnerName(existing.getOwnerName());
+        recipe.setRandomKey(existing.getRandomKey());
         if (!StringUtils.hasText(recipe.getVisibility())) {
             recipe.setVisibility(existing.getVisibility());
         }

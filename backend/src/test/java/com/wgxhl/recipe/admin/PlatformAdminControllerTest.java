@@ -34,6 +34,15 @@ class PlatformAdminControllerTest {
     }
 
     @Test
+    void administrationPagingClampsExtremeOffsets() {
+        when(db.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(0L);
+        assertEquals(5000, controller.users(Integer.MAX_VALUE, "").getData().get("page"));
+        verify(db).queryForList(contains("from app_user u"), eq("%%"), eq("%%"), eq("%%"), eq(99980));
+        assertEquals(5000, controller.notices(Integer.MAX_VALUE, "", "", "", "", "").getData().get("page"));
+        assertEquals(5000, controller.uncertain(Integer.MAX_VALUE).getData().get("page"));
+    }
+
+    @Test
     void changingStatusInvalidatesTokens() {
         when(db.update(anyString(), any(), any(), any())).thenReturn(1);
         AppUser actor = new AppUser(); actor.setId("admin-id");

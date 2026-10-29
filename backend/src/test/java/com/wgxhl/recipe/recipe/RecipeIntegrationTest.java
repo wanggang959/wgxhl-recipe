@@ -6,6 +6,7 @@ import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.favorite.entity.UserFavorite;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
+import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import org.junit.jupiter.api.AfterEach;
@@ -155,6 +156,19 @@ class RecipeIntegrationTest {
         } finally {
             jdbc.update("delete from recipe where recipe_name like ?", prefix + "%");
         }
+    }
+
+    @Test
+    void editingPreservesServerOwnedRandomKey() {
+        jdbc.update("update recipe set random_key=123456 where id=?", id);
+        Recipe changed = new Recipe();
+        changed.setId(id);
+        changed.setRecipeName(id);
+        changed.setRandomKey(0L);
+        RecipeSaveDTO dto = new RecipeSaveDTO();
+        dto.setRecipe(changed);
+        assertEquals(200, recipes.update(dto).getStatus());
+        assertEquals(123456L, jdbc.queryForObject("select random_key from recipe where id=?", Long.class, id));
     }
 
     @Test

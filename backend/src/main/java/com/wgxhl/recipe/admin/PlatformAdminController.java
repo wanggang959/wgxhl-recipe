@@ -53,7 +53,7 @@ public class PlatformAdminController {
     @GetMapping("/users")
     public ApiResponse<Map<String, Object>> users(@RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "") String keyword) {
-        int safePage = Math.max(1, Math.min(page, 100000));
+        int safePage = Math.max(1, Math.min(page, 5000));
         String query = keyword == null ? "" : keyword.trim();
         if (query.length() > 100) return ApiResponse.fail("搜索内容过长");
         String like = "%" + query.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
@@ -85,7 +85,7 @@ public class PlatformAdminController {
             @RequestParam(defaultValue = "") String status, @RequestParam(defaultValue = "") String channel,
             @RequestParam(defaultValue = "") String keyword, @RequestParam(defaultValue = "") String from,
             @RequestParam(defaultValue = "") String to) {
-        int safePage = Math.max(1, Math.min(page, 100000));
+        int safePage = Math.max(1, Math.min(page, 5000));
         if (!Arrays.asList("", "SUCCESS", "FAIL", "SKIP").contains(status)
                 || !Arrays.asList("", "site", "email", "push").contains(channel)) return ApiResponse.fail("筛选条件无效");
         String search = keyword.trim();
@@ -116,7 +116,7 @@ public class PlatformAdminController {
 
     @GetMapping("/notices/uncertain")
     public ApiResponse<Map<String, Object>> uncertain(@RequestParam(defaultValue = "1") int page) {
-        int safePage = Math.max(1, Math.min(page, 100000));
+        int safePage = Math.max(1, Math.min(page, 5000));
         String where = " where (g.status='UNKNOWN' or (g.status='IN_FLIGHT' and g.update_time < now() - interval 5 minute))";
         Long total = db.queryForObject("select count(*) from todo_delivery_guard g" + where, Long.class);
         List<Map<String, Object>> rows = db.queryForList("select g.todo_id, g.recipient_key, g.notify_type, g.status, g.target_time, g.update_time, u.nickname recipient_name "

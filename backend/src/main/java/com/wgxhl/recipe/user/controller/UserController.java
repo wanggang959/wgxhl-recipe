@@ -25,9 +25,11 @@ import java.util.List;
 public class UserController {
 
     private final AppUserService appUserService;
+    private final ClientIpResolver clientIpResolver;
 
-    public UserController(AppUserService appUserService) {
+    public UserController(AppUserService appUserService, ClientIpResolver clientIpResolver) {
         this.appUserService = appUserService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     /***
@@ -87,7 +89,7 @@ public class UserController {
      **/
     @PostMapping("/login")
     public ApiResponse<AppUser> login(@RequestBody UserLoginDTO dto, HttpServletRequest request) {
-        return appUserService.login(dto, ClientIpResolver.resolve(request));
+        return appUserService.login(dto, clientIpResolver.resolve(request));
     }
 
     /***

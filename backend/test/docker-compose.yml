@@ -25,6 +25,8 @@ services:
       - ../sql/add_mail_delivery_tracking.sql:/docker-entrypoint-initdb.d/13-mail-tracking.sql:ro
       - ../sql/add_mail_retention_indexes.sql:/docker-entrypoint-initdb.d/14-mail-retention-indexes.sql:ro
       - ../sql/add_todo_delivery_guard.sql:/docker-entrypoint-initdb.d/15-todo-delivery-guard.sql:ro
+      - ../sql/add_login_attempt_bucket.sql:/docker-entrypoint-initdb.d/16-login-attempt-bucket.sql:ro
+      - ../sql/add_recipe_random_key.sql:/docker-entrypoint-initdb.d/17-recipe-random-key.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u recipe_test -plocal-test-only --silent"]
       interval: 5s

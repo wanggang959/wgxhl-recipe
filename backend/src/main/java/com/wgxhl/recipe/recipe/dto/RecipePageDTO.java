@@ -47,4 +47,5 @@ public class RecipePageDTO extends PageDTO {
      * 排序：latest-最新（默认），likes_desc-赞多优先，likes_asc-赞少优先，random-随机
      */
     private String sort;
+    private Long randomPivot;
 }

@@ -26,6 +26,7 @@ const DEFAULT_QUERY = {
   status: '上架',
   scope: 'family',
   sort: 'latest',
+  randomPivot: 1,
 }
 const DEFAULT_FILTER = {
   recipeName: '',
@@ -114,6 +115,7 @@ function pickScope(scope) {
 function pickSort(sort) {
   if (query.sort === sort) return
   query.sort = sort
+  if (sort === 'random') query.randomPivot = Math.floor(Math.random() * 1_000_000_000) + 1
   refreshList()
 }
 const isShowcaseMode = computed(() => route.query.mode === 'showcase')

@@ -32,8 +32,9 @@ class AppUserLoginTest {
     private final HouseholdService households = mock(HouseholdService.class);
     private final JwtAuthUtil jwt = mock(JwtAuthUtil.class);
     private final TodoService todos = mock(TodoService.class);
+    private final LoginAttemptService attempts = mock(LoginAttemptService.class);
     private final AppUserServiceImpl service = new AppUserServiceImpl(
-            null, null, null, null, todos, null, jwt, members, households, new LoginAttemptService());
+            null, null, null, null, todos, null, jwt, members, households, attempts);
     private AppUser user;
 
     @BeforeEach
@@ -94,6 +95,8 @@ class AppUserLoginTest {
         for (int i = 0; i < 5; i++) {
             assertEquals(500, service.login(login("cook", "wrong"), "ip3").getStatus());
         }
+        verify(attempts, times(5)).onFailure("user:user-1", "ip3");
+        when(attempts.lockedMessage("user:user-1", "ip4")).thenReturn("locked");
         assertEquals(429, service.login(login("cook@example.com", "password"), "ip4").getStatus());
     }
 

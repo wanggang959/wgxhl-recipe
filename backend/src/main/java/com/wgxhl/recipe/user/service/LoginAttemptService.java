@@ -1,111 +1,72 @@
 package com.wgxhl.recipe.user.service;
 
+import com.wgxhl.recipe.user.util.SecurityTokenUtil;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.sql.Timestamp;
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 登录失败限流：同一用户名连续失败 5 次锁定 10 分钟；同一来源 IP 连续失败 20 次锁定 10 分钟。
- * 单实例部署，直接放在内存里；重启后清零。
- */
 @Service
 public class LoginAttemptService {
+    private final JdbcTemplate db;
+    public LoginAttemptService(JdbcTemplate db) { this.db = db; }
 
-    private static final int USER_MAX_FAILURES = 5;
-    private static final int IP_MAX_FAILURES = 20;
-    private static final Duration LOCK_DURATION = Duration.ofMinutes(10);
-    private static final Duration ATTEMPT_TTL = Duration.ofHours(1);
-    private static final int PURGE_THRESHOLD = 500;
-
-    private final Map<String, Attempt> byUsername = new ConcurrentHashMap<>();
-    private final Map<String, Attempt> byIp = new ConcurrentHashMap<>();
-
-    /**
-     * @return 被锁定时返回提示语，否则返回 null
-     */
     public String lockedMessage(String username, String clientIp) {
-        String userMessage = lockedMessage(byUsername, normalize(username),
-                "密码错误次数过多，请 %d 分钟后再试");
-        if (userMessage != null) {
-            return userMessage;
-        }
-        return lockedMessage(byIp, normalizeIp(clientIp),
-                "该网络登录失败次数过多，请 %d 分钟后再试");
+        String message = locked("USER", username, "密码错误次数过多，请 %d 分钟后再试");
+        return message != null ? message : locked("IP", clientIp, "该网络登录失败次数过多，请 %d 分钟后再试");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void onFailure(String username, String clientIp) {
-        record(byUsername, normalize(username), USER_MAX_FAILURES);
-        record(byIp, normalizeIp(clientIp), IP_MAX_FAILURES);
+        LocalDateTime now = LocalDateTime.now();
+        record("USER", username, 5, now);
+        record("IP", clientIp, 20, now);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void onSuccess(String username, String clientIp) {
-        remove(byUsername, normalize(username));
-        remove(byIp, normalizeIp(clientIp));
+        remove("USER", username);
+        remove("IP", clientIp);
     }
 
-    private String lockedMessage(Map<String, Attempt> buckets, String key, String template) {
-        if (!StringUtils.hasText(key)) {
-            return null;
-        }
-        Attempt attempt = buckets.get(key);
-        if (attempt == null || attempt.lockedUntil == null) {
-            return null;
-        }
-        Instant now = Instant.now();
-        if (attempt.lockedUntil.isAfter(now)) {
-            long minutes = Math.max(1, Duration.between(now, attempt.lockedUntil).toMinutes() + 1);
-            return String.format(template, minutes);
-        }
-        buckets.remove(key);
-        return null;
+    private String locked(String type, String value, String template) {
+        if (!StringUtils.hasText(value)) return null;
+        List<Timestamp> locks = db.query("select locked_until from login_attempt_bucket where bucket_type=? and bucket_hash=?",
+                (rs, row) -> rs.getTimestamp(1), type, hash(value));
+        if (locks.isEmpty() || locks.get(0) == null) return null;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime until = locks.get(0).toLocalDateTime();
+        if (!until.isAfter(now)) return null;
+        long minutes = Math.max(1, (Duration.between(now, until).getSeconds() + 59) / 60);
+        return String.format(template, minutes);
     }
 
-    private void record(Map<String, Attempt> buckets, String key, int maxFailures) {
-        if (!StringUtils.hasText(key)) {
-            return;
-        }
-        purgeIfNeeded(buckets);
-        buckets.compute(key, (ignored, current) -> {
-            Attempt attempt = current == null ? new Attempt() : current;
-            attempt.failures += 1;
-            attempt.lastFailure = Instant.now();
-            if (attempt.failures >= maxFailures) {
-                attempt.lockedUntil = Instant.now().plus(LOCK_DURATION);
-            }
-            return attempt;
-        });
+    private void record(String type, String value, int limit, LocalDateTime now) {
+        if (!StringUtils.hasText(value)) return;
+        Timestamp time = Timestamp.valueOf(now);
+        db.update("insert into login_attempt_bucket (bucket_type,bucket_hash,failures,last_failure,locked_until) values (?,?,1,?,null) "
+                        + "on duplicate key update failures=if(last_failure<? or (locked_until is not null and locked_until<=?),1,failures+1), "
+                        + "locked_until=if(failures>=?,?,null), last_failure=?",
+                type, hash(value), time, Timestamp.valueOf(now.minusHours(1)), time, limit, Timestamp.valueOf(now.plusMinutes(10)), time);
     }
 
-    private void remove(Map<String, Attempt> buckets, String key) {
-        if (StringUtils.hasText(key)) {
-            buckets.remove(key);
-        }
+    private void remove(String type, String value) {
+        if (StringUtils.hasText(value)) db.update("delete from login_attempt_bucket where bucket_type=? and bucket_hash=?", type, hash(value));
     }
 
-    private void purgeIfNeeded(Map<String, Attempt> buckets) {
-        if (buckets.size() <= PURGE_THRESHOLD) {
-            return;
-        }
-        Instant threshold = Instant.now().minus(ATTEMPT_TTL);
-        buckets.entrySet().removeIf(entry -> entry.getValue().lastFailure.isBefore(threshold));
-    }
+    private String hash(String value) { return SecurityTokenUtil.hash(value.trim().toLowerCase(Locale.ROOT)); }
 
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String normalizeIp(String ip) {
-        return ip == null ? "" : ip.trim();
-    }
-
-    private static class Attempt {
-        private int failures;
-        private Instant lastFailure = Instant.now();
-        private Instant lockedUntil;
+    @Scheduled(cron = "0 15 4 * * ?", zone = "Asia/Shanghai")
+    public void cleanup() {
+        db.update("delete from login_attempt_bucket where last_failure<? and (locked_until is null or locked_until<?) limit 10000",
+                Timestamp.valueOf(LocalDateTime.now().minusDays(1)), Timestamp.valueOf(LocalDateTime.now()));
     }
 }

@@ -1,31 +1,38 @@
 package com.wgxhl.recipe.config;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-
 import javax.servlet.http.HttpServletRequest;
+import java.net.InetAddress;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-/**
- * 解析客户端 IP。后端只在 127.0.0.1 上被 OpenResty 访问，
- * X-Real-IP 由 nginx 用 $remote_addr 覆盖写入，可信。
- */
-public final class ClientIpResolver {
-
-    private ClientIpResolver() {
+@Component
+public class ClientIpResolver {
+    private final Set<String> trustedProxies;
+    public ClientIpResolver(@Value("${app.trusted-proxy-ips:127.0.0.1,::1}") String proxies) {
+        trustedProxies = Arrays.stream(proxies.split(",")).map(ClientIpResolver::literalIp)
+                .filter(StringUtils::hasText).collect(Collectors.toSet());
     }
 
-    public static String resolve(HttpServletRequest request) {
-        if (request == null) {
-            return "";
+    public String resolve(HttpServletRequest request) {
+        if (request == null) return "";
+        String remote = literalIp(request.getRemoteAddr());
+        if (!StringUtils.hasText(remote)) return "";
+        if (trustedProxies.contains(remote)) {
+            String forwarded = literalIp(request.getHeader("X-Real-IP"));
+            if (StringUtils.hasText(forwarded)) return forwarded;
         }
-        String realIp = request.getHeader("X-Real-IP");
-        if (StringUtils.hasText(realIp)) {
-            return realIp.trim();
-        }
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(forwarded)) {
-            String[] parts = forwarded.split(",");
-            return parts[parts.length - 1].trim();
-        }
-        return request.getRemoteAddr();
+        return remote;
+    }
+
+    private static String literalIp(String value) {
+        if (!StringUtils.hasText(value)) return "";
+        String input = value.trim();
+        if (!input.matches("[0-9a-fA-F:.]+") || (!input.contains(".") && !input.contains(":"))) return "";
+        try { return InetAddress.getByName(input).getHostAddress(); }
+        catch (Exception ignored) { return ""; }
     }
 }

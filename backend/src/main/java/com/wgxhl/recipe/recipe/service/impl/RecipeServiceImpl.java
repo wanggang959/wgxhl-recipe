@@ -56,6 +56,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
@@ -111,6 +112,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (!StringUtils.hasText(entity.getId())) {
             entity.setId(IdUtil.simpleUUID());
         }
+        entity.setRandomKey(ThreadLocalRandom.current().nextLong(1L, 1_000_000_001L));
         LocalDateTime now = LocalDateTime.now();
         entity.setCreateTime(now);
         entity.setUpdateTime(now);
@@ -168,9 +170,13 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                 .like(StringUtils.hasText(dto.getCategoryName()), Recipe::getCategoryName, dto.getCategoryName())
                 .eq(StringUtils.hasText(dto.getDifficulty()), Recipe::getDifficulty, dto.getDifficulty())
                 .like(StringUtils.hasText(dto.getTaste()), Recipe::getTaste, dto.getTaste());
-        applySort(wrapper, dto.getSort());
-
-        Page<Recipe> result = page(page, wrapper);
+        Page<Recipe> result;
+        if ("random".equals(dto.getSort())) {
+            result = randomPage(page, wrapper, dto.getRandomPivot());
+        } else {
+            applySort(wrapper, dto.getSort());
+            result = page(page, wrapper);
+        }
         fillLiked(result.getRecords(), currentUserId);
         fillFavoriteCounts(result.getRecords());
         fillPersonalStates(result.getRecords(), currentUserId);
@@ -228,11 +234,33 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
             wrapper.orderByDesc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         } else if ("likes_asc".equals(value)) {
             wrapper.orderByAsc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
-        } else if ("random".equals(value)) {
-            wrapper.last("order by rand()");
         } else {
             wrapper.orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         }
+    }
+
+    private Page<Recipe> randomPage(Page<Recipe> result, LambdaQueryWrapper<Recipe> filter, Long requestedPivot) {
+        long pivot = requestedPivot == null ? 1L : Math.max(1L, Math.min(requestedPivot, 1_000_000_000L));
+        long total = baseMapper.selectCount(filter.clone());
+        result.setTotal(total);
+        if (total == 0) return result;
+        long upperCount = baseMapper.selectCount(filter.clone().ge(Recipe::getRandomKey, pivot));
+        long offset = (result.getCurrent() - 1) * result.getSize();
+        long remaining = result.getSize();
+        List<Recipe> records = new java.util.ArrayList<>();
+        if (offset < upperCount) {
+            long count = Math.min(remaining, upperCount - offset);
+            records.addAll(baseMapper.selectList(filter.clone().ge(Recipe::getRandomKey, pivot)
+                    .orderByAsc(Recipe::getRandomKey, Recipe::getId).last("LIMIT " + offset + "," + count)));
+            remaining -= count;
+        }
+        if (remaining > 0) {
+            long lowerOffset = Math.max(0L, offset - upperCount);
+            records.addAll(baseMapper.selectList(filter.clone().lt(Recipe::getRandomKey, pivot)
+                    .orderByAsc(Recipe::getRandomKey, Recipe::getId).last("LIMIT " + lowerOffset + "," + remaining)));
+        }
+        result.setRecords(records);
+        return result;
     }
 
     /**

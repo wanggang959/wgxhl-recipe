@@ -12,14 +12,15 @@ import java.util.Map;
 @RequestMapping("/user/security")
 public class AccountSecurityController {
     private final AccountSecurityService service;
-    public AccountSecurityController(AccountSecurityService service) { this.service = service; }
+    private final ClientIpResolver clientIpResolver;
+    public AccountSecurityController(AccountSecurityService service, ClientIpResolver clientIpResolver) { this.service = service; this.clientIpResolver = clientIpResolver; }
 
     @PostMapping("/status")
     public ApiResponse<Map<String, Object>> status() { return service.status(); }
 
     @PostMapping("/requestReset")
     public ApiResponse<Void> requestReset(@RequestBody AccountSecurityDTO dto, HttpServletRequest request) {
-        return service.requestReset(dto.getEmail(), ClientIpResolver.resolve(request));
+        return service.requestReset(dto.getEmail(), clientIpResolver.resolve(request));
     }
 
     @PostMapping("/resetInfo")
@@ -30,7 +31,7 @@ public class AccountSecurityController {
 
     @PostMapping("/email/send")
     public ApiResponse<Map<String, Object>> sendEmail(@RequestBody AccountSecurityDTO dto, HttpServletRequest request) {
-        return service.sendEmailChange(dto.getNewEmail(), dto.getCurrentPassword(), ClientIpResolver.resolve(request));
+        return service.sendEmailChange(dto.getNewEmail(), dto.getCurrentPassword(), clientIpResolver.resolve(request));
     }
 
     @PostMapping("/email/confirm")
@@ -43,7 +44,7 @@ public class AccountSecurityController {
 
     @PostMapping("/member/requestReset")
     public ApiResponse<Void> requestMemberReset(@RequestBody AccountSecurityDTO dto, HttpServletRequest request) {
-        return service.requestMemberReset(dto.getUserId(), ClientIpResolver.resolve(request));
+        return service.requestMemberReset(dto.getUserId(), clientIpResolver.resolve(request));
     }
 
     @PostMapping("/member/resetManaged")

@@ -50,6 +50,7 @@ account:
     public-url: ${ACCOUNT_SECURITY_PUBLIC_URL:https://recipe.wgxhl.space}
 
 app:
+  trusted-proxy-ips: ${TRUSTED_PROXY_IPS:127.0.0.1,::1}
   platform-admin-user-id: ${PLATFORM_ADMIN_USER_ID:}
   mail:
     provider: ${MAIL_PROVIDER:smtp}

@@ -156,4 +156,28 @@ class RecipeIntegrationTest {
             jdbc.update("delete from recipe where recipe_name like ?", prefix + "%");
         }
     }
+
+    @Test
+    void randomOrderWrapsAndPaginatesWithoutDuplicates() {
+        String prefix = UUID.randomUUID().toString();
+        try {
+            for (int i = 1; i <= 60; i++) {
+                jdbc.update("insert into recipe (id, recipe_name, recipe_version, owner_user_id, visibility, status, like_count, random_key) values (?, ?, '1.0', ?, 'public', '上架', 0, ?)",
+                        UUID.randomUUID().toString(), prefix + i, USER, i);
+            }
+            jdbc.update("insert into recipe (id,recipe_name,recipe_version,owner_user_id,visibility,status,like_count,random_key) values (?,?,'1.0','other-user','private','上架',0,30)", UUID.randomUUID().toString(), prefix + "private");
+            RecipePageDTO query = new RecipePageDTO();
+            query.setScope("public"); query.setRecipeName(prefix); query.setSort("random"); query.setRandomPivot(30L); query.setSize(50L);
+            query.setCurrent(1L);
+            List<Recipe> first = recipes.page(query).getData().getRecords();
+            query.setCurrent(2L);
+            List<Recipe> second = recipes.page(query).getData().getRecords();
+            List<Recipe> all = java.util.stream.Stream.concat(first.stream(), second.stream()).collect(Collectors.toList());
+            assertEquals(60, all.size());
+            assertEquals(60, all.stream().map(Recipe::getId).distinct().count());
+            assertEquals(prefix + "30", all.get(0).getRecipeName());
+            assertEquals(prefix + "1", all.get(31).getRecipeName());
+            assertEquals(prefix + "29", all.get(59).getRecipeName());
+        } finally { jdbc.update("delete from recipe where recipe_name like ?", prefix + "%"); }
+    }
 }

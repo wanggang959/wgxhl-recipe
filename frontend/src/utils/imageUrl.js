@@ -10,7 +10,7 @@ export function getImageUrl(path, fallback = '') {
 }
 
 export function getRecipeImage(path) {
-  return getImageUrl(path, '/favicon.svg')
+  return getImageUrl(path, '/favicon.png?v=home-v2')
 }
 
 export function toObjectPath(path) {

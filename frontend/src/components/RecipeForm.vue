@@ -221,9 +221,10 @@ async function doUpload(fileWrapper, folder, cropOptions = {}, uploadKey = '') {
   if (!croppedFile) return ''
 
   const file = await transcodeImageToWebp(croppedFile, {
-    maxLongEdge: 1600,
+    maxLongEdge: folder === 'recipe/cover' ? 1280 : 1600,
     quality: 0.84,
     minCompressBytes: 0,
+    maxBytes: folder === 'recipe/cover' ? 320 * 1024 : 512 * 1024,
   })
   if (!file) throw new Error('未获取到上传文件')
 

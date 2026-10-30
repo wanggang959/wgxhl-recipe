@@ -8,7 +8,8 @@
     "test": "node --test",
     "build": "vite build",
     "preview": "vite preview",
-    "convert:public-webp": "node scripts/convert-public-to-webp.mjs"
+    "convert:public-webp": "node scripts/convert-public-to-webp.mjs",
+    "generate:icons": "node scripts/generate-app-icons.mjs"
   },
   "dependencies": {
     "axios": "^1.16.1",

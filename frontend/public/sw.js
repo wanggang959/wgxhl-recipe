@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v6'
 const IMAGE_CACHE = `wgxhl-image-cache-${CACHE_VERSION}`
 const META_CACHE = `wgxhl-image-meta-${CACHE_VERSION}`
 const CACHE_PREFIX = 'wgxhl-image-cache-'
@@ -40,8 +40,8 @@ self.addEventListener('push', (event) => {
   const notifyUrl = payload.url || payload.data?.url || '/#/todo'
   const options = {
     body: payload.body || '有人更新了待办，点击前往查看',
-    icon: payload.icon || '/pwa-icon-192.png',
-    badge: payload.badge || '/pwa-icon-192.png',
+    icon: payload.icon || '/pwa-icon-192.png?v=home-v2',
+    badge: payload.badge || '/pwa-icon-192.png?v=home-v2',
     tag: payload.tag || 'wgxhl-recipe',
     data: {
       ...(payload.data || {}),

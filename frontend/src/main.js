@@ -175,7 +175,7 @@ function syncThemeColor() {
 function setupShareMetadata() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
 
-  const imageUrl = new URL('/wechat-share.png', window.location.origin).href
+  const imageUrl = new URL('/wechat-share.png?v=home-v2', window.location.origin).href
   const pageUrl = window.location.href
   const imageMetaSelectors = [
     'meta[property="og:image"]',

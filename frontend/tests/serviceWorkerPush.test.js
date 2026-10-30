@@ -46,3 +46,24 @@ test('failure to signal pages does not prevent system notification', async () =>
   await work
   assert.equal(state.notifications.length, 1)
 })
+
+test('activation removes old image caches without touching unrelated caches', async () => {
+  const listeners = new Map()
+  const deleted = []
+  let claimed = false
+  runInNewContext(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
+    self: {
+      addEventListener: (type, listener) => listeners.set(type, listener),
+      clients: { claim: async () => { claimed = true } },
+    },
+    caches: {
+      keys: async () => ['wgxhl-image-cache-v5', 'wgxhl-image-meta-v5', 'wgxhl-image-cache-v6', 'wgxhl-image-meta-v6', 'other-app'],
+      delete: async key => { deleted.push(key) },
+    },
+  })
+  let work
+  listeners.get('activate')({ waitUntil: promise => { work = promise } })
+  await work
+  assert.deepEqual(deleted.sort(), ['wgxhl-image-cache-v5', 'wgxhl-image-meta-v5'])
+  assert.equal(claimed, true)
+})

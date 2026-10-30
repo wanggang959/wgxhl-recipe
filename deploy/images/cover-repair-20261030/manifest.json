@@ -1,0 +1,101 @@
+{
+  "batch": "cover-repair-20261030",
+  "records": [
+    {
+      "id": "dead59361c7a44a7a5d6a6fd9567494d",
+      "name": "蒜香小龙虾",
+      "oldKey": "recipe/cover/72f8b08b-3a37-46dc-a6f6-5b3206385723.webp",
+      "objectKey": "recipe/cover/optimized-20261030/72f8b08b-3a37-46dc-a6f6-5b3206385723.webp",
+      "originalBytes": 2019153,
+      "bytes": 159786,
+      "originalSha256": "2fd72853969c968b4db817dc63450f4f4e26f084f0f1cc2caa06b6be87ce9397",
+      "sha256": "f2119c03ef6a08fcacec8585806f7b9b99f8f24306c45daad6033a7844d4dcd6",
+      "width": 1109,
+      "height": 832
+    },
+    {
+      "id": "1b2c3b0f5f284303a67b9d598172f9ab",
+      "name": "凉拌香菜黄瓜",
+      "oldKey": "recipe/cover/766a078f-204f-409f-8549-db543e6a4c55.webp",
+      "objectKey": "recipe/cover/optimized-20261030/766a078f-204f-409f-8549-db543e6a4c55.webp",
+      "originalBytes": 1420642,
+      "bytes": 113818,
+      "originalSha256": "dfe2946dd9c2078ffcae1b317da0c5d971340d79af1984a06a4a42bfbb17361d",
+      "sha256": "87a31bf5120782eb69eb3893926c3b2d9f0611122d8ab2bd2de1a47e4796e53e",
+      "width": 1014,
+      "height": 761
+    },
+    {
+      "id": "70ce5e07dc514f279671bc1535c06014",
+      "name": "香辣干锅虾",
+      "oldKey": "recipe/cover/7806f638-691b-462f-9172-0684281b4ab3.webp",
+      "objectKey": "recipe/cover/optimized-20261030/7806f638-691b-462f-9172-0684281b4ab3.webp",
+      "originalBytes": 1822273,
+      "bytes": 167236,
+      "originalSha256": "2c4591bbd4fc94390545c0645862cb3e218304df4929d5438d570c715993df0b",
+      "sha256": "0fb25359ff184fb0455b1c5d25c2089a4b475fde3448b1f0bdb50d3dcb1c6c57",
+      "width": 1109,
+      "height": 832
+    },
+    {
+      "id": "d2ab001af912422a820358e6bb92a642",
+      "name": "青椒土豆丝",
+      "oldKey": "recipe/cover/9fae68e3-c468-45d0-99eb-bc69e212d6d6.webp",
+      "objectKey": "recipe/cover/optimized-20261030/9fae68e3-c468-45d0-99eb-bc69e212d6d6.webp",
+      "originalBytes": 1273312,
+      "bytes": 80246,
+      "originalSha256": "368cbea776c4c1029095c919b8101242b96865d17e7295deff3e19dc1ed13298",
+      "sha256": "d283fd942f7d0886bcc4c9ddcd5dc4e5d8a5d09116d1ae37a00ec5fdcf286c0a",
+      "width": 1014,
+      "height": 761
+    },
+    {
+      "id": "55ca0d137d864f7bb46b3ba6c3e4416d",
+      "name": "麻辣小龙虾",
+      "oldKey": "recipe/cover/2f3a8bb4-3245-46b4-8875-ba20d7967f64.webp",
+      "objectKey": "recipe/cover/optimized-20261030/2f3a8bb4-3245-46b4-8875-ba20d7967f64.webp",
+      "originalBytes": 1892247,
+      "bytes": 136668,
+      "originalSha256": "98dba5760106ed3b74ee465a72125984bcd53425124778367d90d17e3a7a9c27",
+      "sha256": "89f3d6e5bb640053aac5f867998b89246335f9604808ee59b47d96ddddbb6da7",
+      "width": 1109,
+      "height": 832
+    },
+    {
+      "id": "adfb5e5e702649efa9e7af340b79e4bf",
+      "name": "火龙果酸奶捞",
+      "oldKey": "recipe/cover/add538cc-d70c-4a8c-8e09-7c20ad78de16.webp",
+      "objectKey": "recipe/cover/optimized-20261030/add538cc-d70c-4a8c-8e09-7c20ad78de16.webp",
+      "originalBytes": 1169231,
+      "bytes": 46792,
+      "originalSha256": "73f4252a13f186b61575eca4d0f8d500e85e980dfe148f3209e7b3bd095aa6be",
+      "sha256": "a146dc469647486a464a60f8bc4b5114a0a63679b7eb31143561eff231c6b293",
+      "width": 1109,
+      "height": 832
+    },
+    {
+      "id": "4e29fa62315745b19e7d1a3c912e1c70",
+      "name": "玉米炒火腿肠",
+      "oldKey": "recipe/cover/65399500-c6c1-4e20-b815-8e654644848c.webp",
+      "objectKey": "recipe/cover/optimized-20261030/65399500-c6c1-4e20-b815-8e654644848c.webp",
+      "originalBytes": 1424017,
+      "bytes": 70616,
+      "originalSha256": "3bcdf09aabd9bae61e1781d1c9b392ea426628d567ca391bffba63f4369c6232",
+      "sha256": "3b75f9b5a5519bebe93d06ca33ecf75ef09331dfbb694561170748cc6d00873c",
+      "width": 1109,
+      "height": 832
+    },
+    {
+      "id": "f3f74094c3804dedbe6822ffc3522440",
+      "name": "兔子面",
+      "oldKey": "recipe/cover/b00a040f-0c72-462c-9be6-01752780a8e9.webp",
+      "objectKey": "recipe/cover/optimized-20261030/b00a040f-0c72-462c-9be6-01752780a8e9.webp",
+      "originalBytes": 1821199,
+      "bytes": 116432,
+      "originalSha256": "f679339d2a98ba294085876c1803d77628e23cc4e9a023eaf5ef66ff8389890e",
+      "sha256": "25973bfa774e8bed9c4937bf145b2eed9420bc1aa52ea5538ddd5b73a07690cf",
+      "width": 1109,
+      "height": 832
+    }
+  ]
+}

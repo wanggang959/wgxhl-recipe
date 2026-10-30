@@ -64,6 +64,24 @@ class ReminderReliabilityIntegrationTest {
         verify(mail, never()).sendNotification(anyString(), any(), anyString(), anyString());
         assertEquals(1, db.queryForObject("select count(*) from notification where household_id=? and related_id=?", Integer.class, household, todo));
         assertEquals(latestRule, db.queryForObject("select rule_id from todo_send_log where household_id=? and todo_id=? and send_status='SUCCESS'", String.class, household, todo));
+        assertEquals(1, db.queryForObject("select count(*) from todo_send_log where household_id=? and todo_id=? and notify_type='coalesced' and send_status='SKIP' and rule_id=?", Integer.class, household, todo, oldRule));
+    }
+
+    @Test
+    @Transactional
+    void alreadyAcceptedOlderRuleIsNotLabeledAsCoalesced() {
+        String household=UUID.randomUUID().toString(), todo=UUID.randomUUID().toString();
+        String older=UUID.randomUUID().toString(), recent=UUID.randomUUID().toString();
+        LocalDateTime now=LocalDateTime.now().withNano(0);
+        db.update("insert into todo (id,household_id,title,category,owner_id,due_time,status,notify_site,notify_email,notify_push,create_time) values (?,?,'test','OTHER','admin-wangshifu',?,'TODO',1,0,0,?)",
+                todo,household,Timestamp.valueOf(now.plusHours(1)),Timestamp.valueOf(now.minusDays(3)));
+        for (String rule:new String[]{older,recent}) db.update("insert into todo_notice_rule (id,household_id,todo_id,before_type,before_minutes,create_time) values (?,?,?,'BEFORE',?,?)",
+                rule,household,todo,rule.equals(older)?180:120,Timestamp.valueOf(now.minusDays(3)));
+        db.update("insert into todo_send_log (id,household_id,todo_id,rule_id,notify_type,send_status,send_time) values (?,?,?,?,'site','SUCCESS',?)",
+                UUID.randomUUID().toString(),household,todo,older,Timestamp.valueOf(now.minusHours(2)));
+        TenantContext.set(household);
+        assertEquals(1,todos.scanAndNotify(now.minusDays(1),now));
+        assertEquals(0,db.queryForObject("select count(*) from todo_send_log where household_id=? and notify_type='coalesced'",Integer.class,household));
     }
 
     @Test
@@ -79,8 +97,8 @@ class ReminderReliabilityIntegrationTest {
         doThrow(new RetryableMailException("test")).doNothing().when(mail)
                 .sendNotification(anyString(), any(), anyString(), anyString());
         TenantContext.set(household);
-        assertThrows(IllegalStateException.class, () -> todos.scanAndNotify(now.minusDays(1), now));
-        db.update("update todo_delivery_guard set update_time=? where household_id=?", Timestamp.valueOf(now.minusMinutes(2)), household);
+        assertThrows(PendingReminderRetryException.class, () -> todos.scanAndNotify(now.minusDays(1), now));
+        db.update("update todo_delivery_guard set update_time=?,next_retry_time=? where household_id=?", Timestamp.valueOf(now.minusMinutes(2)), Timestamp.valueOf(now.minusMinutes(1)), household);
         assertEquals(1, todos.scanAndNotify(now.minusDays(1), now));
         assertEquals(0, todos.scanAndNotify(now.minusDays(1), now));
         verify(mail, times(2)).sendNotification(anyString(), any(), anyString(), anyString());

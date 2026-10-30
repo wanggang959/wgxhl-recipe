@@ -42,11 +42,11 @@ class PlatformAdminPermissionTest {
         other.setId("other-id"); other.setStatus("normal"); other.setUserRole("super_admin");
         when(users.selectById("other-id")).thenReturn(other);
         when(jwtUtil.isVersionCurrent(jwt, other)).thenReturn(true);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/recipe/platform-admin/summary");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/recipe/platform-admin/notices/recover");
         request.addHeader("Authorization", "Bearer token");
         MockHttpServletResponse response = new MockHttpServletResponse();
         HandlerMethod handler = new HandlerMethod(mock(PlatformAdminController.class),
-                PlatformAdminController.class.getMethod("summary"));
+                PlatformAdminController.class.getMethod("recover", com.wgxhl.recipe.todo.dto.ReminderRecoveryDTO.class));
         assertFalse(interceptor.preHandle(request, response, handler));
         assertEquals(403, new ObjectMapper().readTree(response.getContentAsString()).get("status").asInt());
         verifyNoInteractions(members);

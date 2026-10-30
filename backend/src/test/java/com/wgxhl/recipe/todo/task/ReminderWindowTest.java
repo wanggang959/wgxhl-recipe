@@ -20,6 +20,7 @@ class ReminderWindowTest {
         TodoNoticeRule recent = rule(120, now.minusDays(10));
         TodoNoticeRule future = rule(0, now.minusDays(10));
         assertSame(recent, ReminderWindow.latestEligible(todo, Arrays.asList(old, future, recent), now.minusDays(1), now));
+        assertEquals(Arrays.asList(old, recent), ReminderWindow.eligible(todo, Arrays.asList(old, future, recent), now.minusDays(1), now));
     }
 
     @Test

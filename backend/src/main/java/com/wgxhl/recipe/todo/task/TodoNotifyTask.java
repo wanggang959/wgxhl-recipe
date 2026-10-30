@@ -48,6 +48,12 @@ public class TodoNotifyTask {
                         LocalDateTime window = from;
                         count += TenantContext.callWith(household.getId(), () -> todoService.scanAndNotify(window, now));
                         coordinator.markSuccess(household.getId(), now);
+                    } catch (PendingReminderRetryException pending) {
+                        if (from != null) {
+                            try { coordinator.retainWindow(household.getId(), from); }
+                            catch (Exception ex) { log.error("Could not retain retry window for household={}", household.getId(), ex); }
+                        }
+                        log.info("Todo notify household={} is waiting for a bounded retry", household.getId());
                     } catch (Exception ex) {
                         if (from != null) {
                             try { coordinator.retainWindow(household.getId(), from); }

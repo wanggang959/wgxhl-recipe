@@ -16,7 +16,7 @@ import static org.mockito.Mockito.*;
 
 class PlatformAdminControllerTest {
     private final JdbcTemplate db = mock(JdbcTemplate.class);
-    private final PlatformAdminController controller = new PlatformAdminController(db, mock(TodoNotifyTask.class), "admin-id");
+    private final PlatformAdminController controller = new PlatformAdminController(db, mock(TodoNotifyTask.class), "admin-id", mock(com.wgxhl.recipe.todo.task.ReminderRecoveryService.class));
 
     @Test
     void cannotDisableConfiguredAdministrator() {
@@ -40,6 +40,12 @@ class PlatformAdminControllerTest {
         verify(db).queryForList(contains("from app_user u"), eq("%%"), eq("%%"), eq("%%"), eq(99980));
         assertEquals(5000, controller.notices(Integer.MAX_VALUE, "", "", "", "", "").getData().get("page"));
         assertEquals(5000, controller.uncertain(Integer.MAX_VALUE).getData().get("page"));
+    }
+
+    @Test
+    void coalescedRulesCanBeFilteredAsSkippedRecords() {
+        assertEquals(200, controller.notices(1, "SKIP", "coalesced", "", "", "").getStatus());
+        verify(db).queryForList(contains("from todo_send_log"), eq("SKIP"), eq("SKIP"), eq("coalesced"), eq("coalesced"), eq(""), eq("%%"), eq("%%"), eq(0));
     }
 
     @Test

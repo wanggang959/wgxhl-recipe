@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.todo.dto.TodoPageDTO;
 import com.wgxhl.recipe.todo.dto.TodoSummaryDTO;
+import com.wgxhl.recipe.todo.dto.ReminderRecoveryDTO;
 import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.user.entity.AppUser;
 
@@ -34,4 +35,6 @@ public interface TodoService extends IService<Todo> {
     int scanAndNotify();
 
     int scanAndNotify(LocalDateTime from, LocalDateTime now);
+
+    ApiResponse<Void> recoverReminder(ReminderRecoveryDTO request, String actorId);
 }

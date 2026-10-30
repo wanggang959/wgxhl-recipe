@@ -3,6 +3,9 @@ package com.wgxhl.recipe.admin;
 import com.wgxhl.recipe.common.ApiResponse;
 import com.wgxhl.recipe.config.AuthRequestAttributes;
 import com.wgxhl.recipe.todo.task.TodoNotifyTask;
+import com.wgxhl.recipe.todo.task.ReminderRecoveryService;
+import com.wgxhl.recipe.todo.dto.ReminderRecoveryDTO;
+import com.wgxhl.recipe.config.UserContext;
 import com.wgxhl.recipe.user.entity.AppUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,12 +27,14 @@ public class PlatformAdminController {
     private final JdbcTemplate db;
     private final TodoNotifyTask task;
     private final String adminId;
+    private final ReminderRecoveryService recovery;
 
     public PlatformAdminController(JdbcTemplate db, TodoNotifyTask task,
-            @Value("${app.platform-admin-user-id:}") String adminId) {
+            @Value("${app.platform-admin-user-id:}") String adminId, ReminderRecoveryService recovery) {
         this.db = db;
         this.task = task;
         this.adminId = adminId;
+        this.recovery = recovery;
     }
 
     @GetMapping("/access")
@@ -87,7 +92,7 @@ public class PlatformAdminController {
             @RequestParam(defaultValue = "") String to) {
         int safePage = Math.max(1, Math.min(page, 5000));
         if (!Arrays.asList("", "SUCCESS", "FAIL", "SKIP").contains(status)
-                || !Arrays.asList("", "site", "email", "push").contains(channel)) return ApiResponse.fail("筛选条件无效");
+                || !Arrays.asList("", "site", "email", "push", "coalesced").contains(channel)) return ApiResponse.fail("筛选条件无效");
         String search = keyword.trim();
         if (search.length() > 100) return ApiResponse.fail("搜索内容过长");
         String like = "%" + search.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
@@ -117,14 +122,28 @@ public class PlatformAdminController {
     @GetMapping("/notices/uncertain")
     public ApiResponse<Map<String, Object>> uncertain(@RequestParam(defaultValue = "1") int page) {
         int safePage = Math.max(1, Math.min(page, 5000));
-        String where = " where (g.status='UNKNOWN' or (g.status='IN_FLIGHT' and g.update_time < now() - interval 5 minute))";
+        String where = " where (g.status in ('UNKNOWN','REJECTED') or (g.status='FAILED' and g.attempts>=3) or (g.status='IN_FLIGHT' and g.update_time < now() - interval 5 minute))";
         Long total = db.queryForObject("select count(*) from todo_delivery_guard g" + where, Long.class);
-        List<Map<String, Object>> rows = db.queryForList("select g.todo_id, g.recipient_key, g.notify_type, g.status, g.target_time, g.update_time, u.nickname recipient_name "
-                + "from todo_delivery_guard g left join app_user u on u.id=g.recipient_key" + where
-                + " order by g.update_time desc, g.todo_id limit 20 offset ?", (safePage - 1) * 20);
+        List<Map<String, Object>> rows = db.queryForList("select g.household_id,g.todo_id,g.rule_id,g.recipient_key,g.notify_type,g.status,g.attempts, "
+                + "date_format(g.target_time,'%Y-%m-%dT%H:%i:%s.%f') target_time,date_format(g.update_time,'%Y-%m-%dT%H:%i:%s.%f') update_time, "
+                + "u.nickname recipient_name,t.title todo_title,h.household_name, "
+                + "coalesce((select l.error_msg from todo_send_log l where l.household_id=g.household_id and l.todo_id=g.todo_id "
+                + "and l.rule_id=g.rule_id and l.target_time=g.target_time and l.notify_type=g.notify_type "
+                + "and l.recipient_id <=> nullif(g.recipient_key,'') and l.send_status in ('FAIL','PENDING') "
+                + "order by l.update_time desc,l.send_time desc,l.id desc limit 1), "
+                + "case when g.status='IN_FLIGHT' then '处理中断，发送结果未知' when g.status='REJECTED' then '发送被明确拒绝，需要修正配置或收件信息' "
+                + "when g.status='FAILED' then '自动重试次数已用尽' else '平台或设备未确认接收，请先核实' end) recovery_reason "
+                + "from todo_delivery_guard g left join app_user u on u.id=g.recipient_key "
+                + "left join todo t on t.id=g.todo_id and t.household_id=g.household_id left join household h on h.id=g.household_id" + where
+                + " order by g.update_time desc,g.household_id,g.todo_id,g.rule_id,g.notify_type,g.recipient_key limit 20 offset ?", (safePage - 1) * 20);
         Map<String, Object> result = page(rows, total, safePage);
         result.put("gaps", db.queryForList("select c.household_id, h.household_name, c.last_gap_start, c.last_gap_end from todo_scan_checkpoint c left join household h on h.id=c.household_id where c.last_gap_start is not null order by c.last_gap_end desc limit 20"));
         return ApiResponse.success(result);
+    }
+
+    @PostMapping("/notices/recover")
+    public ApiResponse<Void> recover(@RequestBody ReminderRecoveryDTO request) {
+        return recovery.recover(request, UserContext.requireUserId());
     }
 
     private long count(String sql) { return Objects.requireNonNull(db.queryForObject(sql, Long.class)); }

@@ -161,6 +161,27 @@ class MailDeliveryServiceTest {
     }
 
     @Test
+    void temporaryProviderBlockWaitsTenMinutes() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("temporary", "request-id", "FailedOperation.TemporaryBlocked"));
+        RetryableMailException error = assertThrows(RetryableMailException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+        assertEquals(10, error.getRetryAfterMinutes());
+    }
+
+    @Test
+    void explicitPermanentRejectionDoesNotBecomeAnUnknownTimeout() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("invalid", "request-id", "FailedOperation.InvalidTemplateID"));
+        assertThrows(PermanentMailException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+    }
+
+    @Test
+    void timeoutOrUncorrelatedErrorIsNeverAutomaticallyRetryable() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("timeout", "", "RequestLimitExceeded"));
+        MailSendException error = assertThrows(MailSendException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+        assertFalse(error instanceof RetryableMailException);
+        assertFalse(error instanceof PermanentMailException);
+    }
+
+    @Test
     void explicitSmtpRetainsPlaintextCodeAndSender() {
         properties.setProvider(MailProperties.Provider.SMTP);
         properties.setFrom("");

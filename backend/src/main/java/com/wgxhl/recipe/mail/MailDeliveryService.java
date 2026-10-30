@@ -108,7 +108,7 @@ public class MailDeliveryService {
     }
 
     private void send(Kind kind, String recipient, String subject, String text, Map<String, String> variables) {
-        if (!isReady(kind)) throw new MailSendException("邮箱服务或邮件模板未配置");
+        if (!isReady(kind)) throw new PermanentMailException("邮箱服务或邮件模板未配置");
         if (properties.getProvider() == MailProperties.Provider.SMTP) {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(smtpFrom());
@@ -130,12 +130,24 @@ public class MailDeliveryService {
             SendEmailResponse response = ses.SendEmail(request);
             recordMessage(recipient, kind, response == null ? null : response.getMessageId());
         } catch (JsonProcessingException ex) {
-            throw new MailSendException("邮件模板参数生成失败");
+            throw new PermanentMailException("邮件模板参数生成失败");
         } catch (TencentCloudSDKException ex) {
             // SDK messages may include template data containing verification codes or reset links.
             log.warn("SES delivery failed, kind={}, code={}, requestId={}", kind, ex.getErrorCode(), ex.getRequestId());
-            if (StringUtils.hasText(ex.getRequestId()) && "RequestLimitExceeded".equals(ex.getErrorCode())) {
-                throw new RetryableMailException("邮件服务暂时拒绝请求，请稍后重试");
+            String code = ex.getErrorCode() == null ? "" : ex.getErrorCode();
+            if (StringUtils.hasText(ex.getRequestId())) {
+                if ("RequestLimitExceeded".equals(code) || code.startsWith("RequestLimitExceeded.")) {
+                    throw new RetryableMailException("邮件服务暂时拒绝请求，请稍后重试");
+                }
+                if ("FailedOperation.TemporaryBlocked".equals(code)) {
+                    throw new RetryableMailException("收件服务商临时限流，十分钟后重试", 10);
+                }
+                if (code.startsWith("InvalidParameter") || code.startsWith("MissingParameter") || code.startsWith("AuthFailure")
+                        || java.util.Arrays.asList("FailedOperation.InvalidTemplateID", "FailedOperation.NotAuthenticatedSender",
+                        "FailedOperation.InsufficientQuota", "FailedOperation.InsufficientBalance", "FailedOperation.ReceiverHasUnsubscribed",
+                        "FailedOperation.WrongContentJson", "FailedOperation.WithOutPermission", "OperationDenied").contains(code)) {
+                    throw new PermanentMailException("邮件平台已拒绝请求，请检查模板、额度或收件信息");
+                }
             }
             throw new MailSendException("邮件发送失败，请稍后重试");
         }
@@ -157,7 +169,7 @@ public class MailDeliveryService {
             }
         }
         if (result.getBytes(StandardCharsets.UTF_8).length > 800) {
-            throw new MailSendException("邮件模板参数过长");
+            throw new PermanentMailException("邮件模板参数过长");
         }
         return result;
     }

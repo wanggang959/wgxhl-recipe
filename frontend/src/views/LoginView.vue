@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { guestLogin as guestLoginApi, login, previewUserByUsername } from '../api/user'
 import { useUserStore } from '../stores/user'
 import { userAvatarSrc } from '../utils/avatar'
+import { navigateAfterLogin } from '../utils/loginRedirect'
 
 const REMEMBER_USERNAME_KEY = 'wgxhl_recipe_login_username'
 
@@ -73,11 +74,6 @@ onMounted(() => {
   }
 })
 
-function getRedirectTarget() {
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-  return redirect && redirect.startsWith('/') ? redirect : '/recipes'
-}
-
 async function submit() {
   if (!form.username.trim() || !form.password.trim()) {
     showStatus('请输入用户名或邮箱和密码', 'error')
@@ -94,7 +90,7 @@ async function submit() {
     saveRememberedUsername()
     showStatus('登录成功，正在进入生活助手...')
     setTimeout(() => {
-      router.replace(getRedirectTarget())
+      navigateAfterLogin(route.query.redirect, router, window.location)
     }, 260)
   } catch (error) {
     showStatus(error.message || '您的帐号已被禁用，请联系王师傅处理', 'error')
@@ -110,7 +106,7 @@ async function guestLogin() {
     userStore.setUser(res.data)
     showStatus('欢迎随便逛逛～')
     setTimeout(() => {
-      router.replace(getRedirectTarget())
+      navigateAfterLogin(route.query.redirect, router, window.location)
     }, 200)
   } catch (error) {
     showStatus(error.message || '当前系统已禁止游客登录，请联系管理员处理', 'error')

@@ -14,6 +14,9 @@ import com.wgxhl.recipe.push.service.UserPushSubscriptionService;
 import com.wgxhl.recipe.todo.dto.TodoPageDTO;
 import com.wgxhl.recipe.todo.dto.TodoSummaryDTO;
 import com.wgxhl.recipe.todo.entity.Todo;
+import com.wgxhl.recipe.todo.dto.ReminderRecoveryDTO;
+import com.wgxhl.recipe.todo.task.PendingReminderRetryException;
+import com.wgxhl.recipe.mail.PermanentMailException;
 import com.wgxhl.recipe.todo.entity.TodoNoticeRule;
 import com.wgxhl.recipe.todo.entity.TodoOwner;
 import com.wgxhl.recipe.todo.entity.TodoSendLog;
@@ -51,6 +54,7 @@ import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -446,8 +450,14 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         boolean scanFailed = false;
         for (Todo todo : todos) {
             try {
-                TodoNoticeRule rule = ReminderWindow.latestEligible(todo, selectRules(todo.getId()), from, now);
+                List<TodoNoticeRule> rules = selectRules(todo.getId());
+                TodoNoticeRule rule = ReminderWindow.latestEligible(todo, rules, from, now);
                 if (rule == null) continue;
+                for (TodoNoticeRule earlier : ReminderWindow.eligible(todo, rules, from, now)) {
+                    if (Objects.equals(earlier.getId(), rule.getId())) continue;
+                    LocalDateTime earlierTarget = todo.getDueTime().minusMinutes(Math.max(0, earlier.getBeforeMinutes() == null ? 0 : earlier.getBeforeMinutes()));
+                    if (!hasSent(todo.getId(), earlier.getId(), earlierTarget)) deliveryGuard.recordCoalesced(todo, earlier, earlierTarget, rule);
+                }
                 LocalDateTime targetTime = todo.getDueTime().minusMinutes(Math.max(0, rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes()));
                 if (hasLegacySuccess(todo.getId(), rule.getId(), targetTime)) continue;
                 count += sendByRule(todo, rule, targetTime);
@@ -457,7 +467,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                 log.error("Todo notify scan failed, todoId={}", todo.getId(), ex);
             }
         }
-        if (retryPending || scanFailed) throw new IllegalStateException("Reminder scan has unfinished deliveries");
+        if (scanFailed) throw new IllegalStateException("Reminder scan has unfinished deliveries");
+        if (retryPending) throw new PendingReminderRetryException();
         syncAllBirthdayTodos();
         syncSolarYearlyBirthdayTodos();
         syncLunarYearlyTodos();
@@ -531,8 +542,12 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                     log.info("Todo email sent, todoId={}, owner={}, to={}", todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()));
                     sent++;
                 } catch (Exception ex) {
-                    deliveryGuard.finish(todo, rule, targetTime, NOTICE_EMAIL, owner,
-                            ex instanceof RetryableMailException || owner == null || !StringUtils.hasText(owner.getEmail()) ? "FAILED" : "UNKNOWN");
+                    if (ex instanceof RetryableMailException) {
+                        deliveryGuard.retryLater(todo, rule, targetTime, NOTICE_EMAIL, owner, ((RetryableMailException) ex).getRetryAfterMinutes());
+                    } else {
+                        deliveryGuard.finish(todo, rule, targetTime, NOTICE_EMAIL, owner,
+                                ex instanceof PermanentMailException || owner == null || !StringUtils.hasText(owner.getEmail()) ? "REJECTED" : "UNKNOWN");
+                    }
                     log.warn("Todo email failed, todoId={}, owner={}, to={}, reason={}",
                             todo.getId(), ownerLabel(owner), maskEmail(owner == null ? null : owner.getEmail()), ex.getMessage(), ex);
                     logSend(todo, rule, targetTime, owner, NOTICE_EMAIL, "FAIL", ex.getMessage());
@@ -585,6 +600,47 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             }
         }
         return sent;
+    }
+
+    @Override
+    public ApiResponse<Void> recoverReminder(ReminderRecoveryDTO r, String actor) {
+        if (r == null || !r.valid() || !StringUtils.hasText(actor)) return ApiResponse.fail("处理参数无效");
+        if ("CLOSE".equals(r.getAction())) {
+            String id = deliveryGuard.beginRecovery(r, actor);
+            return id == null ? ApiResponse.fail("记录已变化或正在处理，请刷新") : ApiResponse.success("已关闭，不会补发该条提醒", null);
+        }
+        Todo todo = super.getById(r.getTodoId());
+        TodoNoticeRule rule = todoNoticeRuleMapper.selectById(r.getRuleId());
+        if (todo == null || !STATUS_TODO.equals(todo.getStatus()) || todo.getDueTime() == null
+                || rule == null || !todo.getId().equals(rule.getTodoId())
+                || !todo.getDueTime().minusMinutes(Math.max(0, rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes())).equals(r.getTargetTime())
+                || r.getTargetTime().isAfter(LocalDateTime.now())) return ApiResponse.fail("待办或规则已变化，不能补发旧周期，请刷新核实后关闭记录");
+        AppUser owner = resolveOwners(todo).stream().filter(u -> r.getRecipientId().equals(u.getId())).findFirst().orElse(null);
+        if (owner == null || !"normal".equals(owner.getStatus())
+                || !householdMemberService.listUserIds(TenantContext.require()).contains(owner.getId())
+                || !allowNotify(owner, r.getChannel())) return ApiResponse.fail("接收人已失效或关闭了此通知方式");
+        boolean enabled = NOTICE_SITE.equals(r.getChannel()) ? Boolean.TRUE.equals(todo.getNotifySite())
+                : NOTICE_EMAIL.equals(r.getChannel()) ? Boolean.TRUE.equals(todo.getNotifyEmail()) : Boolean.TRUE.equals(todo.getNotifyPush());
+        if (!enabled) return ApiResponse.fail("待办已关闭此通知方式");
+        if (NOTICE_EMAIL.equals(r.getChannel()) && !StringUtils.hasText(owner.getEmail())) return ApiResponse.fail("负责人邮箱未配置");
+        String auditId = deliveryGuard.beginRecovery(r, actor);
+        if (auditId == null) return ApiResponse.fail("记录已变化或正在处理，请刷新");
+        try {
+            if (NOTICE_SITE.equals(r.getChannel())) notificationService.createSiteNotice(owner.getId(), todo.getTitle(), buildNoticeContent(todo), "TODO", todo.getId());
+            else if (NOTICE_EMAIL.equals(r.getChannel())) sendEmail(owner, todo);
+            else if (userPushSubscriptionService.sendToUserIds(Collections.singletonList(owner.getId()), todo.getTitle(), buildNoticeContent(todo),
+                    "/#/todo/" + todo.getId(), "todo-" + todo.getId() + "-" + rule.getId()) == 0) {
+                deliveryGuard.finishRecovery(r, auditId, "UNKNOWN", "推送服务未确认接收，请核实设备");
+                return ApiResponse.fail("未确认送达，请核实设备后再决定是否补发");
+            }
+        } catch (Exception ex) {
+            deliveryGuard.finishRecovery(r, auditId, ex instanceof RetryableMailException || ex instanceof PermanentMailException ? "REJECTED" : "UNKNOWN", "补发未确认成功，请核查接收记录");
+            log.warn("Manual reminder delivery uncertain, actor={}, todo={}, channel={}", actor, todo.getId(), r.getChannel());
+            return ApiResponse.fail("补发未确认成功，请先核实，系统不会自动再次补发");
+        }
+        deliveryGuard.finishRecovery(r, auditId, "SUCCESS", "补发已提交，平台接收不代表最终送达");
+        log.info("Manual reminder delivery accepted, actor={}, todo={}, channel={}", actor, todo.getId(), r.getChannel());
+        return ApiResponse.success("补发已提交，请核查接收情况", null);
     }
 
     private void markSkipped(Todo todo, TodoNoticeRule rule, LocalDateTime target, String channel, AppUser owner) {

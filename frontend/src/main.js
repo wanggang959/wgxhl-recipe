@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, defineAsyncComponent } from 'vue'
 import { createPinia } from 'pinia'
 import 'vant/lib/index.css'
 import './style.css'
@@ -12,22 +12,23 @@ setupShareMetadata()
 setupMobileZoomLock()
 setupViewportMetrics()
 
-const app = createApp(App)
+const isPlatformAdmin = /^\/admin\/?$/.test(window.location.pathname)
+const app = createApp(isPlatformAdmin ? defineAsyncComponent(() => import('./views/PlatformAdmin.vue')) : App)
 const pinia = createPinia()
 
 app.use(pinia)
-app.use(router)
+if (!isPlatformAdmin) app.use(router)
 
 const userStore = useUserStore(pinia)
 userStore.restore()
 
 let pendingNotificationPath = readPendingNotificationPath()
 
-setupNotificationNavigation()
+if (!isPlatformAdmin) setupNotificationNavigation()
 
 app.mount('#app')
 
-if (pendingNotificationPath) {
+if (!isPlatformAdmin && pendingNotificationPath) {
   navigateFromNotification(pendingNotificationPath)
   pendingNotificationPath = null
 }
@@ -174,7 +175,7 @@ function syncThemeColor() {
 function setupShareMetadata() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
 
-  const imageUrl = new URL('/wechat-share.png', window.location.origin).href
+  const imageUrl = new URL('/wechat-share.png?v=home-v2', window.location.origin).href
   const pageUrl = window.location.href
   const imageMetaSelectors = [
     'meta[property="og:image"]',

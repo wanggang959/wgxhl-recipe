@@ -24,6 +24,7 @@ import com.wgxhl.recipe.recipe.entity.RecipeLike;
 import com.wgxhl.recipe.recipe.mapper.RecipeLikeMapper;
 import com.wgxhl.recipe.recipe.mapper.RecipeMapper;
 import com.wgxhl.recipe.recipe.service.RecipeService;
+import com.wgxhl.recipe.recipe.service.RecipeOwnershipGuard;
 import com.wgxhl.recipe.recipe.util.RecipeVersionUtil;
 import com.wgxhl.recipe.recipe.vo.RecipeDetailVO;
 import com.wgxhl.recipe.recipe.vo.RecipeLikeStateVO;
@@ -45,6 +46,7 @@ import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
 import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -56,6 +58,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
@@ -77,6 +80,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private final IngredientMapper ingredientMapper;
     private final SeasoningMapper seasoningMapper;
     private final RecipeLikeMapper recipeLikeMapper;
+    private final RecipeOwnershipGuard ownershipGuard;
 
     public RecipeServiceImpl(RecipeCategoryService recipeCategoryService,
                              RecipeStepService recipeStepService,
@@ -90,7 +94,8 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                              HouseholdMemberService householdMemberService,
                              IngredientMapper ingredientMapper,
                              SeasoningMapper seasoningMapper,
-                             RecipeLikeMapper recipeLikeMapper) {
+                             RecipeLikeMapper recipeLikeMapper,
+                             RecipeOwnershipGuard ownershipGuard) {
         this.recipeCategoryService = recipeCategoryService;
         this.recipeStepService = recipeStepService;
         this.recipeImageService = recipeImageService;
@@ -104,6 +109,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         this.ingredientMapper = ingredientMapper;
         this.seasoningMapper = seasoningMapper;
         this.recipeLikeMapper = recipeLikeMapper;
+        this.ownershipGuard = ownershipGuard;
     }
 
     @Override
@@ -111,6 +117,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         if (!StringUtils.hasText(entity.getId())) {
             entity.setId(IdUtil.simpleUUID());
         }
+        entity.setRandomKey(ThreadLocalRandom.current().nextLong(1L, 1_000_000_001L));
         LocalDateTime now = LocalDateTime.now();
         entity.setCreateTime(now);
         entity.setUpdateTime(now);
@@ -168,9 +175,13 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
                 .like(StringUtils.hasText(dto.getCategoryName()), Recipe::getCategoryName, dto.getCategoryName())
                 .eq(StringUtils.hasText(dto.getDifficulty()), Recipe::getDifficulty, dto.getDifficulty())
                 .like(StringUtils.hasText(dto.getTaste()), Recipe::getTaste, dto.getTaste());
-        applySort(wrapper, dto.getSort());
-
-        Page<Recipe> result = page(page, wrapper);
+        Page<Recipe> result;
+        if ("random".equals(dto.getSort())) {
+            result = randomPage(page, wrapper, dto.getRandomPivot());
+        } else {
+            applySort(wrapper, dto.getSort());
+            result = page(page, wrapper);
+        }
         fillLiked(result.getRecords(), currentUserId);
         fillFavoriteCounts(result.getRecords());
         fillPersonalStates(result.getRecords(), currentUserId);
@@ -201,6 +212,13 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
 
     private void fillPersonalStates(List<Recipe> records, String userId) {
         if (records == null || records.isEmpty()) return;
+        if (!StringUtils.hasText(userId) || "guest".equals(userId)) {
+            records.forEach(recipe -> {
+                recipe.setFavorite(false);
+                recipe.setWanted(false);
+            });
+            return;
+        }
         List<String> ids = records.stream().map(Recipe::getId).filter(StringUtils::hasText).collect(Collectors.toList());
         if (ids.isEmpty()) return;
         Set<String> favorites = userFavoriteMapper.selectList(new LambdaQueryWrapper<UserFavorite>()
@@ -218,14 +236,36 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     private void applySort(LambdaQueryWrapper<Recipe> wrapper, String sort) {
         String value = StringUtils.hasText(sort) ? sort : "latest";
         if ("likes_desc".equals(value)) {
-            wrapper.orderByDesc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime);
+            wrapper.orderByDesc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         } else if ("likes_asc".equals(value)) {
-            wrapper.orderByAsc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime);
-        } else if ("random".equals(value)) {
-            wrapper.last("order by rand()");
+            wrapper.orderByAsc(Recipe::getLikeCount).orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         } else {
-            wrapper.orderByDesc(Recipe::getCreateTime);
+            wrapper.orderByDesc(Recipe::getCreateTime).orderByDesc(Recipe::getId);
         }
+    }
+
+    private Page<Recipe> randomPage(Page<Recipe> result, LambdaQueryWrapper<Recipe> filter, Long requestedPivot) {
+        long pivot = requestedPivot == null ? 1L : Math.max(1L, Math.min(requestedPivot, 1_000_000_000L));
+        long total = baseMapper.selectCount(filter.clone());
+        result.setTotal(total);
+        if (total == 0) return result;
+        long upperCount = baseMapper.selectCount(filter.clone().ge(Recipe::getRandomKey, pivot));
+        long offset = (result.getCurrent() - 1) * result.getSize();
+        long remaining = result.getSize();
+        List<Recipe> records = new java.util.ArrayList<>();
+        if (offset < upperCount) {
+            long count = Math.min(remaining, upperCount - offset);
+            records.addAll(baseMapper.selectList(filter.clone().ge(Recipe::getRandomKey, pivot)
+                    .orderByAsc(Recipe::getRandomKey, Recipe::getId).last("LIMIT " + offset + "," + count)));
+            remaining -= count;
+        }
+        if (remaining > 0) {
+            long lowerOffset = Math.max(0L, offset - upperCount);
+            records.addAll(baseMapper.selectList(filter.clone().lt(Recipe::getRandomKey, pivot)
+                    .orderByAsc(Recipe::getRandomKey, Recipe::getId).last("LIMIT " + lowerOffset + "," + remaining)));
+        }
+        result.setRecords(records);
+        return result;
     }
 
     /**
@@ -345,9 +385,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     }
 
     private String detailVisibilityError(Recipe recipe) {
-        if (recipe == null || !canView(recipe)) return "菜谱不存在";
-        if (STATUS_OFF.equals(recipe.getStatus()) && !canViewOffline(recipe)) return "这道菜已被下架";
-        return null;
+        return ownershipGuard.checkReadable(recipe);
     }
 
     @Override
@@ -438,8 +476,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
      * 已下架的菜谱：作者本人仍可打开查看，超管也可以。
      */
     private boolean canViewOffline(Recipe recipe) {
-        return UserContext.isSuperAdmin()
-                || UserContext.requireUserId().equals(recipe.getOwnerUserId());
+        return ownershipGuard.canViewOffline(recipe);
     }
 
     @Override
@@ -460,6 +497,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         save(recipe);
         ApiResponse<Void> saveChildrenResult = saveChildren(recipe.getId(), dto);
         if (saveChildrenResult.getStatus() != 200) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return ApiResponse.fail(saveChildrenResult.getMessage());
         }
         return ApiResponse.success("保存成功", buildDetailVO(recipe));
@@ -484,6 +522,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         }
         recipe.setOwnerUserId(existing.getOwnerUserId());
         recipe.setOwnerName(existing.getOwnerName());
+        recipe.setRandomKey(existing.getRandomKey());
         if (!StringUtils.hasText(recipe.getVisibility())) {
             recipe.setVisibility(existing.getVisibility());
         }
@@ -497,6 +536,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
         updateById(recipe);
         ApiResponse<Void> saveChildrenResult = saveChildren(recipe.getId(), dto);
         if (saveChildrenResult.getStatus() != 200) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return ApiResponse.fail(saveChildrenResult.getMessage());
         }
         return ApiResponse.success("更新成功", null);
@@ -563,18 +603,7 @@ public class RecipeServiceImpl extends ServiceImpl<RecipeMapper, Recipe>
     }
 
     private boolean canView(Recipe recipe) {
-        String currentUserId = UserContext.requireUserId();
-        if (currentUserId.equals(recipe.getOwnerUserId())) {
-            return true;
-        }
-        if ("public".equals(recipe.getVisibility())) {
-            return true;
-        }
-        if (!"family".equals(recipe.getVisibility())) {
-            return false;
-        }
-        return householdMemberService.listUserIds(TenantContext.require())
-                .contains(recipe.getOwnerUserId());
+        return ownershipGuard.canView(recipe);
     }
 
     private ApiResponse<Void> validateRecipe(Recipe recipe, String excludeId, List<RecipeStep> stepList) {

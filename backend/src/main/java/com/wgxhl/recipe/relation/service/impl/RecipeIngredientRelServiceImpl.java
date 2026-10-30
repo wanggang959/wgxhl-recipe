@@ -55,6 +55,8 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
         if (!StringUtils.hasText(recipeId)) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkReadable(recipeId);
+        if (denied != null) return ApiResponse.fail(403, denied);
         List<RecipeIngredientRel> list = lambdaQuery()
                 .eq(RecipeIngredientRel::getRecipeId, recipeId)
                 .orderByAsc(RecipeIngredientRel::getSortNo)
@@ -103,6 +105,10 @@ public class RecipeIngredientRelServiceImpl extends ServiceImpl<RecipeIngredient
         if (denied != null) {
             return ApiResponse.fail(403, denied);
         }
+        if (StringUtils.hasText(entity.getRecipeId()) && !existing.getRecipeId().equals(entity.getRecipeId())) {
+            return ApiResponse.fail(403, "不能更换所属菜谱");
+        }
+        entity.setRecipeId(existing.getRecipeId());
         if (StringUtils.hasText(entity.getIngredientId())
                 && !entity.getIngredientId().equals(existing.getIngredientId())) {
             ApiResponse<Void> fillResult = fillIngredientName(entity);

@@ -19,10 +19,12 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.util.HtmlUtils;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class MailDeliveryService {
@@ -106,7 +108,7 @@ public class MailDeliveryService {
     }
 
     private void send(Kind kind, String recipient, String subject, String text, Map<String, String> variables) {
-        if (!isReady(kind)) throw new MailSendException("邮箱服务或邮件模板未配置");
+        if (!isReady(kind)) throw new PermanentMailException("邮箱服务或邮件模板未配置");
         if (properties.getProvider() == MailProperties.Provider.SMTP) {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(smtpFrom());
@@ -123,17 +125,53 @@ public class MailDeliveryService {
         Template template = new Template();
         template.setTemplateID(templateId(kind));
         try {
-            template.setTemplateData(json.writeValueAsString(variables));
+            template.setTemplateData(templateData(kind, variables));
             request.setTemplate(template);
             SendEmailResponse response = ses.SendEmail(request);
             recordMessage(recipient, kind, response == null ? null : response.getMessageId());
         } catch (JsonProcessingException ex) {
-            throw new MailSendException("邮件模板参数生成失败");
+            throw new PermanentMailException("邮件模板参数生成失败");
         } catch (TencentCloudSDKException ex) {
             // SDK messages may include template data containing verification codes or reset links.
             log.warn("SES delivery failed, kind={}, code={}, requestId={}", kind, ex.getErrorCode(), ex.getRequestId());
+            String code = ex.getErrorCode() == null ? "" : ex.getErrorCode();
+            if (StringUtils.hasText(ex.getRequestId())) {
+                if ("RequestLimitExceeded".equals(code) || code.startsWith("RequestLimitExceeded.")) {
+                    throw new RetryableMailException("邮件服务暂时拒绝请求，请稍后重试");
+                }
+                if ("FailedOperation.TemporaryBlocked".equals(code)) {
+                    throw new RetryableMailException("收件服务商临时限流，十分钟后重试", 10);
+                }
+                if (code.startsWith("InvalidParameter") || code.startsWith("MissingParameter") || code.startsWith("AuthFailure")
+                        || java.util.Arrays.asList("FailedOperation.InvalidTemplateID", "FailedOperation.NotAuthenticatedSender",
+                        "FailedOperation.InsufficientQuota", "FailedOperation.InsufficientBalance", "FailedOperation.ReceiverHasUnsubscribed",
+                        "FailedOperation.WrongContentJson", "FailedOperation.WithOutPermission", "OperationDenied").contains(code)) {
+                    throw new PermanentMailException("邮件平台已拒绝请求，请检查模板、额度或收件信息");
+                }
+            }
             throw new MailSendException("邮件发送失败，请稍后重试");
         }
+    }
+
+    private String templateData(Kind kind, Map<String, String> variables) throws JsonProcessingException {
+        if (!properties.getSes().isHtmlTemplates()) return json.writeValueAsString(variables);
+        Map<String, String> escaped = new LinkedHashMap<>();
+        variables.forEach((key, value) -> escaped.put(key, value == null ? "" : HtmlUtils.htmlEscape(value, "UTF-8")));
+        String result = json.writeValueAsString(escaped);
+        String detail = variables.get("remindDetail");
+        if (kind == Kind.NOTIFICATION && detail != null) {
+            int length = detail.codePointCount(0, detail.length());
+            while (result.getBytes(StandardCharsets.UTF_8).length > 800 && length > 0) {
+                length--;
+                String shortened = detail.substring(0, detail.offsetByCodePoints(0, length)) + "…";
+                escaped.put("remindDetail", HtmlUtils.htmlEscape(shortened, "UTF-8"));
+                result = json.writeValueAsString(escaped);
+            }
+        }
+        if (result.getBytes(StandardCharsets.UTF_8).length > 800) {
+            throw new PermanentMailException("邮件模板参数过长");
+        }
+        return result;
     }
 
     private void recordMessage(String recipient, Kind kind, String messageId) {

@@ -1,0 +1,60 @@
+package com.wgxhl.recipe.admin;
+
+import com.wgxhl.recipe.common.ApiResponse;
+import com.wgxhl.recipe.config.AuthRequestAttributes;
+import com.wgxhl.recipe.todo.task.TodoNotifyTask;
+import com.wgxhl.recipe.user.entity.AppUser;
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
+
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class PlatformAdminControllerTest {
+    private final JdbcTemplate db = mock(JdbcTemplate.class);
+    private final PlatformAdminController controller = new PlatformAdminController(db, mock(TodoNotifyTask.class), "admin-id", mock(com.wgxhl.recipe.todo.task.ReminderRecoveryService.class));
+
+    @Test
+    void cannotDisableConfiguredAdministrator() {
+        ApiResponse<Void> result = controller.status(Map.of("id", "admin-id", "status", "disabled"), new MockHttpServletRequest());
+        assertNotEquals(200, result.getStatus());
+        verifyNoInteractions(db);
+    }
+
+    @Test
+    void invalidNoticeFiltersAreRejectedWithoutQuerying() {
+        assertNotEquals(200, controller.notices(1, "FAIL", "email", "", "2026-01-02", "2026-01-01").getStatus());
+        assertNotEquals(200, controller.notices(1, "FAIL", "invalid", "", "", "").getStatus());
+        assertNotEquals(200, controller.notices(1, "FAIL", "email", "", "bad-date", "").getStatus());
+        verifyNoInteractions(db);
+    }
+
+    @Test
+    void administrationPagingClampsExtremeOffsets() {
+        when(db.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(0L);
+        assertEquals(5000, controller.users(Integer.MAX_VALUE, "").getData().get("page"));
+        verify(db).queryForList(contains("from app_user u"), eq("%%"), eq("%%"), eq("%%"), eq(99980));
+        assertEquals(5000, controller.notices(Integer.MAX_VALUE, "", "", "", "", "").getData().get("page"));
+        assertEquals(5000, controller.uncertain(Integer.MAX_VALUE).getData().get("page"));
+    }
+
+    @Test
+    void coalescedRulesCanBeFilteredAsSkippedRecords() {
+        assertEquals(200, controller.notices(1, "SKIP", "coalesced", "", "", "").getStatus());
+        verify(db).queryForList(contains("from todo_send_log"), eq("SKIP"), eq("SKIP"), eq("coalesced"), eq("coalesced"), eq(""), eq("%%"), eq("%%"), eq(0));
+    }
+
+    @Test
+    void changingStatusInvalidatesTokens() {
+        when(db.update(anyString(), any(), any(), any())).thenReturn(1);
+        AppUser actor = new AppUser(); actor.setId("admin-id");
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute(AuthRequestAttributes.CURRENT_USER, actor);
+        assertEquals(200, controller.status(Map.of("id", "user-id", "status", "disabled"), request).getStatus());
+        verify(db).update(contains("auth_version = coalesce(auth_version, 0) + 1"), eq("disabled"), eq("user-id"), eq("disabled"));
+    }
+}

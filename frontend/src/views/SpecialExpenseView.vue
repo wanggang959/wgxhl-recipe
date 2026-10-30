@@ -1,4 +1,6 @@
 <script setup>
+import { loadAllPages } from '../utils/pagination'
+import LoadMoreSentinel from '../components/LoadMoreSentinel.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import {
@@ -21,6 +23,10 @@ import { DATA_SCOPE, markDataChanged } from '../utils/dataRefresh'
 const userStore = useUserStore()
 const loading = ref(false)
 const projects = ref([])
+const itemPage = ref(0)
+const itemTotal = ref(0)
+const itemLoadingMore = ref(false)
+let itemRequestVersion = 0
 const items = ref([])
 const members = ref([])
 const selectedProjectId = ref('')
@@ -156,7 +162,7 @@ async function loadMembers() {
 async function loadProjects() {
   loading.value = true
   try {
-    const res = await pageExpenseProjects({
+    const res = await loadAllPages(pageExpenseProjects, {
       current: 1,
       size: 100,
       archived: showArchived.value ? null : false,
@@ -178,9 +184,13 @@ async function toggleShowArchived() {
   await loadProjects()
 }
 
-async function loadProjectData() {
+async function loadProjectData(append = false) {
+  if (append && itemLoadingMore.value) return
+  const version = ++itemRequestVersion
   if (!selectedProjectId.value) {
     items.value = []
+    itemPage.value = 0
+    itemTotal.value = 0
     summary.value = {
       totalBudget: 0,
       actualAmount: 0,
@@ -192,10 +202,13 @@ async function loadProjectData() {
     }
     return
   }
-  const [itemRes, summaryRes] = await Promise.all([
+  if (append) itemLoadingMore.value = true
+  const current = append ? itemPage.value + 1 : 1
+  try {
+    const [itemRes, summaryRes] = await Promise.all([
     pageExpenseItems({
-      current: 1,
-      size: 300,
+      current,
+      size: 50,
       projectId: selectedProjectId.value,
       category: itemCategoryFilter.value,
       status: itemStatusFilter.value,
@@ -205,8 +218,17 @@ async function loadProjectData() {
       status: itemStatusFilter.value,
     }),
   ])
-  items.value = itemRes.data.records || []
-  summary.value = summaryRes.data || summary.value
+    if (version !== itemRequestVersion) return
+    const records = itemRes.data.records || []
+    items.value = append ? [...items.value, ...records] : records
+    itemPage.value = current
+    itemTotal.value = Number(itemRes.data.total || 0)
+    summary.value = summaryRes.data || summary.value
+  } catch (error) {
+    if (version === itemRequestVersion) showFailToast(error.message || '开支清单加载失败')
+  } finally {
+    if (version === itemRequestVersion) itemLoadingMore.value = false
+  }
 }
 
 function resetProjectForm() {
@@ -642,6 +664,7 @@ function dateText(value) {
             </div>
           </div>
         </article>
+        <LoadMoreSentinel v-if="items.length < itemTotal" :loading="itemLoadingMore" @load="loadProjectData(true)" />
       </div>
     </template>
 

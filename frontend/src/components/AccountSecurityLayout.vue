@@ -7,7 +7,7 @@ defineProps({ title: { type: String, required: true }, back: { type: String, def
     <header class="security-header">
       <router-link :to="back" class="security-back" aria-label="返回" title="返回"><van-icon name="arrow-left" /></router-link>
       <span>家庭生活助手</span>
-      <img src="/pwa-icon-192.png" alt="" width="32" height="32" />
+      <img src="/pwa-icon-192.png?v=home-v2" alt="" width="32" height="32" />
     </header>
     <section class="security-content">
       <div class="security-heading"><van-icon name="shield-o" /><h1>{{ title }}</h1></div>

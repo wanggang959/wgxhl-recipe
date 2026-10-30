@@ -6,6 +6,7 @@ import com.wgxhl.recipe.recipe.entity.Recipe;
 import com.wgxhl.recipe.favorite.entity.UserFavorite;
 import com.wgxhl.recipe.favorite.service.UserFavoriteService;
 import com.wgxhl.recipe.recipe.dto.RecipePageDTO;
+import com.wgxhl.recipe.recipe.dto.RecipeSaveDTO;
 import com.wgxhl.recipe.recipe.service.RecipeService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import org.junit.jupiter.api.AfterEach;
@@ -132,5 +133,65 @@ class RecipeIntegrationTest {
         assertEquals(200, recipes.getDetailById(id).getStatus());
         assertEquals(1L, favorites.create(favorite).getData().getFavoriteCount());
         assertEquals(0L, favorites.deleteByRecipeId(USER, id).getData().getFavoriteCount());
+    }
+
+    @Test
+    void pagingIsBoundedAndStableWhenTimestampsMatch() {
+        String prefix = UUID.randomUUID().toString();
+        try {
+            for (int i = 0; i < 60; i++) {
+                jdbc.update("insert into recipe (id, recipe_name, recipe_version, owner_user_id, visibility, status, like_count, create_time) values (?, ?, '1.0', ?, 'public', '上架', 0, '2026-01-01 12:00:00')",
+                        UUID.randomUUID().toString(), prefix + i, USER);
+            }
+            RecipePageDTO query = new RecipePageDTO();
+            query.setScope("public"); query.setRecipeName(prefix); query.setCurrent(1L); query.setSize(100_000L);
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<Recipe> first = recipes.page(query).getData();
+            assertEquals(50, first.getRecords().size());
+            assertEquals(60, first.getTotal());
+            query.setCurrent(2L);
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<Recipe> second = recipes.page(query).getData();
+            assertEquals(10, second.getRecords().size());
+            assertEquals(60, java.util.stream.Stream.concat(first.getRecords().stream(), second.getRecords().stream())
+                    .map(Recipe::getId).distinct().count());
+        } finally {
+            jdbc.update("delete from recipe where recipe_name like ?", prefix + "%");
+        }
+    }
+
+    @Test
+    void editingPreservesServerOwnedRandomKey() {
+        jdbc.update("update recipe set random_key=123456 where id=?", id);
+        Recipe changed = new Recipe();
+        changed.setId(id);
+        changed.setRecipeName(id);
+        changed.setRandomKey(0L);
+        RecipeSaveDTO dto = new RecipeSaveDTO();
+        dto.setRecipe(changed);
+        assertEquals(200, recipes.update(dto).getStatus());
+        assertEquals(123456L, jdbc.queryForObject("select random_key from recipe where id=?", Long.class, id));
+    }
+
+    @Test
+    void randomOrderWrapsAndPaginatesWithoutDuplicates() {
+        String prefix = UUID.randomUUID().toString();
+        try {
+            for (int i = 1; i <= 60; i++) {
+                jdbc.update("insert into recipe (id, recipe_name, recipe_version, owner_user_id, visibility, status, like_count, random_key) values (?, ?, '1.0', ?, 'public', '上架', 0, ?)",
+                        UUID.randomUUID().toString(), prefix + i, USER, i);
+            }
+            jdbc.update("insert into recipe (id,recipe_name,recipe_version,owner_user_id,visibility,status,like_count,random_key) values (?,?,'1.0','other-user','private','上架',0,30)", UUID.randomUUID().toString(), prefix + "private");
+            RecipePageDTO query = new RecipePageDTO();
+            query.setScope("public"); query.setRecipeName(prefix); query.setSort("random"); query.setRandomPivot(30L); query.setSize(50L);
+            query.setCurrent(1L);
+            List<Recipe> first = recipes.page(query).getData().getRecords();
+            query.setCurrent(2L);
+            List<Recipe> second = recipes.page(query).getData().getRecords();
+            List<Recipe> all = java.util.stream.Stream.concat(first.stream(), second.stream()).collect(Collectors.toList());
+            assertEquals(60, all.size());
+            assertEquals(60, all.stream().map(Recipe::getId).distinct().count());
+            assertEquals(prefix + "30", all.get(0).getRecipeName());
+            assertEquals(prefix + "1", all.get(31).getRecipeName());
+            assertEquals(prefix + "29", all.get(59).getRecipeName());
+        } finally { jdbc.update("delete from recipe where recipe_name like ?", prefix + "%"); }
     }
 }

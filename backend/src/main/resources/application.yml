@@ -50,6 +50,8 @@ account:
     public-url: ${ACCOUNT_SECURITY_PUBLIC_URL:https://recipe.wgxhl.space}
 
 app:
+  trusted-proxy-ips: ${TRUSTED_PROXY_IPS:127.0.0.1,::1}
+  platform-admin-user-id: ${PLATFORM_ADMIN_USER_ID:}
   mail:
     provider: ${MAIL_PROVIDER:smtp}
     from: ${MAIL_FROM:}
@@ -61,6 +63,7 @@ app:
       code-template-id: ${SES_CODE_TEMPLATE_ID:0}
       reset-template-id: ${SES_RESET_TEMPLATE_ID:0}
       notification-template-id: ${SES_NOTIFICATION_TEMPLATE_ID:0}
+      html-templates: ${SES_HTML_TEMPLATES:false}
 
 push:
   vapid:

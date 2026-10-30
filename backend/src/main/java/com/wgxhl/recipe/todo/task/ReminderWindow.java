@@ -1,0 +1,40 @@
+package com.wgxhl.recipe.todo.task;
+
+import com.wgxhl.recipe.todo.entity.Todo;
+import com.wgxhl.recipe.todo.entity.TodoNoticeRule;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+
+/** Selects only the most recent eligible rule when a scan covers missed intervals. */
+public final class ReminderWindow {
+    private ReminderWindow() {}
+
+    public static TodoNoticeRule latestEligible(Todo todo, List<TodoNoticeRule> rules,
+                                                LocalDateTime from, LocalDateTime now) {
+        TodoNoticeRule selected = null;
+        LocalDateTime latest = null;
+        for (TodoNoticeRule rule : eligible(todo, rules, from, now)) {
+            int minutes = Math.max(0, rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes());
+            LocalDateTime target = todo.getDueTime().minusMinutes(minutes);
+            if (latest == null || target.isAfter(latest)) { selected = rule; latest = target; }
+        }
+        return selected;
+    }
+
+    public static List<TodoNoticeRule> eligible(Todo todo, List<TodoNoticeRule> rules,
+                                               LocalDateTime from, LocalDateTime now) {
+        if (todo == null || todo.getDueTime() == null || rules == null || from == null || now == null) return Collections.emptyList();
+        List<TodoNoticeRule> result = new ArrayList<>();
+        for (TodoNoticeRule rule : rules) {
+            int minutes = Math.max(0, rule.getBeforeMinutes() == null ? 0 : rule.getBeforeMinutes());
+            LocalDateTime target = todo.getDueTime().minusMinutes(minutes);
+            if (target.isBefore(from) || target.isAfter(now)
+                    || (todo.getCreateTime() != null && target.isBefore(todo.getCreateTime()))
+                    || (rule.getCreateTime() != null && target.isBefore(rule.getCreateTime()))) continue;
+            result.add(rule);
+        }
+        return result;
+    }
+}

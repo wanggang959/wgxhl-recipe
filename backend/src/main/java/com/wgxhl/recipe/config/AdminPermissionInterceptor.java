@@ -10,10 +10,13 @@ import com.wgxhl.recipe.household.service.HouseholdService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.method.HandlerMethod;
+import com.wgxhl.recipe.admin.PlatformAdminController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -47,6 +50,9 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
     private final AppUserMapper appUserMapper;
     private final HouseholdMemberService householdMemberService;
     private final HouseholdService householdService;
+
+    @Value("${app.platform-admin-user-id:}")
+    private String platformAdminUserId;
 
     public AdminPermissionInterceptor(ObjectMapper objectMapper,
                                       JwtAuthUtil jwtAuthUtil,
@@ -92,6 +98,12 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         request.setAttribute(AuthRequestAttributes.CURRENT_USER, currentUser);
 
         String path = normalizePath(request.getRequestURI());
+        boolean platformAdminHandler = handler instanceof HandlerMethod
+                && PlatformAdminController.class.isAssignableFrom(((HandlerMethod) handler).getBeanType());
+        if (platformAdminHandler && !isPlatformAdmin(platformAdminUserId, currentUser.getId())) {
+            writeJson(response, ApiResponse.fail(403, "无权访问系统管理后台"));
+            return false;
+        }
         if (isGuestUser(currentUser) && !isReadOnlyPath(path)) {
             writeJson(response, ApiResponse.fail(403, "游客仅可查看，无法执行此操作"));
             return false;
@@ -144,6 +156,10 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
 
     private boolean requiresSuperAdmin(String path) {
         return "/user/setStatus".equals(path);
+    }
+
+    static boolean isPlatformAdmin(String configuredId, String userId) {
+        return StringUtils.hasText(configuredId) && configuredId.equals(userId);
     }
 
     private boolean isGuestUser(AppUser user) {

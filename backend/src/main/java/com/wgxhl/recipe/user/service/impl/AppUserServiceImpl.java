@@ -275,7 +275,18 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
                 .eq(StringUtils.hasText(dto.getUserRole()), AppUser::getUserRole, dto.getUserRole())
                 .eq(StringUtils.hasText(dto.getStatus()), AppUser::getStatus, dto.getStatus())
                 .orderByDesc(AppUser::getCreateTime)
+                .orderByDesc(AppUser::getId)
                 .page(page);
+        if (UserContext.isGuest()) {
+            result.setRecords(result.getRecords().stream().map(user -> {
+                AppUser profile = new AppUser();
+                profile.setId(user.getId());
+                profile.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername());
+                profile.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getId()));
+                return profile;
+            }).collect(Collectors.toList()));
+            return ApiResponse.success(result);
+        }
         Map<String, String> roleByUser = householdMemberService.listByHousehold(householdId).stream()
                 .filter(member -> StringUtils.hasText(member.getUserId()))
                 .collect(Collectors.toMap(HouseholdMember::getUserId,
@@ -309,11 +320,24 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("用户id不能为空");
         }
+        if (UserContext.isGuest()) return ApiResponse.fail(403, "游客不能查看账号资料");
+        if (!UserContext.requireUserId().equals(id)) {
+            if (!UserContext.isHouseholdManager()) return ApiResponse.fail(403, "无权查看此账号资料");
+            HouseholdMember member = householdMemberService.find(TenantContext.require(), id);
+            if (member == null || !STATUS_NORMAL.equals(member.getStatus())) {
+                return ApiResponse.fail(403, "无权查看此账号资料");
+            }
+        }
         AppUser user = super.getById(id);
         if (user == null) {
             return ApiResponse.fail("用户不存在");
         }
         maskPassword(user);
+        user.setAuthVersion(null);
+        user.setAccountOrigin(null);
+        user.setCreatedByUserId(null);
+        user.setCreatedHouseholdId(null);
+        user.setActiveHouseholdId(null);
         return ApiResponse.success(user);
     }
 
@@ -735,6 +759,7 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
         preview.setUsername(user.getUsername());
         preview.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername());
         preview.setAvatar(DefaultAvatars.normalizeOrPick(user.getAvatar(), user.getId()));
+        if (UserContext.isGuest()) return preview;
         preview.setEmail(user.getEmail());
         preview.setBirthday(user.getBirthday());
         preview.setBirthdayCalendar(user.getBirthdayCalendar());

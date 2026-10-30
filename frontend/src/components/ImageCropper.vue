@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, reactive, ref } from 'vue'
+import { canvasToImageBlob, imageBlobToFile } from '../utils/image'
 
 const visible = ref(false)
 const frameRef = ref(null)
@@ -24,6 +25,7 @@ const dragState = reactive({
 })
 
 let resolver = null
+let rejecter = null
 
 const frameStyle = computed(() => ({
   aspectRatio: String(aspectRatio.value),
@@ -56,6 +58,7 @@ function open(file, options = {}) {
 
     cleanup()
     resolver = resolve
+    rejecter = reject
     fileName.value = file.name
     aspectRatio.value = options.aspectRatio || 1
     sourceUrl.value = URL.createObjectURL(file)
@@ -193,19 +196,13 @@ async function confirmCrop() {
     const destX = (left / frame.width) * outputWidth
     const destY = (top / frame.height) * outputHeight
     ctx.drawImage(img, destX, destY, destWidth, destHeight)
-    const blob = await new Promise((resolve) => {
-      canvas.toBlob(resolve, 'image/webp', 0.92)
-    })
-    if (!blob) {
-      resolveAndClose(null)
-      return
+    try {
+      const blob = await canvasToImageBlob(canvas, 0.92)
+      resolveAndClose(imageBlobToFile(blob, fileName.value))
+    } catch (error) {
+      if (rejecter) rejecter(error)
+      close()
     }
-
-    const croppedName = fileName.value.replace(/\.[^.]+$/, '') + '.webp'
-    resolveAndClose(new File([blob], croppedName, {
-      type: 'image/webp',
-      lastModified: Date.now(),
-    }))
   }
   img.onerror = () => resolveAndClose(null)
   img.src = sourceUrl.value
@@ -225,6 +222,7 @@ function resolveAndClose(value) {
 function close() {
   visible.value = false
   resolver = null
+  rejecter = null
   dragState.dragging = false
   cleanup()
 }

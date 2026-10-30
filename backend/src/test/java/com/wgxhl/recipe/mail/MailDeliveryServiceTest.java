@@ -93,6 +93,28 @@ class MailDeliveryServiceTest {
     }
 
     @Test
+    void htmlTemplateEscapesUserContentWithoutChangingThePlainTextMode() throws Exception {
+        properties.getSes().setHtmlTemplates(true);
+        delivery.sendNotification("user@example.test", MailDeliveryService.ReminderType.TODO,
+                "2026-10-28 09:00", "采购 <img src=x> & \"牛奶\"");
+        JsonNode variables = json.readTree(request().getTemplate().getTemplateData());
+        assertEquals("采购 &lt;img src=x&gt; &amp; &quot;牛奶&quot;", variables.get("remindDetail").asText());
+    }
+
+    @Test
+    void htmlTemplateLimitsEscapedPayloadWithoutSplittingUnicode() throws Exception {
+        properties.getSes().setHtmlTemplates(true);
+        delivery.sendNotification("user@example.test", MailDeliveryService.ReminderType.TODO,
+                "2026-10-28 09:00", "&😀".repeat(100));
+        String data = request().getTemplate().getTemplateData();
+        assertTrue(data.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 800);
+        String detail = json.readTree(data).get("remindDetail").asText();
+        assertTrue(detail.endsWith("…"));
+        assertFalse(detail.contains("�"));
+        assertFalse(detail.matches(".*&(?!amp;).*"));
+    }
+
+    @Test
     void longReminderDetailsAreLimitedToAnItemSummary() throws Exception {
         delivery.sendNotification("user@example.test", MailDeliveryService.ReminderType.MEAL_PREPARATION,
                 "2026-10-28", "菜".repeat(201));
@@ -129,6 +151,34 @@ class MailDeliveryServiceTest {
         assertNull(error.getCause());
         verify(ses, times(1)).SendEmail(any());
         verifyNoInteractions(smtp);
+    }
+
+    @Test
+    void providerExplicitRateLimitIsRetryable() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("rate limit", "request-id", "RequestLimitExceeded"));
+        assertThrows(RetryableMailException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+        verify(ses, times(1)).SendEmail(any());
+    }
+
+    @Test
+    void temporaryProviderBlockWaitsTenMinutes() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("temporary", "request-id", "FailedOperation.TemporaryBlocked"));
+        RetryableMailException error = assertThrows(RetryableMailException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+        assertEquals(10, error.getRetryAfterMinutes());
+    }
+
+    @Test
+    void explicitPermanentRejectionDoesNotBecomeAnUnknownTimeout() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("invalid", "request-id", "FailedOperation.InvalidTemplateID"));
+        assertThrows(PermanentMailException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+    }
+
+    @Test
+    void timeoutOrUncorrelatedErrorIsNeverAutomaticallyRetryable() throws Exception {
+        when(ses.SendEmail(any())).thenThrow(new TencentCloudSDKException("timeout", "", "RequestLimitExceeded"));
+        MailSendException error = assertThrows(MailSendException.class, () -> delivery.sendCode("user@example.test", "注册", "123456"));
+        assertFalse(error instanceof RetryableMailException);
+        assertFalse(error instanceof PermanentMailException);
     }
 
     @Test

@@ -85,6 +85,7 @@ public class UserWantedRecipeServiceImpl extends ServiceImpl<UserWantedRecipeMap
                 .ge(dto.getPlannedDateStart() != null, UserWantedRecipe::getPlannedDate, dto.getPlannedDateStart())
                 .orderByAsc(UserWantedRecipe::getPlannedDate)
                 .orderByDesc(UserWantedRecipe::getUpdateTime)
+                .orderByDesc(UserWantedRecipe::getId)
                 .page(page);
         return ApiResponse.success(result);
     }

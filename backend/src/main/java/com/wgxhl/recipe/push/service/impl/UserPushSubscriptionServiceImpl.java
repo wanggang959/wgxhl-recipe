@@ -17,6 +17,8 @@ import org.apache.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
@@ -31,6 +33,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Service
+@DependsOn("securityProviderConfig")
 public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscriptionMapper, UserPushSubscription>
         implements UserPushSubscriptionService {
 
@@ -90,6 +93,7 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<PushSubscriptionStatusVO> subscribe(String userId, PushSubscriptionDTO dto) {
         if (!StringUtils.hasText(userId)) {
             return ApiResponse.fail(401, "Login required");
@@ -101,6 +105,12 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
                 || !StringUtils.hasText(dto.getP256dh())
                 || !StringUtils.hasText(dto.getAuth())) {
             return ApiResponse.fail("Invalid push subscription");
+        }
+        if (!PushEndpointPolicy.isAllowed(dto.getEndpoint())) {
+            return ApiResponse.fail("不支持此推送服务地址，请使用支持通知的浏览器重新开启通知");
+        }
+        if (!validSubscriptionKeys(dto) || (dto.getUserAgent() != null && dto.getUserAgent().length() > 512)) {
+            return ApiResponse.fail("通知订阅信息无效，请重新开启通知");
         }
 
         remove(new LambdaQueryWrapper<UserPushSubscription>()
@@ -209,6 +219,10 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
     }
 
     private boolean sendToSubscription(UserPushSubscription subscription, Map<String, Object> payload) {
+        if (!PushEndpointPolicy.isAllowed(subscription.getEndpoint())) {
+            log.warn("Web Push delivery blocked, userId={}, reason=unsupported_endpoint", subscription.getUserId());
+            return false;
+        }
         try {
             String payloadJson = objectMapper.writeValueAsString(payload);
             Notification notification = new Notification(
@@ -241,6 +255,17 @@ public class UserPushSubscriptionServiceImpl extends ServiceImpl<UserPushSubscri
 
     static boolean isInvalidSubscriptionStatus(int code) {
         return code == 404 || code == 410;
+    }
+
+    private boolean validSubscriptionKeys(PushSubscriptionDTO dto) {
+        if (dto.getP256dh().length() > 100 || dto.getAuth().length() > 30) return false;
+        try {
+            byte[] publicKey = java.util.Base64.getUrlDecoder().decode(dto.getP256dh());
+            byte[] auth = java.util.Base64.getUrlDecoder().decode(dto.getAuth());
+            return publicKey.length == 65 && publicKey[0] == 4 && auth.length == 16;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     private String classifyError(HttpResponse response) {

@@ -27,11 +27,15 @@ class CompatiblePushService extends PushService {
     @Override
     public HttpPost preparePost(Notification notification, Encoding encoding)
             throws GeneralSecurityException, IOException, JoseException {
+        if (!PushEndpointPolicy.isAllowed(notification.getEndpoint())) {
+            throw new IOException("Unsupported push service endpoint");
+        }
         HttpPost post = super.preparePost(notification, encoding);
         post.setConfig(RequestConfig.custom()
                 .setConnectTimeout(10000)
                 .setConnectionRequestTimeout(10000)
                 .setSocketTimeout(10000)
+                .setRedirectsEnabled(false)
                 .build());
         if ("fcm.googleapis.com".equalsIgnoreCase(post.getURI().getHost())) {
             Header header = post.getFirstHeader("Crypto-Key");

@@ -14,65 +14,68 @@ function calculateTargetSize(width, height, maxLongEdge) {
   }
   const ratio = maxLongEdge / longEdge
   return {
-    width: Math.round(width * ratio),
-    height: Math.round(height * ratio),
+    width: Math.max(1, Math.round(width * ratio)),
+    height: Math.max(1, Math.round(height * ratio)),
   }
+}
+
+export async function canvasToImageBlob(canvas, quality = 0.84) {
+  const encode = type => new Promise(resolve => canvas.toBlob(resolve, type, quality))
+  const webp = await encode('image/webp')
+  if (webp?.type === 'image/webp') return webp
+  const jpeg = await encode('image/jpeg')
+  if (jpeg?.type === 'image/jpeg') return jpeg
+  throw new Error('当前浏览器无法压缩图片，请更换浏览器后重试')
+}
+
+export function imageBlobToFile(blob, name) {
+  const extension = { 'image/webp': 'webp', 'image/jpeg': 'jpg' }[blob.type]
+  if (!extension) throw new Error('图片编码格式不受支持')
+  return new File([blob], name.replace(/\.[^.]+$/, '') + '.' + extension, {
+    type: blob.type,
+    lastModified: Date.now(),
+  })
 }
 
 export async function transcodeImageToWebp(file, options = {}) {
   const {
-    maxLongEdge = 2048,
-    quality = 0.86,
+    maxLongEdge = 1600,
+    quality = 0.84,
     minCompressBytes = 300 * 1024,
+    maxBytes = 512 * 1024,
   } = options
 
   if (!(file instanceof File) || !file.type.startsWith('image/')) {
     return file
   }
 
-  // 小图不做处理，避免无谓耗时与可能的质量损失。
-  if (file.size <= minCompressBytes) {
-    return file
-  }
-
   const objectUrl = URL.createObjectURL(file)
   try {
     const img = await loadImage(objectUrl)
-    const target = calculateTargetSize(img.naturalWidth, img.naturalHeight, maxLongEdge)
+    let edge = Math.min(maxLongEdge, Math.max(img.naturalWidth, img.naturalHeight))
+    if (file.size <= minCompressBytes && file.size <= maxBytes
+        && Math.max(img.naturalWidth, img.naturalHeight) <= maxLongEdge) return file
     const canvas = document.createElement('canvas')
-    canvas.width = target.width
-    canvas.height = target.height
     const ctx = canvas.getContext('2d')
-    if (!ctx) {
-      return file
+    if (!ctx) throw new Error('当前浏览器无法处理图片')
+    const qualities = [...new Set([quality, Math.min(quality, 0.74), Math.min(quality, 0.64)])]
+    while (true) {
+      const target = calculateTargetSize(img.naturalWidth, img.naturalHeight, edge)
+      canvas.width = target.width
+      canvas.height = target.height
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(0, 0, target.width, target.height)
+      ctx.drawImage(img, 0, 0, target.width, target.height)
+      for (const q of qualities) {
+        const blob = await canvasToImageBlob(canvas, q)
+        if (blob.size <= maxBytes) return imageBlobToFile(blob, file.name)
+      }
+      if (edge <= 480) break
+      edge = Math.max(480, Math.floor(edge * 0.8))
     }
-
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, 0, 0, target.width, target.height)
-
-    const blob = await new Promise((resolve) => {
-      canvas.toBlob(resolve, 'image/webp', quality)
-    })
-
-    if (!blob) {
-      return file
-    }
-
-    const webpName = file.name.replace(/\.[^.]+$/, '') + '.webp'
-    const webpFile = new File([blob], webpName, {
-      type: 'image/webp',
-      lastModified: Date.now(),
-    })
-
-    // 如果转码后反而更大，回退原图。
-    if (webpFile.size >= file.size) {
-      return file
-    }
-
-    return webpFile
-  } catch (error) {
-    return file
+    throw new Error('图片压缩后仍然过大，请选择其他图片')
   } finally {
     URL.revokeObjectURL(objectUrl)
   }

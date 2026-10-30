@@ -1,4 +1,5 @@
 <script setup>
+import { loadAllPages } from '../utils/pagination'
 import { computed, onActivated, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
@@ -14,6 +15,7 @@ import { useUserStore } from '../stores/user'
 import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markDataStale, rememberDataVersions } from '../utils/dataRefresh'
 import { getRecipeImage } from '../utils/imageUrl'
 import { formatRecipeVersionLabel } from '../utils/recipeVersion'
+import { beginRecipeRefresh } from '../utils/recipePaging'
 
 const CACHE_MAX_AGE = 60 * 1000
 const DEFAULT_QUERY = {
@@ -25,6 +27,7 @@ const DEFAULT_QUERY = {
   status: '上架',
   scope: 'family',
   sort: 'latest',
+  randomPivot: null,
 }
 const DEFAULT_FILTER = {
   recipeName: '',
@@ -67,6 +70,7 @@ const wantDateVisible = ref(false)
 const wantTargetRecipe = ref(null)
 const customWantDate = ref('')
 let recommendMessageTimer = null
+let listRevision = 0
 const watchedDataScopes = [DATA_SCOPE.recipes, DATA_SCOPE.favorites, DATA_SCOPE.wanted, DATA_SCOPE.base]
 const seenDataVersions = {}
 
@@ -179,7 +183,7 @@ watch(
 
 async function loadCategory() {
   try {
-    const res = await pageCategory({ current: 1, size: 100 })
+    const res = await loadAllPages(pageCategory)
     categories.value = res.data.records || []
     saveRecipeListCache()
   } catch (error) {
@@ -189,7 +193,9 @@ async function loadCategory() {
 
 async function refreshList(options = {}) {
   const keepExisting = Boolean(options.keepExisting)
-  query.current = 1
+  listRevision += 1
+  loading.value = false
+  beginRecipeRefresh(query)
   if (!keepExisting) {
     list.value = []
   }
@@ -207,9 +213,11 @@ async function refreshList(options = {}) {
 async function loadMore(options = {}) {
   if (finished.value || loading.value) return
   const currentPage = query.current
+  const revision = listRevision
   loading.value = true
   try {
     const res = await pageRecipe({ ...query })
+    if (revision !== listRevision) return
     const records = res.data.records || []
     total.value = Number(res.data.total || 0)
     list.value = options.replace ? records : list.value.concat(records)
@@ -230,13 +238,14 @@ async function loadMore(options = {}) {
     saveRecipeListCache()
     rememberDataVersions(watchedDataScopes, seenDataVersions)
   } catch (error) {
+    if (revision !== listRevision) return
     const message = error.message || '菜谱加载失败'
     if (!options.silent || list.value.length === 0) {
       errorText.value = message
       showFailToast(errorText.value)
     }
   } finally {
-    loading.value = false
+    if (revision === listRevision) loading.value = false
   }
 }
 

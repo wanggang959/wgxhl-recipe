@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { ADMIN_LOGIN_URL } from '../utils/loginRedirect'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -20,6 +21,10 @@ function isPublicApi(url) {
 
 function clearLoginAndRedirect() {
   localStorage.removeItem(STORAGE_KEY)
+  if (/^\/admin\/?$/.test(window.location.pathname)) {
+    window.location.replace(ADMIN_LOGIN_URL)
+    return
+  }
   if (!window.location.hash.includes('/login')) {
     window.location.hash = '#/login'
   }

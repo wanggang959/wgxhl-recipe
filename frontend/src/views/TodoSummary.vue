@@ -1,4 +1,5 @@
 <script setup>
+import { loadAllPages } from '../utils/pagination'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
@@ -142,10 +143,7 @@ function formatPurchaseLine(item) {
 async function loadSummary() {
   loading.value = true
   try {
-    const wantedRes = await pageWantedRecipe({
-      current: 1,
-      size: 500,
-    })
+    const wantedRes = await loadAllPages(pageWantedRecipe)
     wantedList.value = wantedRes.data.records || []
     const recipeIds = [...new Set(wantedList.value.map((item) => item.recipeId).filter(Boolean))]
     const detailResults = await Promise.allSettled(recipeIds.map((id) => getRecipeDetail(id)))

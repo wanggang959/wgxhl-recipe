@@ -59,6 +59,11 @@
             <version>${cos.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>3.15.0</version>
+        </dependency>
+        <dependency>
             <groupId>nl.martijndwars</groupId>
             <artifactId>web-push</artifactId>
             <version>${web-push.version}</version>

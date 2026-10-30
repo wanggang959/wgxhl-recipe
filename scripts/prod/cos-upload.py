@@ -7,6 +7,7 @@
 """
 import hashlib
 import hmac
+import mimetypes
 import os
 import sys
 import time
@@ -77,6 +78,8 @@ def main():
 
     request = urllib.request.Request(f'https://{host}{path}', data=payload, method='PUT')
     request.add_header('Authorization', authorization)
+    content_type = 'image/webp' if local_path.lower().endswith('.webp') else mimetypes.guess_type(local_path)[0]
+    request.add_header('Content-Type', content_type or 'application/octet-stream')
     if acl:
         request.add_header('x-cos-acl', acl)
 

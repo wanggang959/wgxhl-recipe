@@ -20,14 +20,16 @@ import javax.servlet.http.HttpServletRequest;
 public class RegisterController {
 
     private final UserRegistrationService userRegistrationService;
+    private final ClientIpResolver clientIpResolver;
 
-    public RegisterController(UserRegistrationService userRegistrationService) {
+    public RegisterController(UserRegistrationService userRegistrationService, ClientIpResolver clientIpResolver) {
         this.userRegistrationService = userRegistrationService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/sendCode")
     public ApiResponse<Void> sendCode(@RequestBody RegisterCodeDTO dto, HttpServletRequest request) {
-        return userRegistrationService.sendRegisterCode(dto == null ? null : dto.getEmail(), ClientIpResolver.resolve(request));
+        return userRegistrationService.sendRegisterCode(dto == null ? null : dto.getEmail(), clientIpResolver.resolve(request));
     }
 
     @PostMapping("/inviteInfo")

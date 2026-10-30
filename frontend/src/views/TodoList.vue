@@ -1,4 +1,5 @@
 <script setup>
+import { loadAllPages } from '../utils/pagination'
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
@@ -183,9 +184,9 @@ function loadTodo(options = {}) {
       const todoQuery = { current: 1, size: 200 }
       if (userStore.isGuest) todoQuery.category = 'COOK'
       const [pageRes, summaryRes, wantedRes] = await Promise.all([
-        pageTodo(todoQuery),
+        loadAllPages(pageTodo, todoQuery),
         getTodoSummary(),
-        pageWantedRecipe({
+        loadAllPages(pageWantedRecipe, {
           current: 1,
           size: 200,
           plannedDateStart: formatDate(new Date()),
@@ -232,7 +233,7 @@ function saveTodoCache() {
 }
 
 async function loadFamilyMembers() {
-  const res = await pageUser({ current: 1, size: 200 })
+  const res = await loadAllPages(pageUser)
   const nextMap = {}
   ;(res.data.records || []).forEach((user) => {
     nextMap[user.id] = user.nickname || user.username || '家人'

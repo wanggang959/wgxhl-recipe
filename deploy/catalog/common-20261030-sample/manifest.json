@@ -1,0 +1,19 @@
+{
+  "batch": "common-20261030",
+  "records": [
+    {
+      "id": "5bafc276-0b24-2f51-7ad2-bd132b031868",
+      "kind": "ingredient",
+      "name": "茄子",
+      "description": "茄科蔬菜，适合红烧、清蒸、煎炒。",
+      "objectKey": "ingredient/common-20261030/eggplant.webp"
+    },
+    {
+      "id": "bebc226c-3bd4-6569-6563-71edf084c6b8",
+      "kind": "ingredient",
+      "name": "西葫芦",
+      "description": "瓜类蔬菜，适合清炒、炒蛋或做馅。",
+      "objectKey": "ingredient/common-20261030/zucchini.webp"
+    }
+  ]
+}

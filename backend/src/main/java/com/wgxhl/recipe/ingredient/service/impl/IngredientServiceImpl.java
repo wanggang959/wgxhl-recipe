@@ -57,10 +57,13 @@ public class IngredientServiceImpl extends ServiceImpl<IngredientMapper, Ingredi
                                 .eq(Ingredient::getScope, "personal")
                                 .eq(Ingredient::getOwnerUserId, userId)))
                 .like(StringUtils.hasText(dto.getIngredientName()), Ingredient::getIngredientName, dto.getIngredientName())
+                .and(StringUtils.hasText(dto.getKeyword()), wrapper -> wrapper
+                        .like(Ingredient::getIngredientName, dto.getKeyword())
+                        .or().like(Ingredient::getIngredientDesc, dto.getKeyword()))
+                .orderByAsc(Ingredient::getScope)
                 .orderByDesc(Ingredient::getCreateTime)
+                .orderByDesc(Ingredient::getId)
                 .page(page);
-        List<Ingredient> records = result.getRecords();
-        records.sort(Comparator.comparingInt((Ingredient item) -> "platform".equals(item.getScope()) ? 1 : 0));
         return ApiResponse.success(result);
     }
 

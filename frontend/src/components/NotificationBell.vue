@@ -11,6 +11,7 @@ import {
 } from '../api/notification'
 import NotificationList from './NotificationList.vue'
 import { useUserStore } from '../stores/user'
+import { startUnreadRefresh } from '../utils/unreadRefresh'
 
 const userStore = useUserStore()
 const visible = ref(false)
@@ -29,12 +30,22 @@ const hasRead = computed(() => items.value.some((item) => item.isRead))
 
 let bodyScrollLockCount = 0
 let lockedScrollY = 0
+let stopUnreadRefresh = null
+let unreadRequestVersion = 0
 
 onMounted(() => {
-  refreshUnread()
+  stopUnreadRefresh = startUnreadRefresh({
+    refresh: refreshUnread,
+    document,
+    serviceWorker: navigator.serviceWorker,
+    setInterval: window.setInterval.bind(window),
+    clearInterval: window.clearInterval.bind(window),
+  })
 })
 
 onUnmounted(() => {
+  stopUnreadRefresh?.()
+  unreadRequestVersion += 1
   unlockBodyScroll()
 })
 
@@ -80,11 +91,12 @@ function showNoticeConfirm(options) {
 }
 
 async function refreshUnread() {
+  const version = ++unreadRequestVersion
   try {
     const res = await unreadNotificationCount()
-    unread.value = Number(res.data || 0)
+    if (version === unreadRequestVersion) unread.value = Number(res.data || 0)
   } catch (error) {
-    unread.value = 0
+    // Keep the last known count when a refresh fails.
   }
 }
 
@@ -140,6 +152,7 @@ async function removeOne(item) {
     })
     await deleteNotification(item.id)
     items.value = items.value.filter((notice) => notice.id !== item.id)
+    unreadRequestVersion += 1
     if (!item.isRead && unread.value > 0) {
       unread.value -= 1
     }

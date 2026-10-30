@@ -12,4 +12,5 @@ public class SeasoningPageDTO extends PageDTO {
      * 调料名称
      */
     private String seasoningName;
+    private String keyword;
 }

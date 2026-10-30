@@ -53,6 +53,7 @@ public class UserFavoriteServiceImpl extends ServiceImpl<UserFavoriteMapper, Use
                 .eq(UserFavorite::getUserId, UserContext.requireUserId())
                 .like(StringUtils.hasText(dto.getRecipeName()), UserFavorite::getRecipeName, dto.getRecipeName())
                 .orderByDesc(UserFavorite::getCreateTime)
+                .orderByDesc(UserFavorite::getId)
                 .page(page);
         return ApiResponse.success(result);
     }

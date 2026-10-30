@@ -23,6 +23,7 @@ Thumbs.db
 
 # DB backups (may contain production data)
 backend/sql/backups/
+deploy/images/*/originals/
 
 # Env & secrets
 backend/src/main/resources/application-dev.yml
@@ -33,3 +34,7 @@ deploy/backend/.env
 deploy/backend/*.jar
 deploy/frontend/.env
 deploy/frontend/dist/
+
+# Local tooling and generated previews
+tools/
+output/

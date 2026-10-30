@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v6'
 const IMAGE_CACHE = `wgxhl-image-cache-${CACHE_VERSION}`
 const META_CACHE = `wgxhl-image-meta-${CACHE_VERSION}`
 const CACHE_PREFIX = 'wgxhl-image-cache-'
@@ -40,8 +40,8 @@ self.addEventListener('push', (event) => {
   const notifyUrl = payload.url || payload.data?.url || '/#/todo'
   const options = {
     body: payload.body || '有人更新了待办，点击前往查看',
-    icon: payload.icon || '/pwa-icon-192.png',
-    badge: payload.badge || '/pwa-icon-192.png',
+    icon: payload.icon || '/pwa-icon-192.png?v=home-v2',
+    badge: payload.badge || '/pwa-icon-192.png?v=home-v2',
     tag: payload.tag || 'wgxhl-recipe',
     data: {
       ...(payload.data || {}),
@@ -49,8 +49,24 @@ self.addEventListener('push', (event) => {
     },
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    notifyOpenPages(),
+  ]))
 })
+
+async function notifyOpenPages() {
+  try {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    for (const client of clients) {
+      if (new URL(client.url).origin === self.location.origin) {
+        client.postMessage({ type: 'notification-received' })
+      }
+    }
+  } catch (error) {
+    // A page messaging failure must not prevent the system notification.
+  }
+}
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()

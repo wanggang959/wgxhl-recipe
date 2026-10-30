@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDateTime;
 
@@ -69,6 +70,9 @@ public class Recipe {
      * 点赞数
      */
     private Integer likeCount;
+
+    @JsonIgnore
+    private Long randomKey;
 
     /*
      * 当前用户是否已点赞（非数据库字段）

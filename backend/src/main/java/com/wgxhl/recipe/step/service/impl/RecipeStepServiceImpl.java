@@ -50,6 +50,8 @@ public class RecipeStepServiceImpl extends ServiceImpl<RecipeStepMapper, RecipeS
         if (!StringUtils.hasText(recipeId)) {
             return ApiResponse.fail("菜谱id不能为空");
         }
+        String denied = ownershipGuard.checkReadable(recipeId);
+        if (denied != null) return ApiResponse.fail(403, denied);
         List<RecipeStep> list = lambdaQuery()
                 .eq(RecipeStep::getRecipeId, recipeId)
                 .orderByAsc(RecipeStep::getStepNo)
@@ -92,6 +94,10 @@ public class RecipeStepServiceImpl extends ServiceImpl<RecipeStepMapper, RecipeS
         if (denied != null) {
             return ApiResponse.fail(403, denied);
         }
+        if (StringUtils.hasText(entity.getRecipeId()) && !existing.getRecipeId().equals(entity.getRecipeId())) {
+            return ApiResponse.fail(403, "不能更换所属菜谱");
+        }
+        entity.setRecipeId(existing.getRecipeId());
         if (entity.getStepNo() != null
                 && lambdaQuery()
                 .ne(RecipeStep::getId, entity.getId())

@@ -1,0 +1,229 @@
+{
+  "batch": "common-extra-20261030",
+  "records": [
+    {
+      "id": "3afe20da-9720-750b-87df-ade84bd2e802",
+      "kind": "ingredient",
+      "name": "空心菜",
+      "description": "又称蕹菜，茎中空，适合蒜蓉清炒、腐乳炒制或做汤。",
+      "objectKey": "ingredient/common-extra-20261030/water-spinach.webp"
+    },
+    {
+      "id": "8f627c77-fca5-7a11-077f-2ccc4fd02549",
+      "kind": "ingredient",
+      "name": "竹笋",
+      "description": "笋类食材，适合炒肉、焖烧、炖汤或制作腌笋。",
+      "objectKey": "ingredient/common-extra-20261030/bamboo-shoot.webp"
+    },
+    {
+      "id": "3cc3f152-f98c-0a4a-dc93-2a9c8c2a47c4",
+      "kind": "ingredient",
+      "name": "茭白",
+      "description": "水生茎类蔬菜，口感脆嫩，适合炒肉、油焖或清炒。",
+      "objectKey": "ingredient/common-extra-20261030/water-bamboo.webp"
+    },
+    {
+      "id": "531293a5-ea77-e972-5fc1-88df6af2b67a",
+      "kind": "ingredient",
+      "name": "毛豆",
+      "description": "鲜食大豆，适合盐水煮、炒肉或与其他蔬菜搭配炒制。",
+      "objectKey": "ingredient/common-extra-20261030/edamame.webp"
+    },
+    {
+      "id": "efaca14f-4be8-6ddd-d3d3-c8a03b37e9fe",
+      "kind": "ingredient",
+      "name": "豌豆",
+      "description": "豆类食材，适合炒饭、配菜、煮汤或制作豌豆泥。",
+      "objectKey": "ingredient/common-extra-20261030/peas.webp"
+    },
+    {
+      "id": "b98c7d9d-ada6-03a3-7411-209f6ffda294",
+      "kind": "ingredient",
+      "name": "秋葵",
+      "description": "荚果类蔬菜，切面呈星形，适合清炒、白灼或凉拌。",
+      "objectKey": "ingredient/common-extra-20261030/okra.webp"
+    },
+    {
+      "id": "d16c47fa-96b5-d28f-49aa-8363568b8eb2",
+      "kind": "ingredient",
+      "name": "鸭血",
+      "description": "凝固鸭血制品，适合毛血旺、火锅、炖煮或粉丝汤。",
+      "objectKey": "ingredient/common-extra-20261030/duck-blood.webp"
+    },
+    {
+      "id": "c1381f6a-92d6-bef4-262f-f235531a9c81",
+      "kind": "ingredient",
+      "name": "鹌鹑蛋",
+      "description": "小型蛋类食材，适合卤制、炖煮、煎制或涮火锅。",
+      "objectKey": "ingredient/common-extra-20261030/quail-egg.webp"
+    },
+    {
+      "id": "2b1af853-d5b6-5889-fc1c-80f8b5a1c0c0",
+      "kind": "ingredient",
+      "name": "扇贝",
+      "description": "贝类食材，适合蒜蓉粉丝蒸制、煎制或煮汤。",
+      "objectKey": "ingredient/common-extra-20261030/scallop.webp"
+    },
+    {
+      "id": "a0a3e13d-151a-b7e0-18ba-cf72291f0c26",
+      "kind": "ingredient",
+      "name": "腊肉",
+      "description": "腌腊猪肉制品，适合蒸制、炒蒜苗、炒笋或制作焖饭。",
+      "objectKey": "ingredient/common-extra-20261030/cured-pork.webp"
+    },
+    {
+      "id": "ad96879e-0e12-9739-ac1d-3a27c88bdb0a",
+      "kind": "ingredient",
+      "name": "香肠",
+      "description": "灌制肉制品，常用于蒸制、炒菜、炒饭或制作焖饭。",
+      "objectKey": "ingredient/common-extra-20261030/chinese-sausage.webp"
+    },
+    {
+      "id": "c3adafe8-cd6a-c08f-fa3c-ed61fbf0a487",
+      "kind": "ingredient",
+      "name": "猪肚",
+      "description": "猪内脏食材，适合炖汤、卤制或切条炒制。",
+      "objectKey": "ingredient/common-extra-20261030/pork-tripe.webp"
+    },
+    {
+      "id": "5b7a1e2d-f09d-0d11-5c47-e5a659bc30c3",
+      "kind": "ingredient",
+      "name": "鸡胗",
+      "description": "禽类内脏食材，口感紧实，适合爆炒、卤制或烧烤。",
+      "objectKey": "ingredient/common-extra-20261030/chicken-gizzard.webp"
+    },
+    {
+      "id": "c31e2373-e21a-442f-ff9d-b27f2fe47243",
+      "kind": "ingredient",
+      "name": "猪肉末",
+      "description": "切碎或绞制的猪肉，常用于做馅、炒菜、蒸蛋或制作丸子。",
+      "objectKey": "ingredient/common-extra-20261030/minced-pork.webp"
+    },
+    {
+      "id": "eceb20ef-007d-f6e9-017b-dac555e2310d",
+      "kind": "ingredient",
+      "name": "口蘑",
+      "description": "白色菌菇类食材，适合煎炒、炖汤、烧菜或搭配意面。",
+      "objectKey": "ingredient/common-extra-20261030/button-mushroom.webp"
+    },
+    {
+      "id": "cb962d18-ea45-124a-3a1f-75036f3bc640",
+      "kind": "ingredient",
+      "name": "荷兰豆",
+      "description": "嫩荚类蔬菜，豆荚扁平，适合清炒、炒肉或搭配菌菇。",
+      "objectKey": "ingredient/common-extra-20261030/snow-peas.webp"
+    },
+    {
+      "id": "184c66de-ea1a-3704-d5a3-6983e87495fc",
+      "kind": "ingredient",
+      "name": "紫甘蓝",
+      "description": "又称紫包菜，叶色紫红，适合凉拌、沙拉、清炒或配色。",
+      "objectKey": "ingredient/common-extra-20261030/purple-cabbage.webp"
+    },
+    {
+      "id": "73f05acc-b775-6631-e888-facae31854ac",
+      "kind": "ingredient",
+      "name": "茼蒿",
+      "description": "带独特清香的叶菜，适合清炒、煮汤或涮火锅。",
+      "objectKey": "ingredient/common-extra-20261030/chrysanthemum-greens.webp"
+    },
+    {
+      "id": "c31231c4-adb6-444d-097f-895a3144db29",
+      "kind": "ingredient",
+      "name": "芥蓝",
+      "description": "茎叶类蔬菜，适合白灼、清炒、炒肉或制作蚝油芥蓝。",
+      "objectKey": "ingredient/common-extra-20261030/chinese-kale.webp"
+    },
+    {
+      "id": "b8b55775-d209-fa9c-e55d-b003cb232a9f",
+      "kind": "ingredient",
+      "name": "韭黄",
+      "description": "避光培育的韭菜，茎叶淡黄，适合炒蛋、炒肉或做馅。",
+      "objectKey": "ingredient/common-extra-20261030/yellow-chives.webp"
+    },
+    {
+      "id": "9e23000b-4cdd-8699-289a-985d299997aa",
+      "kind": "ingredient",
+      "name": "蛋饺",
+      "description": "以蛋皮包馅的食材，适合炖汤、蒸制、砂锅或涮火锅。",
+      "objectKey": "ingredient/common-extra-20261030/egg-dumplings.webp"
+    },
+    {
+      "id": "281eca3d-1b7c-961c-9f56-f616b8bb5717",
+      "kind": "ingredient",
+      "name": "米粉",
+      "description": "米制主食，适合汤粉、炒粉或凉拌，可按产品说明泡煮。",
+      "objectKey": "ingredient/common-extra-20261030/rice-noodles.webp"
+    },
+    {
+      "id": "d9cfa33d-56e7-c87b-a081-934fb9bc06fa",
+      "kind": "ingredient",
+      "name": "年糕",
+      "description": "米制食材，口感软糯，适合炒制、煮汤或蒸制。",
+      "objectKey": "ingredient/common-extra-20261030/rice-cake.webp"
+    },
+    {
+      "id": "96b3e11b-7f18-b955-e98b-7bd26fe9db87",
+      "kind": "ingredient",
+      "name": "红薯粉",
+      "description": "红薯淀粉制粉条，适合酸辣粉、炖菜、火锅或凉拌。",
+      "objectKey": "ingredient/common-extra-20261030/sweet-potato-noodles.webp"
+    },
+    {
+      "id": "2dfcf9d1-f7fa-04cb-5eef-030c9b45c0bd",
+      "kind": "seasoning",
+      "name": "剁椒",
+      "description": "剁碎腌制的辣椒调味品，适合蒸鱼头、蒸菜或炒菜。",
+      "objectKey": "seasoning/common-extra-20261030/chopped-chili.webp"
+    },
+    {
+      "id": "0836a336-c760-5dc6-b0d3-312279ccfda0",
+      "kind": "seasoning",
+      "name": "黄酒",
+      "description": "谷物酿造酒，常用于肉类或水产的腌制、焖烧和炖煮。",
+      "objectKey": "seasoning/common-extra-20261030/huangjiu.webp"
+    },
+    {
+      "id": "12afd76e-eb26-dc1c-4cdc-99adee643fc9",
+      "kind": "seasoning",
+      "name": "鱼露",
+      "description": "发酵鱼制成的咸鲜调味汁，适合调汁、凉拌、炒菜或蘸食。",
+      "objectKey": "seasoning/common-extra-20261030/fish-sauce.webp"
+    },
+    {
+      "id": "eb622826-306c-6365-e68c-4aafc679d4cd",
+      "kind": "seasoning",
+      "name": "椒盐",
+      "description": "盐与香辛料配制的调味料，常用于炸物、煎烤或出锅撒料。",
+      "objectKey": "seasoning/common-extra-20261030/pepper-salt.webp"
+    },
+    {
+      "id": "a0e50662-e298-6602-c34e-89ae115b8d46",
+      "kind": "seasoning",
+      "name": "十三香",
+      "description": "复合香料粉，适合腌肉、卤制、调馅或炖煮。",
+      "objectKey": "seasoning/common-extra-20261030/thirteen-spice.webp"
+    },
+    {
+      "id": "67fa2209-cd59-6e34-9bfd-2614e17b534c",
+      "kind": "seasoning",
+      "name": "蒜蓉辣椒酱",
+      "description": "带蒜香与辣味的复合酱料，适合蒸菜、炒菜、烧烤或蘸食。",
+      "objectKey": "seasoning/common-extra-20261030/garlic-chili-sauce.webp"
+    },
+    {
+      "id": "0fa6dc50-bca9-1a94-7775-3fca3b50e3d8",
+      "kind": "seasoning",
+      "name": "甜辣酱",
+      "description": "带甜味与辣味的复合酱料，适合蘸炸物、调汁或烧烤。",
+      "objectKey": "seasoning/common-extra-20261030/sweet-chili-sauce.webp"
+    },
+    {
+      "id": "dd8f181f-d302-28a7-9614-af2bf68eedd8",
+      "kind": "seasoning",
+      "name": "辣鲜露",
+      "description": "带鲜味和辣味的液体复合调味料，适合凉拌、调汁或炒菜。",
+      "objectKey": "seasoning/common-extra-20261030/savory-chili-seasoning.webp"
+    }
+  ]
+}

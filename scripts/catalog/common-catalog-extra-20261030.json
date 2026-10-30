@@ -1,0 +1,39 @@
+{
+  "batch": "common-extra-20261030",
+  "ingredients": [
+    ["water-spinach", "空心菜", "又称蕹菜，茎中空，适合蒜蓉清炒、腐乳炒制或做汤。", "a fresh bunch of Chinese water spinach, long hollow green stems and pointed arrow shaped green leaves"],
+    ["bamboo-shoot", "竹笋", "笋类食材，适合炒肉、焖烧、炖汤或制作腌笋。", "one fresh bamboo shoot with brown conical husk and one peeled ivory shoot cut lengthwise showing layered interior"],
+    ["water-bamboo", "茭白", "水生茎类蔬菜，口感脆嫩，适合炒肉、油焖或清炒。", "three fresh Chinese water bamboo shoots with swollen ivory edible stems and short pale green leaf husks, one peeled stem"],
+    ["edamame", "毛豆", "鲜食大豆，适合盐水煮、炒肉或与其他蔬菜搭配炒制。", "a small pile of fresh fuzzy green edamame soybean pods with a few shelled oval green beans"],
+    ["peas", "豌豆", "豆类食材，适合炒饭、配菜、煮汤或制作豌豆泥。", "a small plain white bowl of round fresh green peas with two open pea pods beside it"],
+    ["okra", "秋葵", "荚果类蔬菜，切面呈星形，适合清炒、白灼或凉拌。", "a few fresh green okra pods and several cross sections clearly showing star shaped seed chambers"],
+    ["duck-blood", "鸭血", "凝固鸭血制品，适合毛血旺、火锅、炖煮或粉丝汤。", "a neat block and several clean smooth cubes of solidified dark reddish brown Chinese duck blood tofu on a plain white plate, a cooked coagulated food product, no raw liquid blood or gore"],
+    ["quail-egg", "鹌鹑蛋", "小型蛋类食材，适合卤制、炖煮、煎制或涮火锅。", "a small group of whole speckled quail eggs and one peeled cooked quail egg half with yellow yolk"],
+    ["scallop", "扇贝", "贝类食材，适合蒜蓉粉丝蒸制、煎制或煮汤。", "two fresh scallops on their natural fan shaped shells with visible ivory round adductor meat and orange roe, no garnish"],
+    ["cured-pork", "腊肉", "腌腊猪肉制品，适合蒸制、炒蒜苗、炒笋或制作焖饭。", "one slab and several slices of Chinese cured pork belly, reddish brown lean meat alternating with translucent creamy fat, rustic cured surface"],
+    ["chinese-sausage", "香肠", "灌制肉制品，常用于蒸制、炒菜、炒饭或制作焖饭。", "three links of Chinese dried cured pork sausage, slender reddish brown casing with visible small pale fat pieces, not hot dogs"],
+    ["pork-tripe", "猪肚", "猪内脏食材，适合炖汤、卤制或切条炒制。", "a clean blanched pale ivory pork stomach tripe piece with several cut strips on a plain white plate, food ingredient presentation, no blood or gore"],
+    ["chicken-gizzard", "鸡胗", "禽类内脏食材，口感紧实，适合爆炒、卤制或烧烤。", "a few clean prepared raw chicken gizzards with reddish purple muscular lobes and a few cut slices on a plain white dish, no blood or gore"],
+    ["minced-pork", "猪肉末", "切碎或绞制的猪肉，常用于做馅、炒菜、蒸蛋或制作丸子。", "a neat small mound of fresh raw minced pork with pink lean meat and small white fat flecks, no packaging"],
+    ["button-mushroom", "口蘑", "白色菌菇类食材，适合煎炒、炖汤、烧菜或搭配意面。", "several fresh white button mushrooms with rounded white caps and short stems, one halved mushroom"],
+    ["snow-peas", "荷兰豆", "嫩荚类蔬菜，豆荚扁平，适合清炒、炒肉或搭配菌菇。", "a neat small pile of fresh flat bright green snow pea pods with small barely developed seeds"],
+    ["purple-cabbage", "紫甘蓝", "又称紫包菜，叶色紫红，适合凉拌、沙拉、清炒或配色。", "one round purple red cabbage head and one cut wedge showing tightly packed purple and white leaves"],
+    ["chrysanthemum-greens", "茼蒿", "带独特清香的叶菜，适合清炒、煮汤或涮火锅。", "a fresh bunch of Chinese garland chrysanthemum greens with deeply lobed serrated green leaves and tender stems, no flowers"],
+    ["chinese-kale", "芥蓝", "茎叶类蔬菜，适合白灼、清炒、炒肉或制作蚝油芥蓝。", "a fresh bunch of Chinese gai lan kale with thick green stalks, broad smooth dark green leaves and tiny closed flower buds"],
+    ["yellow-chives", "韭黄", "避光培育的韭菜，茎叶淡黄，适合炒蛋、炒肉或做馅。", "a neat fresh bundle of pale yellow Chinese blanched garlic chives with long flat tender leaves, no green leaves"],
+    ["egg-dumplings", "蛋饺", "以蛋皮包馅的食材，适合炖汤、蒸制、砂锅或涮火锅。", "several uncooked prepared Chinese egg dumplings with folded thin golden yellow egg wrappers enclosing meat filling, crescent shapes, no garnish"],
+    ["rice-noodles", "米粉", "米制主食，适合汤粉、炒粉或凉拌，可按产品说明泡煮。", "a small neat bundle of dried white round Chinese rice noodles, medium thin strands noticeably thicker than glass vermicelli"],
+    ["rice-cake", "年糕", "米制食材，口感软糯，适合炒制、煮汤或蒸制。", "a few smooth white Chinese rice cake cylinders and several oval sliced white rice cake pieces"],
+    ["sweet-potato-noodles", "红薯粉", "红薯淀粉制粉条，适合酸辣粉、炖菜、火锅或凉拌。", "a small neatly tied bundle of dried sweet potato starch noodles, translucent grey brown round thick vermicelli strands"]
+  ],
+  "seasonings": [
+    ["chopped-chili", "剁椒", "剁碎腌制的辣椒调味品，适合蒸鱼头、蒸菜或炒菜。", "a small plain white ceramic bowl of bright red Chinese fermented chopped chili with visible chopped red pepper pieces and seeds"],
+    ["huangjiu", "黄酒", "谷物酿造酒，常用于肉类或水产的腌制、焖烧和炖煮。", "a small unbranded clear glass bottle of amber Chinese huangjiu cooking rice wine, a little amber wine in a small clear glass beside it, no label or text"],
+    ["fish-sauce", "鱼露", "发酵鱼制成的咸鲜调味汁，适合调汁、凉拌、炒菜或蘸食。", "a small unbranded clear glass bottle of transparent amber brown fish sauce and a small plain white dipping dish holding a little of the sauce, no labels"],
+    ["pepper-salt", "椒盐", "盐与香辛料配制的调味料，常用于炸物、煎烤或出锅撒料。", "a small plain white ceramic dish of fine pale beige Chinese pepper salt seasoning with tiny darker pepper flecks"],
+    ["thirteen-spice", "十三香", "复合香料粉，适合腌肉、卤制、调馅或炖煮。", "a small plain white ceramic dish of fine light brown Chinese thirteen spice blend powder, no whole spices or other props"],
+    ["garlic-chili-sauce", "蒜蓉辣椒酱", "带蒜香与辣味的复合酱料，适合蒸菜、炒菜、烧烤或蘸食。", "a small plain white ceramic bowl of glossy orange red garlic chili sauce with clearly visible tiny pale minced garlic pieces"],
+    ["sweet-chili-sauce", "甜辣酱", "带甜味与辣味的复合酱料，适合蘸炸物、调汁或烧烤。", "a small plain white ceramic bowl of translucent glossy orange red sweet chili dipping sauce with small red chili flecks and seeds"],
+    ["savory-chili-seasoning", "辣鲜露", "带鲜味和辣味的液体复合调味料，适合凉拌、调汁或炒菜。", "a small unbranded clear glass bottle containing thin dark amber reddish brown liquid chili seasoning and a small plain white dipping dish of the same thin liquid, no labels or text"]
+  ]
+}

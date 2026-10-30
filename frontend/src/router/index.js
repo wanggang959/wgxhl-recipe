@@ -162,24 +162,21 @@ router.beforeEach((to) => {
 
   const isGuest = user.id === 'guest' || user.username === 'guest'
   if (isGuest) {
-    const guestWriteBlocked = to.path === '/todo/create'
-      || to.path === '/account/email'
-      || to.path === '/todo/summary'
+    // 游客只有公共浏览，收藏/想吃/待办/开支都属于家庭数据
+    const guestFamilyOnly = to.path === '/favorites'
+      || to.path === '/want'
+      || to.path === '/todo'
+      || to.path.startsWith('/todo/')
+      || to.path === '/expenses'
+    if (guestFamilyOnly) return '/recipes'
+    const guestWriteBlocked = to.path === '/account/email'
       || to.path === '/recipe/create'
-      || to.path === '/expenses/create'
-      || /^\/todo\/[^/]+\/edit$/.test(to.path)
       || /^\/recipe\/[^/]+\/edit$/.test(to.path)
       || to.path === '/manage/base'
-    if (guestWriteBlocked) return isGuestTodoPath(to.path) ? '/todo' : '/recipes'
+    if (guestWriteBlocked) return '/recipes'
   }
 
   return true
 })
-
-function isGuestTodoPath(path) {
-  return path === '/todo/create'
-    || path === '/todo/summary'
-    || /^\/todo\/[^/]+\/edit$/.test(path)
-}
 
 export default router

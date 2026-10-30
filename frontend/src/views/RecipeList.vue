@@ -79,6 +79,12 @@ const query = reactive({
   ...(recipeListCache.query || {}),
 })
 
+// 游客没有家庭数据，直接落在公共范围
+if (userStore.isGuest) {
+  query.scope = 'public'
+  query.status = '上架'
+}
+
 const filter = reactive({
   ...DEFAULT_FILTER,
   ...(recipeListCache.filter || {}),
@@ -612,7 +618,7 @@ function submitCustomWantDate() {
     </section>
 
     <div v-if="!isTodayMode" class="scope-switch">
-      <div class="scope-tabs">
+      <div v-if="!userStore.isGuest" class="scope-tabs">
         <button type="button" :class="{ active: !isPublicScope }" @click="pickScope('family')">
           <van-icon name="friends-o" size="13" />
           家庭
@@ -621,6 +627,12 @@ function submitCustomWantDate() {
           <van-icon name="globe-o" size="13" />
           公共
         </button>
+      </div>
+      <div v-else class="scope-tabs guest-scope">
+        <span>
+          <van-icon name="globe-o" size="13" />
+          看看大家的家常菜
+        </span>
       </div>
       <div class="sort-switch">
         <button
@@ -1329,6 +1341,17 @@ function submitCustomWantDate() {
 .scope-tabs button.active {
   background: #fff1e6;
   color: #c2410c;
+}
+
+.guest-scope span {
+  height: 30px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--app-muted);
 }
 
 .sort-switch button.active {

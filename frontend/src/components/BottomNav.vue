@@ -15,6 +15,7 @@ const active = computed(() => {
   if (route.path.startsWith('/want')) return '/want'
   if (route.path.startsWith('/todo')) return '/todo'
   if (route.path.startsWith('/expenses')) return '/profile'
+  if (route.path.startsWith('/commute')) return '/profile'
   if (route.path.startsWith('/profile')) return '/profile'
   return '/recipes'
 })

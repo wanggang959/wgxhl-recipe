@@ -52,6 +52,12 @@ account:
 app:
   trusted-proxy-ips: ${TRUSTED_PROXY_IPS:127.0.0.1,::1}
   platform-admin-user-id: ${PLATFORM_ADMIN_USER_ID:}
+  qweather:
+    host: ${QWEATHER_HOST:}
+    developer-id: ${QWEATHER_DEVELOPER_ID:}
+    project-id: ${QWEATHER_PROJECT_ID:}
+    key-id: ${QWEATHER_KEY_ID:}
+    private-key-path: ${QWEATHER_PRIVATE_KEY_PATH:}
   mail:
     provider: ${MAIL_PROVIDER:smtp}
     from: ${MAIL_FROM:}
@@ -63,6 +69,7 @@ app:
       code-template-id: ${SES_CODE_TEMPLATE_ID:0}
       reset-template-id: ${SES_RESET_TEMPLATE_ID:0}
       notification-template-id: ${SES_NOTIFICATION_TEMPLATE_ID:0}
+      commute-template-id: ${SES_COMMUTE_TEMPLATE_ID:0}
       html-templates: ${SES_HTML_TEMPLATES:false}
 
 push:

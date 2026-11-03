@@ -166,6 +166,7 @@ async function openNotice(item) {
   if (userStore.canMutate && !item.isRead) {
     await markRead(item)
   }
+  if(item.notificationType==='COMMUTE') { visible.value=false; window.location.hash='#/commute'; return }
   if (item.relatedId) {
     visible.value = false
     window.location.hash = `#/todo/${item.relatedId}`

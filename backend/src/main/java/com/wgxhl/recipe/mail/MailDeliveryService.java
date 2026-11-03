@@ -28,9 +28,9 @@ import java.nio.charset.StandardCharsets;
 
 @Service
 public class MailDeliveryService {
-    public enum Kind { CODE, PASSWORD_RESET, NOTIFICATION }
+    public enum Kind { CODE, PASSWORD_RESET, NOTIFICATION, COMMUTE }
     public enum ReminderType {
-        TODO("待办事项"), BIRTHDAY("生日"), MEAL_PREPARATION("备菜");
+        TODO("待办事项"), BIRTHDAY("生日"), MEAL_PREPARATION("备菜"), COMMUTE("通勤出门");
 
         private final String label;
 
@@ -107,6 +107,14 @@ public class MailDeliveryService {
         send(Kind.NOTIFICATION, recipient, "【王师傅生活助手】" + type.label + "提醒", text, variables);
     }
 
+    public void sendCommute(String recipient, Map<String,String> variables, String text) {
+        Map<String,String> safe=new LinkedHashMap<>(variables);
+        String weather=safe.get("weatherSummary");
+        if(weather!=null && weather.codePointCount(0,weather.length())>100)
+            safe.put("weatherSummary",weather.substring(0,weather.offsetByCodePoints(0,100))+"…");
+        send(Kind.COMMUTE,recipient,"【王师傅生活助手】通勤出门提醒",text+NOTICE_FOOTER,safe);
+    }
+
     private void send(Kind kind, String recipient, String subject, String text, Map<String, String> variables) {
         if (!isReady(kind)) throw new PermanentMailException("邮箱服务或邮件模板未配置");
         if (properties.getProvider() == MailProperties.Provider.SMTP) {
@@ -154,7 +162,7 @@ public class MailDeliveryService {
     }
 
     private String templateData(Kind kind, Map<String, String> variables) throws JsonProcessingException {
-        if (!properties.getSes().isHtmlTemplates()) return json.writeValueAsString(variables);
+        if (!properties.getSes().isHtmlTemplates() && kind != Kind.COMMUTE) return json.writeValueAsString(variables);
         Map<String, String> escaped = new LinkedHashMap<>();
         variables.forEach((key, value) -> escaped.put(key, value == null ? "" : HtmlUtils.htmlEscape(value, "UTF-8")));
         String result = json.writeValueAsString(escaped);
@@ -166,6 +174,15 @@ public class MailDeliveryService {
                 String shortened = detail.substring(0, detail.offsetByCodePoints(0, length)) + "…";
                 escaped.put("remindDetail", HtmlUtils.htmlEscape(shortened, "UTF-8"));
                 result = json.writeValueAsString(escaped);
+            }
+        }
+        String weather=variables.get("weatherSummary");
+        if(kind==Kind.COMMUTE && weather!=null) {
+            int length=weather.codePointCount(0,weather.length());
+            while(result.getBytes(StandardCharsets.UTF_8).length>800 && length>0) {
+                length--;
+                escaped.put("weatherSummary",HtmlUtils.htmlEscape(weather.substring(0,weather.offsetByCodePoints(0,length))+"…","UTF-8"));
+                result=json.writeValueAsString(escaped);
             }
         }
         if (result.getBytes(StandardCharsets.UTF_8).length > 800) {
@@ -202,6 +219,7 @@ public class MailDeliveryService {
             case CODE: return properties.getSes().getCodeTemplateId();
             case PASSWORD_RESET: return properties.getSes().getResetTemplateId();
             case NOTIFICATION: return properties.getSes().getNotificationTemplateId();
+            case COMMUTE: return properties.getSes().getCommuteTemplateId();
             default: throw new IllegalArgumentException("Unknown mail kind");
         }
     }

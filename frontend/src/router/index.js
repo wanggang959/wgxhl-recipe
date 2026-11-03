@@ -91,6 +91,7 @@ const routes = [
         name: 'SpecialExpense',
         component: () => import('../views/SpecialExpenseView.vue'),
       },
+      { path: '/commute', name: 'Commute', component: () => import('../views/CommuteView.vue') },
     ],
   },
   {
@@ -168,6 +169,7 @@ router.beforeEach((to) => {
       || to.path === '/todo'
       || to.path.startsWith('/todo/')
       || to.path === '/expenses'
+      || to.path === '/commute'
     if (guestFamilyOnly) return '/recipes'
     const guestWriteBlocked = to.path === '/account/email'
       || to.path === '/recipe/create'

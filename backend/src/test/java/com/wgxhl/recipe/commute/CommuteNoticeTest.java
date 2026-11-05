@@ -26,6 +26,7 @@ class CommuteNoticeTest {
         when(push.sendToUserIds(anyList(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
         service.notifyDaily();
         verify(service).recommend(eq("u"),eq(LocalDate.now(CommuteService.ZONE).plusDays(1)));
+        verify(service,never()).snapshot(anyString(),anyMap());
         verify(push).sendToUserIds(eq(Collections.singletonList("u")),anyString(),anyString(),eq("/#/commute"),anyString());
         verify(mail,never()).sendCommute(anyString(),anyMap(),anyString());
         verify(db).update(contains("insert into notification"),anyString(),eq("home"),eq("u"),anyString(),anyString());

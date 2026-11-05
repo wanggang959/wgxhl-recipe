@@ -36,7 +36,6 @@ public class CommuteController {
     @PostMapping("/recommendation")
     public ApiResponse<Map<String,Object>> recommendation() {
         Map<String,Object> result=service.recommend(UserContext.requireUserId(), service.targetDate(UserContext.requireUserId()));
-        if(Boolean.TRUE.equals(result.get("configured")) && Boolean.TRUE.equals(result.get("workDay"))) service.snapshot(UserContext.requireUserId(),result);
         return ApiResponse.success(result);
     }
 
@@ -98,7 +97,13 @@ public class CommuteController {
         int page = 1;
         if (request != null && request.get("page") instanceof Number) page = ((Number) request.get("page")).intValue();
         page = Math.max(1, Math.min(page, 1000));
-        return ApiResponse.success(db.queryForList("select id,commute_date as commuteDate,direction,departure_time as departureTime,arrival_time as arrivalTime,duration_minutes as durationMinutes,transport,remark,include_stats as includeStats,actual_rain as actualRain,weather_group as weatherGroup,weather_summary as weatherSummary from commute_record where user_id=? order by commute_date desc,direction asc limit 30 offset ?", UserContext.requireUserId(), (page - 1) * 30));
+        return ApiResponse.success(db.queryForList("select id,commute_date as commuteDate,direction,departure_time as departureTime,arrival_time as arrivalTime,duration_minutes as durationMinutes,transport,remark,include_stats as includeStats,actual_rain as actualRain,weather_group as weatherGroup,weather_summary as weatherSummary from commute_record where user_id=? and commute_date<=? order by commute_date desc,direction asc limit 30 offset ?", UserContext.requireUserId(), LocalDate.now(CommuteService.ZONE), (page - 1) * 30));
+    }
+
+    @PostMapping("/statistics")
+    public ApiResponse<Map<String,Object>> statistics() {
+        LocalDate today = LocalDate.now(CommuteService.ZONE);
+        return ApiResponse.success(db.queryForMap("select count(*) as allCount, avg(duration_minutes) as allAverage, count(case when actual_rain='RAIN' then 1 end) as rainCount, avg(case when actual_rain='RAIN' then duration_minutes end) as rainAverage, count(case when actual_rain='DRY' then 1 end) as dryCount, avg(case when actual_rain='DRY' then duration_minutes end) as dryAverage from commute_record where user_id=? and direction='OUTBOUND' and include_stats=1 and duration_minutes>0 and commute_date between ? and ?", UserContext.requireUserId(), today.minusDays(29), today));
     }
 
     @PostMapping("/records/save")

@@ -93,7 +93,20 @@ public class CommuteService {
         cache.put(key,new Cached(now,data)); return data;
     }
     public void snapshot(String userId,Map<String,Object> r) {
+        if (!LocalDate.now(ZONE).toString().equals(String.valueOf(r.get("date")))) return;
         db.update("insert into commute_record(id,user_id,commute_date,direction,weather_group,weather_summary,weather_forecast_time,create_time,update_time) values(?,?,?,'OUTBOUND',?,?,now(),now(),now()) on duplicate key update weather_group=if(weather_group is null,values(weather_group),weather_group),weather_summary=if(weather_summary is null,values(weather_summary),weather_summary)",IdUtil.simpleUUID(),userId,r.get("date"),r.get("weatherGroup"),r.get("weatherSummary"));
+    }
+    @Scheduled(cron="0 * * * * *",zone="Asia/Shanghai")
+    public void createTodayRecords() {
+        LocalDateTime now=LocalDateTime.now(ZONE);
+        try {
+            List<Map<String,Object>> users=db.queryForList("select s.user_id from commute_settings s join app_user u on u.id=s.user_id where u.status='normal' and find_in_set(?,s.work_days)>0 and timestamp(?,s.arrival_time)>? and timestamp(?,s.arrival_time)<=date_add(?,interval (s.fallback_minutes+s.buffer_minutes+60) minute) and not exists(select 1 from commute_record r where r.user_id=s.user_id and r.commute_date=? and r.direction='OUTBOUND') order by s.user_id limit 200",now.getDayOfWeek().getValue(),now.toLocalDate(),now,now.toLocalDate(),now,now.toLocalDate());
+            for (Map<String,Object> user:users) {
+                String id=user.get("user_id").toString();
+                try { snapshot(id,recommend(id,now.toLocalDate())); }
+                catch (Exception e) { LOG.warn("Commute record generation failed, type={}",e.getClass().getSimpleName()); }
+            }
+        } catch (Exception e) { LOG.warn("Commute record scan failed, type={}",e.getClass().getSimpleName()); }
     }
     @Scheduled(cron="0 * * * * *",zone="Asia/Shanghai")
     public void notifyDaily() {
@@ -110,7 +123,7 @@ public class CommuteService {
                 if(completed.contains("all")) continue;
                 if((!flag(u,"site_enabled") || completed.contains("site")) && (!flag(u,"email_enabled") || completed.contains("email")) && (!flag(u,"push_enabled") || completed.contains("push"))) continue;
                 Map<String,Object> result;
-                try { result=recommend(user,commuteDate); snapshot(user,result); }
+                try { result=recommend(user,commuteDate); }
                 catch(Exception e) { LOG.warn("Commute recommendation failed, type={}",e.getClass().getSimpleName()); continue; }
                 CommuteRecommendation.Result dry=(CommuteRecommendation.Result)result.get("dry"), rain=(CommuteRecommendation.Result)result.get("rain");
                 String detail="不下雨建议 "+dry.departure.toString().replace('T',' ')+"，下雨建议 "+rain.departure.toString().replace('T',' ')+" 前出门；已含预留 "+result.get("bufferMinutes")+" 分钟。"+result.get("weatherSummary");

@@ -6,6 +6,7 @@ import { post } from '../api/request'
 import { recordTimes, timePart } from '../utils/commuteRecordTime'
 const router = useRouter()
 const tab = ref('records'), busy = ref(false), error = ref(''), records = ref([]), recommendation = ref(null), page = ref(1), more = ref(true)
+const statistics = ref(null), statisticsError = ref(false)
 const settings = reactive({ noticeDay: 0, arrivalTime: '09:00', noticeTime: '07:00', bufferMinutes: 10, fallbackMinutes: 45, workDays: '1,2,3,4,5', siteEnabled: true, emailEnabled: false, pushEnabled: false, originName: '', originLat: null, originLon: null, destinationName: '', destinationLat: null, destinationLon: null })
 const locations = reactive({ origin: { mode: 'city', query: '', items: [], loading: false }, destination: { mode: 'city', query: '', items: [], loading: false } })
 const editor = ref(false)
@@ -23,8 +24,10 @@ async function load(reset = true) {
 async function refresh() {
   error.value = ''
   try { recommendation.value = (await post('/commute/recommendation')).data } catch(e) { error.value = e.message }
+  try { statistics.value = (await post('/commute/statistics')).data; statisticsError.value = false } catch(e) { statistics.value = null; statisticsError.value = true }
   await load()
 }
+function average(value) { return value == null ? '—' : String(Math.round(Number(value) * 10) / 10) }
 async function saveSettings() {
   busy.value = true
   try { await post('/commute/settings/save', settings); showSuccessToast('已保存'); tab.value = 'records'; await refresh() }
@@ -56,7 +59,7 @@ async function saveRecord() {
   catch(e) { showFailToast(e.message) } finally { busy.value = false }
 }
 async function remove(item) {
-  try { await showConfirmDialog({ title: '删除这条通勤记录？' }); await post('/commute/records/delete', { id: item.id }); await refresh() } catch(e) { if(e?.message) showFailToast(e.message) }
+  try { await showConfirmDialog({ title: '删除通勤记录', message: `确定删除 ${item.commuteDate?.slice(0,10) || ''} 的这条记录吗？删除后无法恢复。`, confirmButtonText: '删除', confirmButtonColor: '#dc4438', className: 'commute-delete-dialog', width: 'min(320px, calc(100vw - 40px))' }); await post('/commute/records/delete', { id: item.id }); await refresh() } catch(e) { if(e?.message) showFailToast(e.message) }
 }
 async function pause() { try { await post('/commute/pause-today'); showSuccessToast('本次未发送的通知已暂停'); await refresh() } catch(e) { showFailToast(e.message) } }
 onMounted(async () => {
@@ -81,6 +84,16 @@ onMounted(async () => {
         <button class="commute-link" @click="pause">暂停本次通知</button>
       </div>
       <div v-else class="commute-empty"><p>还没有通勤设置</p><button class="commute-primary" @click="tab='settings'">设置通勤</button></div>
+      <section class="commute-statistics" aria-label="近30天通勤统计">
+        <div class="commute-statistics-heading"><h2>近30天通勤</h2><small>上班 · 平均时长</small></div>
+        <p v-if="statisticsError" class="commute-error" role="alert">统计暂时不可用 <button class="commute-link" @click="refresh">重试</button></p>
+        <div v-else-if="statistics" class="commute-statistics-grid">
+          <div v-for="group in [{label:'全部', count:statistics.allCount, average:statistics.allAverage}, {label:'下雨', count:statistics.rainCount, average:statistics.rainAverage}, {label:'不下雨', count:statistics.dryCount, average:statistics.dryAverage}]" :key="group.label" class="commute-statistic">
+            <span>{{ group.label }}</span><strong>{{ average(group.average) }}<small v-if="group.average != null"> 分钟</small></strong><small>{{ group.count }} 条记录</small>
+          </div>
+        </div>
+        <p v-else class="commute-statistics-loading">正在加载统计…</p>
+      </section>
       <div class="commute-section-title"><h2>我的记录</h2><button class="commute-primary" @click="edit(null)"><van-icon name="plus" /> 记录</button></div>
       <p v-if="!records.length && !error" class="commute-empty">暂无通勤记录</p>
       <article v-for="item in records" :key="item.id" class="commute-record">
@@ -118,5 +131,10 @@ onMounted(async () => {
 
 <style scoped>
 .commute-page{padding-bottom:120px!important}
+.commute-statistics{padding:18px 0 2px}.commute-statistics-heading{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.commute-statistics-heading h2{font-size:16px;margin:0 0 10px}.commute-statistics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.commute-statistic{min-width:0;border:1px solid #f1dfd0;background:#fff;border-radius:8px;padding:11px 9px;display:grid;gap:5px}.commute-statistic>span{font-size:12px;color:#856b59}.commute-statistic strong{font-size:18px;color:#3c3029}.commute-statistic strong small{font-size:11px;font-weight:400}.commute-statistic>small{font-size:11px}.commute-statistics-loading{color:#8b7868}
 .commute-page{padding:16px 12px 32px;color:#352d28}.commute-heading,.commute-row,.commute-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px}.commute-heading{justify-content:flex-start}.commute-heading>div{flex:1}.commute-heading small{color:#f47716}.commute-heading h1{font-size:22px;margin:2px 0 14px}.commute-page button{cursor:pointer;border:1px solid #f7dfcc;background:#fff8ef;color:#81563a;padding:9px 12px;border-radius:8px;flex-shrink:0}.commute-tabs{display:flex;border-bottom:1px solid #f0ddcc;margin-bottom:16px;gap:8px}.commute-tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none}.commute-tabs .active{color:#f77710;border-bottom-color:#f77710}.commute-advice{padding:16px 0;border-bottom:1px solid #f0ddcc}.commute-advice h2{font-size:20px;line-height:1.5;margin:8px 0}.commute-page p{line-height:1.65;font-size:13px;overflow-wrap:anywhere}.commute-page small{font-size:12px;color:#8b7868}.commute-advice a{color:#9b7050;font-size:11px}.commute-section-title{margin:22px 0 12px}.commute-section-title h2,.commute-editor h2{font-size:18px}.commute-page .commute-primary{background:#ff7912;color:white;border-color:#ff7912}.commute-record{background:white;border:1px solid #f4ddc9;border-radius:8px;padding:14px;margin:12px 0}.commute-record strong,.commute-record b{font-size:13px}.commute-record p{font-size:12px;color:#8b7868}.commute-record .commute-row{flex-wrap:wrap}.commute-record button{margin-left:8px}.commute-form{display:grid;gap:16px}.commute-form label{display:grid;gap:7px;font-size:13px;color:#735945}.commute-form input,.commute-form select,.commute-form textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;background:white;border:1px solid #f1dcc9;border-radius:8px;padding:10px;color:#352d28;font:inherit}.commute-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.commute-form fieldset{border:0;border-top:1px solid #efdfcf;padding:14px 0;min-width:0;display:grid;gap:10px}.commute-form legend{padding:0 8px 0 0;font-weight:600;font-size:14px}.commute-row input{flex:1;width:0}.commute-form .commute-check{display:flex;align-items:center}.commute-check input{width:18px;height:18px}.commute-editor{padding:20px 16px max(24px,env(safe-area-inset-bottom))}.commute-city{text-align:left}.commute-empty{text-align:center;padding:24px 8px;color:#9c8875}.commute-error{color:#b42338}.commute-page .commute-link{background:none;border:0;font-size:12px;text-decoration:underline}
+</style>
+
+<style>
+.commute-delete-dialog.van-dialog{max-width:calc(100vw - 40px);border-radius:16px;overflow:hidden}.commute-delete-dialog .van-dialog__header{padding:22px 20px 0;font-size:17px;font-weight:600;color:#352d28}.commute-delete-dialog .van-dialog__message{padding:16px 22px 20px;font-size:14px;line-height:1.6;color:#806b5b}.commute-delete-dialog .van-dialog__footer .van-button{height:48px;font-size:14px}
 </style>

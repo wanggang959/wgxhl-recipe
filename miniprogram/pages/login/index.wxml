@@ -1,0 +1,8 @@
+<view class="page login-page">
+  <view class="brand"><view class="brand-mark">家</view><view class="eyebrow">王师傅家生活助手</view><view class="welcome">欢迎回来</view><view class="muted">把每一天照顾好</view></view>
+  <view class="surface login-form">
+    <view class="form-title">账号登录</view><view class="field"><view class="field-label">用户名或邮箱</view><input value="{{username}}" bindinput="onUsername" placeholder="请输入用户名或邮箱" autocomplete="username" /></view>
+    <view class="field"><view class="field-label">密码</view><input value="{{password}}" bindinput="onPassword" placeholder="请输入密码" password confirm-type="done" bindconfirm="submit" /></view>
+    <view wx:if="{{error}}" class="error">{{error}}</view><button class="primary submit" loading="{{loading}}" disabled="{{loading}}" bindtap="submit">登录</button>
+  </view>
+</view>

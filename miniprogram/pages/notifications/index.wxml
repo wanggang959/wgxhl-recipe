@@ -1,0 +1,21 @@
+<view class="page notice-page">
+  <view class="heading"><view><view class="eyebrow">家庭通知</view><view class="heading-title">提醒中心</view><view class="heading-sub">{{unread ? unread + ' 条未读' : '暂无未读'}}</view></view></view>
+  <view class="toolbar surface"><text class="count">{{total}} 条消息</text><button wx:if="{{!readonly}}" class="mark-all" bindtap="markAll" disabled="{{!unread || busy}}">全部已读</button></view>
+  <view wx:if="{{error}}" class="state surface">{{error}}<button class="retry" bindtap="retry">重新加载</button></view>
+  <view wx:elif="{{loading && !items.length}}" class="state">正在加载</view>
+  <view wx:elif="{{!items.length}}" class="state surface">暂无通知</view>
+  <view wx:else class="notice-list">
+    <view wx:for="{{items}}" wx:key="id" class="notice surface {{item.isRead ? '' : 'unread'}}">
+      <view class="notice-icon"><text class="van-icon van-icon-bell"></text></view>
+      <view class="notice-body">
+        <view class="notice-title-row"><text class="notice-title">{{item.title}}</text><text wx:if="{{!item.isRead}}" class="unread-tag">未读</text></view>
+        <view class="notice-content">{{item.content}}</view>
+        <view class="notice-time">{{item.displayTime}}</view>
+        <block wx:if="{{item.relatedId}}"><view wx:if="{{item.notificationType === 'TODO'}}" class="notice-actions"><button data-id="{{item.id}}" bindtap="openTodo">查看待办</button></view></block>
+        <view wx:if="{{!readonly}}" class="notice-actions"><button wx:if="{{!item.isRead}}" data-id="{{item.id}}" bindtap="markRead" disabled="{{busy}}">标为已读</button><button class="remove" data-id="{{item.id}}" bindtap="remove" disabled="{{busy}}">删除</button></view>
+      </view>
+    </view>
+    <view wx:if="{{loading}}" class="state">正在加载</view>
+    <view wx:elif="{{items.length < total}}" class="more">继续上滑加载</view>
+  </view>
+</view>

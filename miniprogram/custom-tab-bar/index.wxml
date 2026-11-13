@@ -1,0 +1,5 @@
+<view wx:if="{{!hidden}}" class="tabs">
+  <view wx:for="{{items}}" wx:key="key" class="tab {{selected === item.key ? 'active' : ''}}" data-key="{{item.key}}" role="button" aria-label="{{item.label}}" bindtap="navigate">
+    <text class="tab-icon van-icon {{item.icon}}"></text><text class="tab-label">{{item.label}}</text>
+  </view>
+</view>

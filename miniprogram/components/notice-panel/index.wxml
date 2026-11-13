@@ -1,0 +1,25 @@
+<view wx:if="{{visible}}" class="notice-layer" bindtap="close">
+  <view class="notice-panel" catchtap="swallow">
+    <view class="notice-header"><view><view class="eyebrow">家庭通知</view><view class="notice-heading">提醒中心</view><view class="notice-subtitle">{{unread ? unread + ' 条未读' : '暂无未读'}}</view></view><view class="close-button" role="button" aria-label="关闭通知" bindtap="close">×</view></view>
+    <view class="toolbar"><text class="count">{{total}} 条消息</text><view wx:if="{{!readonly}}" class="mark-all {{!unread || busy ? 'disabled' : ''}}" role="button" bindtap="markAll">全部已读</view></view>
+    <scroll-view class="notice-scroll" scroll-y enhanced show-scrollbar="{{false}}" bindscrolltolower="loadMore">
+      <view wx:if="{{error}}" class="empty">{{error}}<view class="retry" bindtap="retry">重新加载</view></view>
+      <view wx:elif="{{loading && !items.length}}" class="empty">正在加载</view>
+      <view wx:elif="{{!items.length}}" class="empty">暂无通知</view>
+      <view wx:else class="notice-list">
+        <view wx:for="{{items}}" wx:key="id" class="notice {{item.isRead ? '' : 'unread'}}">
+          <view class="notice-icon"><text class="van-icon van-icon-bell"></text></view>
+          <view class="notice-body">
+            <view class="notice-title-row"><text class="notice-title">{{item.title}}</text><text wx:if="{{!item.isRead}}" class="unread-tag">未读</text></view>
+            <view class="notice-content">{{item.content}}</view><view class="notice-time">{{item.displayTime}}</view>
+            <view class="notice-actions">
+              <block wx:if="{{item.relatedId}}"><view wx:if="{{item.notificationType === 'TODO'}}" class="action" data-id="{{item.id}}" bindtap="openTodo">查看待办</view></block>
+              <block wx:if="{{!readonly}}"><view wx:if="{{!item.isRead}}" class="action" data-id="{{item.id}}" bindtap="markRead">标为已读</view><view class="action remove" data-id="{{item.id}}" bindtap="remove">删除</view></block>
+            </view>
+          </view>
+        </view>
+        <view wx:if="{{loading}}" class="loading">正在加载</view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

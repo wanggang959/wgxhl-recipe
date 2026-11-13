@@ -1,0 +1,19 @@
+<view class="page detail-page">
+  <view class="eyebrow">家庭待办</view><view class="page-title">待办详情</view>
+  <view wx:if="{{loading}}" class="state">正在加载</view>
+  <view wx:elif="{{error}}" class="surface state">{{error}}<button class="retry" bindtap="retry">重新加载</button></view>
+  <view wx:elif="{{todo}}" class="surface detail-card">
+    <view class="title-row"><view class="title">{{todo.title}}</view><text class="tag">{{todo.categoryLabel}}</text></view>
+    <view class="details">
+      <view class="row"><text class="label">负责人</text><text class="value">{{todo.displayOwner}}</text></view>
+      <view wx:if="{{todo.birthdayDisplayText}}" class="row"><text class="label">生日</text><text class="value">{{todo.birthdayDisplayText}}</text></view>
+      <view class="row"><text class="label">时间</text><text class="value">{{todo.displayDate}}</text></view>
+      <view wx:if="{{todo.lastOccurrenceLabel}}" class="row"><text class="label">历史记录</text><text class="value">{{todo.lastOccurrenceLabel}}</text></view>
+      <view wx:if="{{todo.remainText}}" class="row"><text class="label">到期状态</text><text class="value">{{todo.remainText}}</text></view>
+      <view wx:if="{{todo.nextNotifyLabel}}" class="row"><text class="label">下次提醒</text><text class="value">{{todo.nextNotifyLabel}}</text></view>
+      <view class="row"><text class="label">重复规则</text><text class="value">{{repeatLabel}}</text></view>
+      <view wx:if="{{todo.description}}" class="row"><text class="label">备注</text><text class="value">{{todo.description}}</text></view>
+    </view>
+    <button wx:if="{{canManage}}" class="edit" bindtap="edit">编辑待办</button>
+  </view>
+</view>

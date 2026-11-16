@@ -2,7 +2,7 @@
   <view class="app-header"><view><view class="eyebrow">王师傅家</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view class="header-add" role="button" aria-label="新增待办" bindtap="add">＋</view></view></view>
   <view class="overview surface">
     <view class="overview-main"><view class="eyebrow">待办清单</view><view class="overview-title">今日 {{todayCount}} 件</view><view class="overview-detail">已完成 {{summary.doneCount || 0}} 件 · 近期待办 {{dueSoonCount}} 件</view></view>
-    <button class="add-button" bindtap="add">＋ 新增待办</button>
+    <view class="overview-actions"><button class="summary-button" bindtap="openSummary"><text class="van-icon van-icon-cart-o"></text> 采购汇总</button><button class="add-button ghost" bindtap="add">＋ 新增待办</button></view>
   </view>
   <view class="filters surface">
     <view class="filter-row"><text class="filter-label">范围</text><scroll-view class="filter-scroll" scroll-x show-scrollbar="{{false}}"><view class="filter-options"><view wx:for="{{ranges}}" wx:key="value" class="filter-chip {{range === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseRange">{{item.label}}</view></view></scroll-view></view>

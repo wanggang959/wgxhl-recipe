@@ -1,8 +1,53 @@
-<view class="page login-page">
-  <view class="brand"><view class="brand-mark">家</view><view class="eyebrow">王师傅家生活助手</view><view class="welcome">欢迎回来</view><view class="muted">把每一天照顾好</view></view>
-  <view class="surface login-form">
-    <view class="form-title">账号登录</view><view class="field"><view class="field-label">用户名或邮箱</view><input value="{{username}}" bindinput="onUsername" placeholder="请输入用户名或邮箱" autocomplete="username" /></view>
-    <view class="field"><view class="field-label">密码</view><input value="{{password}}" bindinput="onPassword" placeholder="请输入密码" password confirm-type="done" bindconfirm="submit" /></view>
-    <view wx:if="{{error}}" class="error">{{error}}</view><button class="primary submit" loading="{{loading}}" disabled="{{loading}}" bindtap="submit">登录</button>
+<view class="login-page">
+  <image class="login-bg" src="/assets/login/login-bg.webp" mode="widthFix" />
+  <view class="login-hero" style="padding-top:{{statusBarHeight + 8 > 50 ? statusBarHeight + 8 : 50}}px">
+    <view class="brand-lockup">
+      <view class="chef-mark"><image src="/assets/login/login-chef.webp" mode="aspectFill" /></view>
+      <view class="brand-main">王师傅家</view>
+      <view class="brand-sub"><text class="line"></text><text>生活助手</text><text class="line"></text></view>
+    </view>
+  </view>
+
+  <view class="login-content">
+    <view class="welcome">
+      <view class="welcome-kicker">欢迎来到</view>
+      <view class="welcome-house">王师傅和谢老板的家</view>
+      <view class="login-tip"><text class="diamond"></text><text>请登录以继续</text><text class="diamond"></text></view>
+    </view>
+
+    <view class="form-card">
+      <view class="dish-ornament"><view class="steam steam-1"></view><view class="steam steam-2"></view><view class="pot-mark"><image src="/assets/login/login-pot.webp" mode="aspectFill" /></view><view class="steam steam-3"></view></view>
+
+      <view wx:if="{{statusText}}" class="status {{statusType === 'error' ? 'error' : ''}}"><text class="van-icon {{statusType === 'error' ? 'van-icon-warning-o' : 'van-icon-checked'}}"></text><text>{{statusText}}</text></view>
+
+      <view class="field-group">
+        <view class="field-label"><text class="van-icon van-icon-contact-o"></text><text>用户名或邮箱</text></view>
+        <view class="input-shell username-shell {{previewAvatar ? 'has-avatar' : ''}}">
+          <input class="native-input {{previewAvatar ? 'with-avatar' : ''}}" value="{{username}}" bindinput="onUsername" placeholder="请输入用户名或邮箱" placeholder-style="color:#b7aaa1" autocomplete="username" />
+          <image wx:if="{{previewAvatar}}" class="username-avatar" src="{{previewAvatar}}" mode="aspectFill" />
+        </view>
+      </view>
+
+      <view class="field-group">
+        <view class="field-label"><text class="van-icon van-icon-lock"></text><text>密码</text></view>
+        <view class="input-shell password-shell">
+          <input class="native-input" value="{{password}}" bindinput="onPassword" placeholder="请输入密码" placeholder-style="color:#b7aaa1" password="{{!passwordVisible}}" confirm-type="done" bindconfirm="submit" />
+          <view class="icon-button" role="button" aria-label="{{passwordVisible ? '隐藏密码' : '显示密码'}}" bindtap="togglePassword"><text class="van-icon {{passwordVisible ? 'van-icon-eye-o' : 'van-icon-closed-eye'}}"></text></view>
+        </view>
+      </view>
+
+      <view class="form-options">
+        <view class="remember" role="checkbox" aria-checked="{{rememberMe}}" bindtap="toggleRemember"><view class="checkbox {{rememberMe ? 'checked' : ''}}"><text wx:if="{{rememberMe}}" class="van-icon van-icon-success"></text></view><text>记住我</text></view>
+        <view class="forgot" role="button" bindtap="forgotPassword"><text>忘记密码？</text><text class="van-icon van-icon-arrow"></text></view>
+      </view>
+
+      <view class="login-button {{loading ? 'is-loading' : ''}}" role="button" aria-label="{{loading ? '正在登录' : '进入生活助手'}}" aria-disabled="{{loading}}" bindtap="submit">{{loading ? '正在进家门...' : '进入生活助手'}}</view>
+
+      <view class="guest-row"><text>还没有账号？</text><text class="link" bindtap="register">注册账号</text><text>·</text><text class="link" bindtap="guestLogin">游客登录</text></view>
+
+      <view class="family-frame"><image class="family-illustration" src="/assets/login/login-family.webp" mode="widthFix" /></view>
+    </view>
+
+    <view class="footer-note"><text class="van-icon van-icon-like"></text><text>记录一家人的吃穿用度，把日子过明白</text><text class="van-icon van-icon-like"></text></view>
   </view>
 </view>

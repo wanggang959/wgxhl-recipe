@@ -139,6 +139,7 @@ function getCurrentUser() {
 }
 
 router.beforeEach((to) => {
+  if (to.path === '/recipes' && (to.query.pick === 'today' || to.query.mode === 'showcase')) return { path: '/recipes', replace: true }
   if (to.path === '/reset-password') return true
   const user = getCurrentUser()
   const isLogin = Boolean(user?.id && user?.token && user?.userRole)

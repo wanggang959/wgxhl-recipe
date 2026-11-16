@@ -1,0 +1,40 @@
+<view class="page wanted-page">
+  <view class="app-header"><view><view class="eyebrow">{{user.householdName || '王师傅家'}}</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view wx:if="{{!guest}}" class="header-add" role="button" aria-label="添加菜谱" bindtap="add">＋</view></view></view>
+  <view class="page-head"><view><view class="eyebrow">我的菜单</view><view class="page-title">想吃</view></view><view class="page-count">{{list.length}} 道</view></view>
+  <view wx:if="{{guest}}" class="surface state">游客只能浏览公共菜谱，想吃清单是家庭成员的功能。</view>
+  <block wx:else>
+    <scroll-view scroll-x class="date-scroll" show-scrollbar="{{false}}"><view class="date-tabs"><view wx:for="{{dateTabs}}" wx:key="value" class="date-tab {{selectedDate===item.value?'active':''}}" data-value="{{item.value}}" bindtap="pickDate">{{item.label}}</view></view></scroll-view>
+    <view wx:if="{{hasWanted}}" class="quick-actions"><view class="quick-button" role="button" bindtap="openNotify"><text class="van-icon van-icon-bell"></text> 通知家人备菜</view></view>
+    <view wx:if="{{loading}}" class="state">正在加载...</view>
+    <view wx:elif="{{error}}" class="surface state" bindtap="retry">{{error}}，点击重试</view>
+    <view wx:elif="{{!list.length}}" class="empty-state"><view class="empty-plate"><text class="van-icon van-icon-shop-o"></text></view><view class="empty-text">这天还没有想吃的菜</view><button class="empty-button" bindtap="goHome">去首页挑菜</button></view>
+    <block wx:else>
+      <view class="want-list">
+        <view wx:for="{{list}}" wx:key="id" class="want-item" data-id="{{item.recipeId}}" bindtap="openRecipe">
+          <image wx:if="{{item.coverUrl}}" class="want-cover" src="{{item.coverUrl}}" mode="aspectFill" lazy-load/>
+          <view wx:else class="want-cover placeholder">菜</view>
+          <view class="want-info"><view class="want-name">{{item.recipeName}}</view><view class="want-date">{{item.plannedLabel}} 想吃</view></view>
+          <view class="want-actions"><view class="want-action" role="button" data-id="{{item.id}}" catchtap="openEdit">改日期</view><view class="want-action danger" role="button" data-id="{{item.id}}" catchtap="remove">删除</view></view>
+        </view>
+      </view>
+      <view wx:if="{{loadingMore}}" class="state">正在加载...</view>
+      <view wx:elif="{{list.length>=total}}" class="state">已显示全部</view>
+    </block>
+  </block>
+</view>
+<view wx:if="{{editOpen}}" class="sheet-layer" bindtap="closeEdit">
+  <view class="sheet" catchtap="swallow">
+    <view class="sheet-title">{{editTarget.recipeName || '修改想吃日期'}}</view>
+    <view class="sheet-row"><text>想吃日期</text><picker mode="date" value="{{editDate}}" start="{{today}}" end="2099-12-31" bindchange="changeEditDate"><view class="sheet-value">{{editDate}} ›</view></picker></view>
+    <view class="sheet-actions"><button class="sheet-cancel" disabled="{{busy}}" bindtap="closeEdit">取消</button><button class="sheet-submit" loading="{{busy}}" disabled="{{busy}}" bindtap="submitEdit">保存</button></view>
+  </view>
+</view>
+<view wx:if="{{notifyOpen}}" class="sheet-layer" bindtap="closeNotify">
+  <view class="sheet" catchtap="swallow">
+    <view class="sheet-title">通知家人备菜</view>
+    <view class="notify-preview">{{notifyPreview}}</view>
+    <view class="notify-members"><view wx:for="{{notifyMembers}}" wx:key="id" class="member-chip {{item.selected?'active':''}}" data-id="{{item.id}}" bindtap="toggleNotifyMember">{{item.label}}</view></view>
+    <view class="sheet-actions"><button class="sheet-cancel" disabled="{{notifyBusy}}" bindtap="closeNotify">取消</button><button class="sheet-submit" loading="{{notifyBusy}}" disabled="{{notifyBusy}}" bindtap="submitNotify">发送通知</button></view>
+  </view>
+</view>
+<notice-panel visible="{{noticeOpen}}" bind:close="closeNotifications" bind:change="refreshUnread" />

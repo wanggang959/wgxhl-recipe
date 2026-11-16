@@ -3,7 +3,7 @@ const api = require('../../services/api')
 const {displayMember,isGuest} = require('../../utils/profile')
 Page({
   data:{ user:null, profile:null, members:[], membersPage:0, membersTotal:0, membersLoading:false, membersError:'', guestStatusBusy:false, isGuest:false, canManage:false, unread:0, noticeOpen:false, passwordOpen:false, passwordBusy:false, passwordError:'', oldPassword:'', newPassword:'', confirmPassword:'' },
-  onShow() { const user=session.get(); if (!user?.token) { wx.reLaunch({url:'/pages/login/index'}); return } this.getTabBar()?.setData({selected:'profile',hidden:false}); const guest=isGuest(user); this.setData({user,profile:displayMember(user),isGuest:guest,canManage:!guest && (['owner','admin'].includes(user.memberRole) || user.userRole==='super_admin')}); if(!guest)this.loadMembers(true); else { this.membersRequestVersion=(this.membersRequestVersion||0)+1; this.setData({members:[],membersPage:0,membersTotal:0,membersLoading:false,membersError:''}) } this.refreshUnread(); this.unreadTimer=setInterval(()=>this.refreshUnread(),60000) },
+  onShow() { const user=session.get(); if (!user?.token) { wx.reLaunch({url:'/pages/login/index'}); return } this.getTabBar()?.setData({selected:'profile',hidden:false}); const guest=isGuest(user); this.setData({user,profile:displayMember(user),isGuest:guest,canManage:!guest && (['owner','admin'].includes(user.memberRole) || user.userRole==='super_admin')}); if(!guest)this.loadMembers(true); else { this.membersRequestVersion=(this.membersRequestVersion||0)+1; this.setData({members:[],membersPage:0,membersTotal:0,membersLoading:false,membersError:''}) } this.checkAdminAccess(); this.refreshUnread(); this.stopUnreadRefresh(); this.unreadTimer=setInterval(()=>this.refreshUnread(),60000) },
   onReachBottom() { if(!this.data.isGuest && !this.data.membersError && this.data.membersPage>0 && this.data.members.length<this.data.membersTotal)this.loadMembers(false) },
   onHide() { this.stopUnreadRefresh(); this.closeNotifications(); this.closePassword() },
   onUnload() { this.stopUnreadRefresh() },
@@ -11,7 +11,6 @@ Page({
   async refreshUnread() { try { const count=await api.post('/notification/unreadCount'); this.setData({unread:Math.max(0,Number(count)||0)}) } catch(_) {} },
   openNotifications() { this.setData({noticeOpen:true}); this.getTabBar()?.setData({hidden:true}); wx.hideTabBar({animation:false,fail:()=>{}}) },
   closeNotifications() { if(!this.data.noticeOpen)return; this.setData({noticeOpen:false}); this.getTabBar()?.setData({hidden:false}); wx.showTabBar({animation:false,fail:()=>{}}); this.refreshUnread() },
-  add() { wx.navigateTo({url:'/pages/todo-form/index'}) },
   async loadMembers(reset = false) {
     if(!reset && (this.data.membersLoading || (this.data.membersPage>0 && this.data.members.length>=this.data.membersTotal)))return
     const version=(this.membersRequestVersion||0)+1
@@ -36,11 +35,13 @@ Page({
     finally { if(version===this.membersRequestVersion)this.setData({membersLoading:false}) }
   },
   retryMembers() { this.loadMembers(this.data.membersPage===0) },
-  unavailable() { wx.showToast({title:'功能开发中',icon:'none'}) },
+  async checkAdminAccess() { const user=this.data.user;this.setData({canAccessAdmin:false});if(!user?.token || !(user.userRole==='super_admin'||user.username==='王师傅'))return;try{const allowed=await api.get('/platform-admin/access');if(this.data.user?.id===user.id)this.setData({canAccessAdmin:Boolean(allowed)})}catch(_){} },
+  openAdmin() { if(this.data.canAccessAdmin)wx.navigateTo({url:'/pages/platform-admin/index'}) },
+  addRecipe() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/recipe-form/index'}) },
   openEmailSecurity() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/email-security/index'}) },
   openHousehold() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/household/index'}) },
   openCommute() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/commute/index'}) },
-  openExpense() { wx.navigateTo({url:'/pages/expense/index'}) },
+  openExpense() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/expense/index'}) },
   openBaseManage() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/base-manage/index'}) },
   addMember() { if(this.data.canManage)wx.navigateTo({url:'/pages/member-form/index'}) },
   editMember(e) {

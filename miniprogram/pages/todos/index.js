@@ -1,5 +1,6 @@
 const api = require('../../services/api')
 const session = require('../../services/session')
+const { isGuest } = require('../../utils/profile')
 const { present } = require('../../utils/todo')
 const { groupItems } = require('../../utils/todoList')
 async function allPages(path, query = {}) {
@@ -19,13 +20,13 @@ Page({
   updateGroups() { this.setData(groupItems(this.data.items, this.data.plans, this.data.category, this.data.range)) },
   chooseRange(e) { this.setData({range:e.currentTarget.dataset.value}); this.updateGroups() },
   chooseCategory(e) { this.setData({category:e.currentTarget.dataset.value}); this.updateGroups() },
-  onShow() { if (!session.get()?.token) { wx.reLaunch({ url:'/pages/login/index' }); return } this.getTabBar()?.setData({selected:'todos',hidden:false}); this.load(true); this.loadPlans(true); this.refreshUnread(); this.unreadTimer = setInterval(() => this.refreshUnread(), 60000) },
+  onShow() { const user=session.get(); if (!user?.token) { wx.reLaunch({ url:'/pages/login/index' }); return } if (isGuest(user)) { wx.switchTab({ url:'/pages/home/index' }); return } this.getTabBar()?.setData({selected:'todos',hidden:false}); this.load(true); this.loadPlans(true); this.refreshUnread(); this.unreadTimer = setInterval(() => this.refreshUnread(), 60000) },
   onHide() { this.stopUnreadRefresh(); this.closeNotifications() },
   onUnload() { this.stopUnreadRefresh() },
   stopUnreadRefresh() { if (this.unreadTimer) clearInterval(this.unreadTimer); this.unreadTimer = null },
   async refreshUnread() { try { const count = await api.post('/notification/unreadCount'); this.setData({unread:Math.max(0, Number(count) || 0)}) } catch (_) {} },
-  openNotifications() { this.setData({noticeOpen:true}); this.getTabBar()?.setData({hidden:true}); wx.hideTabBar({animation:false,fail:()=>{}}) },
-  closeNotifications() { if (!this.data.noticeOpen) return; this.setData({noticeOpen:false}); this.getTabBar()?.setData({hidden:false}); wx.showTabBar({animation:false,fail:()=>{}}); this.refreshUnread() },
+  openNotifications() { this.setData({noticeOpen:true}); this.getTabBar()?.setData({hidden:true}); wx.hideTabBar({animation:false,fail:()=>{}}) },  closeNotifications() { if (!this.data.noticeOpen) return; this.setData({noticeOpen:false}); this.getTabBar()?.setData({hidden:false}); wx.showTabBar({animation:false,fail:()=>{}}); this.refreshUnread() },
+  openSummary() { wx.navigateTo({url:'/pages/todo-summary/index?range=today'}) },
   onPullDownRefresh() { Promise.all([this.load(true),this.loadPlans(true)]).finally(() => wx.stopPullDownRefresh()) },
   onReachBottom() { if (this.data.items.length < this.data.total) this.load(false) },
   async load(reset) {

@@ -18,3 +18,6 @@
 .van-icon-cluster-o::before{content:"\e693"}
 .van-icon-shield-o::before{content:"\e74b"}
 .van-icon-like-o::before{content:"\e6d7"}
+.van-icon-shop-o::before{content:"\e71b"}.van-icon-like::before{content:"\e6d4"}.van-icon-good-job::before{content:"\e6c9"}.van-icon-good-job-o::before{content:"\e6c5"}
+.van-icon-arrow-left::before{content:"\e668"}.van-icon-plus::before{content:"\e6fa"}.van-icon-photo-o::before{content:"\e700"}
+.van-icon-lock::before{content:"\e6dc"}.van-icon-eye-o::before{content:"\e6b3"}.van-icon-closed-eye::before{content:"\e691"}.van-icon-arrow::before{content:"\e660"}.van-icon-checked::before{content:"\e68d"}.van-icon-warning-o::before{content:"\e743"}

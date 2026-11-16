@@ -1,6 +1,7 @@
 const api=require('../../services/api')
 const session=require('../../services/session')
 const {isGuest}=require('../../utils/profile')
+const expenseExport=require('../../utils/expenseExport')
 const projectTypes=[{value:'WEDDING',label:'婚礼'},{value:'DECORATION',label:'装修'},{value:'MOVE',label:'搬家'},{value:'TRAVEL',label:'旅行'},{value:'BABY',label:'备产'},{value:'OTHER',label:'其他'}]
 const categories=[{value:'',label:'全部'},{value:'FOOD',label:'食品'},{value:'CLOTHES',label:'服饰'},{value:'JEWELRY',label:'首饰'},{value:'HOME_TEXTILE',label:'家纺'},{value:'APPLIANCE',label:'家电'},{value:'BANQUET',label:'酒席'},{value:'HOME',label:'婚房'},{value:'DOCUMENT',label:'证件'},{value:'SUPPLY',label:'用品'},{value:'OTHER',label:'其他'}]
 const statuses=[{value:'',label:'全部'},{value:'CONFIRM',label:'待确认'},{value:'TODO',label:'待购买'},{value:'ORDERED',label:'已下单'},{value:'RECEIVED',label:'已到货'},{value:'DONE',label:'已完成'},{value:'CANCELLED',label:'已取消'}]
@@ -45,6 +46,29 @@ Page({
   finally{if(version===this.itemsVersion)this.setData({itemsLoading:false})}
  },
  onReachBottom(){if(this.data.view==='list'&&!this.data.itemsLoading&&this.data.items.length<this.data.total)this.loadItems(false)},
+ async exportImage(){
+  if(!this.data.project||this.data.exporting)return
+  const {selectedId,category,status}=this.data,projectName=this.data.project.projectName
+  this.setData({exporting:true,exportError:'',exportPath:'',exportCanvasHeight:1})
+  try{
+   const entries=await expenseExport.loadEntries(api.post,{projectId:selectedId,category,status})
+   if(this.data.selectedId!==selectedId||this.data.category!==category||this.data.status!==status)throw Error('筛选条件已变化，请重新导出')
+   const query=()=>new Promise((resolve,reject)=>wx.nextTick(()=>wx.createSelectorQuery().in(this).select('#expense-export-canvas').fields({node:true,size:true}).exec(result=>result?.[0]?.node?resolve(result[0].node):reject(Error('图片画布初始化失败')))))
+   let canvas=await query(),ctx=canvas.getContext('2d')
+   if(!ctx)throw Error('当前设备暂不支持生成图片')
+   const layout=expenseExport.layout(ctx,projectName,entries)
+   this.setData({exportCanvasHeight:layout.height})
+   canvas=await query();canvas.width=expenseExport.WIDTH;canvas.height=layout.height;ctx=canvas.getContext('2d');expenseExport.draw(ctx,layout)
+   const path=await new Promise((resolve,reject)=>wx.canvasToTempFilePath({canvas,fileType:'png',success:result=>resolve(result.tempFilePath),fail:()=>reject(Error('图片生成失败，请稍后重试'))},this))
+   if(this.data.selectedId!==selectedId||this.data.category!==category||this.data.status!==status)throw Error('筛选条件已变化，请重新导出')
+   this.setData({exportPath:path,exportOpen:true})
+  }catch(error){wx.showToast({title:error.message||'图片生成失败',icon:'none'})}
+  finally{this.setData({exporting:false})}
+ },
+ closeExport(){this.setData({exportOpen:false,exportPath:''})},
+ saveExport(){const filePath=this.data.exportPath;if(!filePath)return;wx.saveImageToPhotosAlbum({filePath,success:()=>wx.showToast({title:'已保存到相册',icon:'success'}),fail:()=>wx.showToast({title:'保存失败，请检查相册权限',icon:'none'})})},
+ shareExport(){const path=this.data.exportPath;if(!path)return;if(typeof wx.showShareImageMenu!=='function'){wx.showToast({title:'当前微信版本不支持分享图片',icon:'none'});return}wx.showShareImageMenu({path,fail:()=>wx.showToast({title:'分享未完成',icon:'none'})})},
+ swallow(){},
  chooseProject(e){const project=this.data.projects.find(p=>p.id===e.currentTarget.dataset.id);if(!project||project.id===this.data.selectedId)return;this.setData({project,selectedId:project.id,items:[],page:0,total:0,summary:null,category:'',status:''});this.loadItems(true)},
  toggleArchived(){this.setData({showArchived:!this.data.showArchived});this.loadProjects()},
  filter(e){const kind=e.currentTarget.dataset.kind,value=e.currentTarget.dataset.value;if(kind==='category'||kind==='status'){this.setData({[kind]:value,items:[],page:0,total:0,summary:null});this.loadItems(true)}},

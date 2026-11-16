@@ -1,0 +1,121 @@
+<view class="page form-page">
+  <view wx:if="{{loading}}" class="state">正在加载...</view>
+  <view wx:elif="{{error}}" class="surface state" bindtap="bootstrap">{{error}}，点击重试</view>
+  <block wx:else>
+    <view class="form-section surface">
+      <view class="section-title">基础信息</view>
+      <view class="field"><view class="label">菜名 <text class="required">*</text></view><input value="{{form.recipeName}}" data-field="form.recipeName" bindinput="field" maxlength="64" placeholder="请输入菜名" /></view>
+      <view class="field"><view class="label">版本</view><input value="{{form.recipeVersion}}" data-field="form.recipeVersion" bindinput="field" maxlength="5" placeholder="默认 1.0，如 2.0" /></view>
+      <view class="hint">同一上传者下，菜名 + 版本唯一（如「青椒肉丝 1.0」与「青椒肉丝 2.0」可并存）。</view>
+      <view class="select-grid">
+        <view class="field"><view class="label">分类</view><picker range="{{categoryOptions}}" range-key="categoryName" value="{{categoryIndex}}" bindchange="changeCategory"><view class="picker">{{categoryOptions[categoryIndex].categoryName}} <text>›</text></view></picker></view>
+        <view class="field"><view class="label">口味</view><input value="{{form.taste}}" data-field="form.taste" bindinput="field" maxlength="32" placeholder="如：微辣" /></view>
+      </view>
+      <view class="select-grid">
+        <view class="field"><view class="label">可见范围</view><picker range="{{visibilityOptions}}" range-key="label" value="{{visibilityIndex}}" bindchange="changeVisibility"><view class="picker">{{visibilityOptions[visibilityIndex].label}} <text>›</text></view></picker></view>
+        <view class="field"><view class="label">难度</view><picker range="{{difficultyOptions}}" value="{{difficultyIndex}}" bindchange="changeDifficulty"><view class="picker">{{difficultyOptions[difficultyIndex]}} <text>›</text></view></picker></view>
+      </view>
+      <view class="field"><view class="label">用时（分钟）</view><input type="number" value="{{form.cookingMinutes}}" data-field="form.cookingMinutes" bindinput="field" maxlength="5" placeholder="如：30" /></view>
+      <view class="hint">选「所有人可见」时，其他家庭和游客看到的是公开昵称。</view>
+      <view class="field"><view class="label">人数</view><picker range="{{servingPickerOptions}}" value="{{servingIndex}}" bindchange="changeServing"><view class="picker">{{servingPickerOptions[servingIndex]}} <text>›</text></view></picker></view>
+      <view class="field"><view class="label">成品图</view>
+        <view class="cover-uploader" bindtap="uploadCover">
+          <image wx:if="{{coverPreview}}" class="cover-image" src="{{coverPreview}}" mode="aspectFill"/>
+          <view wx:else class="upload-ghost"><text class="upload-plus">＋</text><text>{{coverUploading ? '上传中...' : '上传封面'}}</text></view>
+          <view wx:if="{{coverUploading && coverPreview}}" class="upload-mask">上传中...</view>
+        </view>
+        <view wx:if="{{coverPreview}}" class="link-danger" bindtap="removeCover">移除封面</view>
+      </view>
+    </view>
+
+    <view class="form-section surface">
+      <view class="section-title">食材列表</view>
+      <view wx:for="{{ingredients}}" wx:key="key" class="row-panel">
+        <view class="row-head"><text>食材 {{index + 1}}</text><text class="row-delete" data-index="{{index}}" bindtap="removeIngredient">删除</text></view>
+        <view class="base-trigger" data-type="ingredient" data-index="{{index}}" bindtap="openBasePicker">
+          <image wx:if="{{item.imageUrl}}" class="base-thumb" src="{{item.imageUrl}}" mode="aspectFill"/>
+          <view wx:else class="base-thumb placeholder">食</view>
+          <text class="base-name {{item.ingredientName ? '' : 'empty'}}">{{item.ingredientName || '请选择食材'}}</text>
+          <text class="chevron">›</text>
+        </view>
+        <view class="select-grid">
+          <view class="field"><view class="label">用量</view><input value="{{item.amount}}" data-index="{{index}}" data-field="amount" bindinput="ingredientField" placeholder="如：1" /></view>
+          <view class="field"><view class="label">单位</view><picker range="{{ingredientUnits}}" value="{{item.unitIndex}}" data-index="{{index}}" bindchange="changeIngredientUnit"><view class="picker">{{item.unit}} <text>›</text></view></picker></view>
+        </view>
+      </view>
+      <view class="row-actions"><button class="tail-button" bindtap="addIngredient">＋ 添加食材</button><button class="tail-button ghost" data-type="ingredient" bindtap="openQuick">＋ 新建食材</button></view>
+    </view>
+
+    <view class="form-section surface">
+      <view class="section-title">调料列表</view>
+      <view wx:for="{{seasonings}}" wx:key="key" class="row-panel">
+        <view class="row-head"><text>调料 {{index + 1}}</text><text class="row-delete" data-index="{{index}}" bindtap="removeSeasoning">删除</text></view>
+        <view class="base-trigger" data-type="seasoning" data-index="{{index}}" bindtap="openBasePicker">
+          <image wx:if="{{item.imageUrl}}" class="base-thumb" src="{{item.imageUrl}}" mode="aspectFill"/>
+          <view wx:else class="base-thumb placeholder">调</view>
+          <text class="base-name {{item.seasoningName ? '' : 'empty'}}">{{item.seasoningName || '请选择调料'}}</text>
+          <text class="chevron">›</text>
+        </view>
+        <view class="select-grid">
+          <view class="field"><view class="label">用量</view><input value="{{item.amount}}" data-index="{{index}}" data-field="amount" bindinput="seasoningField" placeholder="如：少许" /></view>
+          <view class="field"><view class="label">单位</view><picker range="{{seasoningUnits}}" value="{{item.unitIndex}}" data-index="{{index}}" bindchange="changeSeasoningUnit"><view class="picker">{{item.unit}} <text>›</text></view></picker></view>
+        </view>
+      </view>
+      <view class="row-actions"><button class="tail-button" bindtap="addSeasoning">＋ 添加调料</button><button class="tail-button ghost" data-type="seasoning" bindtap="openQuick">＋ 新建调料</button></view>
+    </view>
+
+    <view class="form-section surface">
+      <view class="section-title">制作步骤</view>
+      <view wx:for="{{steps}}" wx:key="key" class="row-panel">
+        <view class="row-head"><text>步骤 {{index + 1}}</text><view class="step-tools"><text class="row-tool {{index === 0 ? 'disabled' : ''}}" data-index="{{index}}" data-direction="-1" bindtap="moveStep">上移</text><text class="row-tool {{index === steps.length - 1 ? 'disabled' : ''}}" data-index="{{index}}" data-direction="1" bindtap="moveStep">下移</text><text class="row-delete" data-index="{{index}}" bindtap="removeStep">删除</text></view></view>
+        <view class="field"><view class="label">标题</view><input value="{{item.stepTitle}}" data-index="{{index}}" data-field="stepTitle" bindinput="stepField" maxlength="64" placeholder="如：腌制肉丝" /></view>
+        <view class="field"><view class="label">说明</view><textarea value="{{item.stepDesc}}" data-index="{{index}}" data-field="stepDesc" bindinput="stepField" maxlength="1000" placeholder="这一步怎么做" /></view>
+        <view class="step-image" data-index="{{index}}" bindtap="uploadStepImage">
+          <image wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="widthFix"/>
+          <view wx:else class="upload-ghost">{{uploadingStepIndex === index ? '上传中...' : '上传步骤图'}}</view>
+        </view>
+        <view wx:if="{{item.imageUrl}}" class="link-danger" data-index="{{index}}" bindtap="removeStepImage">移除步骤图</view>
+      </view>
+      <view class="row-actions"><button class="tail-button" bindtap="addStep">＋ 添加步骤</button></view>
+    </view>
+
+    <view class="form-section surface"><view class="section-title">小贴士</view><view class="field"><textarea value="{{form.remark}}" data-field="form.remark" bindinput="field" maxlength="500" placeholder="容易翻车的地方、替代做法..." /></view></view>
+    <view class="form-section surface"><view class="section-title">简介</view><view class="field"><textarea value="{{form.recipeDesc}}" data-field="form.recipeDesc" bindinput="field" maxlength="500" placeholder="这道菜的来历、口味特点..." /></view></view>
+    <view class="save-space"></view>
+  </block>
+</view>
+<view wx:if="{{!loading && !error}}" class="save-bar"><view class="save-button {{saving || coverUploading || uploadingKey ? 'is-busy' : ''}}" role="button" aria-disabled="{{saving || coverUploading || !!uploadingKey}}" bindtap="submit">{{saving ? '保存中...' : isEdit ? '保存修改' : '保存菜谱'}}</view></view>
+
+<view wx:if="{{baseOpen}}" class="sheet-layer" bindtap="closeBasePicker">
+  <view class="sheet" catchtap="swallow">
+    <view class="sheet-title">选择{{baseType === 'ingredient' ? '食材' : '调料'}}</view>
+    <view class="search-row"><input value="{{baseKeyword}}" bindinput="inputBaseKeyword" bindconfirm="searchBase" confirm-type="search" placeholder="搜索名称或描述" /><view class="search-button" bindtap="searchBase">搜索</view></view>
+    <view wx:if="{{baseError}}" class="error-text">{{baseError}}</view>
+    <scroll-view scroll-y class="base-list" bindscrolltolower="loadMoreBase">
+      <view wx:for="{{baseList}}" wx:key="id" class="base-item" data-id="{{item.id}}" bindtap="selectBase">
+        <image wx:if="{{item.imageUrl}}" class="base-thumb" src="{{item.imageUrl}}" mode="aspectFill"/>
+        <view wx:else class="base-thumb placeholder">{{baseType === 'ingredient' ? '食' : '调'}}</view>
+        <view class="base-info"><view class="base-title">{{item.name}}</view><view wx:if="{{item.desc}}" class="base-desc">{{item.desc}}</view></view>
+        <text wx:if="{{item.selected}}" class="base-check">✓</text>
+      </view>
+      <view wx:if="{{baseLoading}}" class="state">正在加载...</view>
+      <view wx:elif="{{!baseList.length}}" class="state">没有找到，试试新建</view>
+      <view wx:elif="{{baseList.length >= baseTotal}}" class="state">已显示全部</view>
+    </scroll-view>
+    <view class="sheet-actions"><button class="sheet-cancel" bindtap="closeBasePicker">取消</button><button class="sheet-submit" bindtap="openQuickFromBase">新建{{baseType === 'ingredient' ? '食材' : '调料'}}</button></view>
+  </view>
+</view>
+
+<view wx:if="{{quickOpen}}" class="sheet-layer" bindtap="closeQuick">
+  <view class="sheet" catchtap="swallow">
+    <view class="sheet-title">新建{{quickType === 'ingredient' ? '食材' : '调料'}}</view>
+    <view class="field"><view class="label">名称 <text class="required">*</text></view><input value="{{quickName}}" data-field="quickName" bindinput="quickField" maxlength="64" placeholder="如：青椒" /></view>
+    <view class="field"><view class="label">描述（选填）</view><input value="{{quickDesc}}" data-field="quickDesc" bindinput="quickField" maxlength="200" placeholder="如：本地薄皮青椒" /></view>
+    <view class="quick-image" bindtap="uploadQuickImage">
+      <image wx:if="{{quickPreview}}" src="{{quickPreview}}" mode="aspectFill"/>
+      <view wx:else class="upload-ghost">{{quickUploading ? '上传中...' : '上传图片（选填）'}}</view>
+    </view>
+    <view wx:if="{{quickError}}" class="error-text">{{quickError}}</view>
+    <view class="sheet-actions"><button class="sheet-cancel" disabled="{{quickSaving}}" bindtap="closeQuick">取消</button><button class="sheet-submit" loading="{{quickSaving}}" disabled="{{quickSaving || quickUploading}}" bindtap="submitQuick">创建并选用</button></view>
+  </view>
+</view>

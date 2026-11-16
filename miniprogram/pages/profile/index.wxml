@@ -1,19 +1,19 @@
 <view class="page profile-page">
-  <view class="app-header"><view><view class="eyebrow">{{user.householdName || '王师傅家'}}</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view class="header-add" role="button" aria-label="新增待办" bindtap="add">＋</view></view></view>
+  <view class="app-header"><view><view class="eyebrow">{{user.householdName || '王师傅家'}}</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view wx:if="{{!isGuest}}" class="header-add" role="button" aria-label="添加菜谱" bindtap="addRecipe">＋</view></view></view>
 
   <view class="profile-card surface"><image class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill"></image><view class="profile-main"><view class="eyebrow">我的</view><view class="profile-name">{{profile.nickname || profile.username}}</view><view class="profile-role">{{profile.roleLabel}}</view></view></view>
 
   <view wx:if="{{!isGuest}}" class="section surface"><view class="section-title">家庭</view><view class="row"><text>当前家庭</text><text class="row-value">{{user.householdName || '未加入'}}</text></view><view class="outline-command" role="button" bindtap="openHousehold">切换 / 创建家庭</view></view>
 
-  <view wx:if="{{!isGuest}}" class="shortcut-grid"><view class="shortcut" role="button" bindtap="unavailable"><text class="van-icon van-icon-plus"></text> 添加菜谱</view><view class="shortcut" role="button" bindtap="openBaseManage"><text class="van-icon van-icon-apps-o"></text> 基础数据</view></view>
+  <view wx:if="{{!isGuest}}" class="shortcut-grid"><view class="shortcut" role="button" bindtap="addRecipe"><text class="van-icon van-icon-plus"></text> 添加菜谱</view><view class="shortcut" role="button" bindtap="openBaseManage"><text class="van-icon van-icon-apps-o"></text> 基础数据</view></view>
 
   <view class="section surface"><view class="section-title">账号</view><view class="row"><text>当前用户</text><text class="row-value">{{profile.nickname || profile.username}}</text></view><view class="row"><text>权限</text><text class="row-value">{{profile.roleLabel}}</text></view>
-    <block wx:if="{{!isGuest}}"><view class="row link-row" role="button" bindtap="openEmailSecurity"><text>邮箱安全</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openPassword"><text>修改密码</text><text class="van-icon van-icon-arrow"></text></view><view class="push-setting"><view><view class="push-title">微信通知</view><view class="push-caption">暂未接入</view></view><text class="pending">开发中</text></view></block>
+    <block wx:if="{{!isGuest}}"><view wx:if="{{canAccessAdmin}}" class="row link-row" role="button" bindtap="openAdmin"><text>系统管理</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openEmailSecurity"><text>邮箱安全</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openPassword"><text>修改密码</text><text class="van-icon van-icon-arrow"></text></view><view class="push-setting"><view><view class="push-title">微信通知</view><view class="push-caption">暂未接入</view></view><text class="pending">开发中</text></view></block>
     <view class="logout" role="button" bindtap="logout">退出登录</view>
   </view>
 
-  <view class="section surface"><view class="section-title">生活工具</view>
-    <view wx:if="{{!isGuest}}" class="tool-entry" role="button" bindtap="openCommute"><view class="tool-icon"><text class="van-icon van-icon-logistics"></text></view><view class="tool-copy"><view class="tool-title">通勤记录</view><view class="tool-subtitle">记录每日上班通勤耗时</view></view><text class="van-icon van-icon-arrow"></text></view>
+  <view wx:if="{{!isGuest}}" class="section surface"><view class="section-title">生活工具</view>
+    <view class="tool-entry" role="button" bindtap="openCommute"><view class="tool-icon"><text class="van-icon van-icon-logistics"></text></view><view class="tool-copy"><view class="tool-title">通勤记录</view><view class="tool-subtitle">记录每日上班通勤耗时</view></view><text class="van-icon van-icon-arrow"></text></view>
     <view class="tool-entry" role="button" bindtap="openExpense"><view class="tool-icon"><text class="van-icon van-icon-balance-list-o"></text></view><view class="tool-copy"><view class="tool-title">专项开支</view><view class="tool-subtitle">婚礼、装修、搬家这类阶段性采购记录</view></view><text class="van-icon van-icon-arrow"></text></view>
   </view>
 

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "想吃",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "notice-panel": "/components/notice-panel/index"
+  }
+}

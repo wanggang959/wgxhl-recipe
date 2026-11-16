@@ -1,6 +1,7 @@
 const api = require('../../services/api')
 const session = require('../../services/session')
 const config = require('../../config')
+const {cropImage} = require('../../utils/imageUpload')
 const { isGuest } = require('../../utils/profile')
 const kinds = { category: '分类', ingredient: '食材', seasoning: '调料' }
 const imageBase = 'https://wg-recipe-1385696563.cos.ap-chengdu.myqcloud.com/'
@@ -58,7 +59,7 @@ Page({
   inputForm(e) { const field = e.currentTarget.dataset.field; if (['name','code','sortNo','description'].includes(field)) this.setData({ ['form.' + field]: e.detail.value, formError: '' }) },
   chooseImage() {
     if (this.data.uploading || this.data.saving) return
-    wx.chooseMedia({ count: 1, mediaType: ['image'], sizeType: ['compressed'], sourceType: ['album', 'camera'], success: result => { const file = result.tempFiles?.[0]; if (file?.tempFilePath) this.uploadImage(file.tempFilePath) } })
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sizeType: ['compressed'], sourceType: ['album', 'camera'], success: async result => { const file = result.tempFiles?.[0]; if (!file?.tempFilePath) return; this.setData({uploading:true}); try { const cropped=await cropImage(file.tempFilePath,this.data.kind); this.setData({uploading:false}); if(cropped && this.data.formOpen)this.uploadImage(cropped) } catch(error) { this.setData({uploading:false,formError:error.message||'图片裁剪失败'}) } } })
   },
   uploadImage(filePath) {
     const user = session.get(), kind = this.data.kind

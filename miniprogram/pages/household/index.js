@@ -58,6 +58,7 @@ Page({
   }})
  },
  copy(e){const code=e.currentTarget.dataset.code;if(code)wx.setClipboardData({data:code})},
+ copyLink(e){const code=e.currentTarget.dataset.code;if(code)wx.setClipboardData({data:`https://recipe.wgxhl.space/#/join?code=${encodeURIComponent(code)}`})},
  async join(){
   if(this.data.busy)return
   const inviteCode=this.data.joinCode.trim().toUpperCase()

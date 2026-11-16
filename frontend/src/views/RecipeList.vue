@@ -757,17 +757,15 @@ function submitCustomWantDate() {
         <RecipeCard
           v-for="item in list"
           :key="item.id"
+          class="home-recipe-card"
           :recipe="item"
           :favorite="Boolean(favoriteMap[item.id])"
-          :wanted="Boolean(wantedMap[item.id])"
           :liked="Boolean(item.liked)"
           :like-count="Number(item.likeCount || 0)"
           :show-like-button="canMutate"
           :show-favorite-button="canMutate"
-          :show-want-button="canMutate"
           @open="openDetail"
           @favorite="toggleFavoriteSafe"
-          @want="openWantAction"
           @like="toggleLikeOnCard"
         />
       </div>
@@ -1483,8 +1481,21 @@ function submitCustomWantDate() {
 
 .cards {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 759px) {
+  .home-page :deep(.home-recipe-card .body) { padding: 10px; }
+  .home-page :deep(.home-recipe-card .title-row) { flex-wrap: wrap; gap: 2px 6px; }
+  .home-page :deep(.home-recipe-card .title-row h3) { flex: 1 1 100%; font-size: 15px; }
+  .home-page :deep(.home-recipe-card .title-row span) { line-height: 1.4; }
+  .home-page :deep(.home-recipe-card .tags-row) { gap: 5px; margin-top: 8px; }
+  .home-page :deep(.home-recipe-card .tags-meta) { flex-wrap: wrap; margin-left: 0; min-width: 0; max-width: 100%; }
+  .home-page :deep(.home-recipe-card .tag) { overflow-wrap: anywhere; line-height: 1.25; }
+  .home-page :deep(.home-recipe-card .favorite) { width: 38px; height: 38px; }
+  .home-page :deep(.home-recipe-card .favorite.has-count) { width: auto; max-width: 60%; }
+  .home-page :deep(.home-recipe-card .like-pill) { min-width: 38px; height: 38px; box-sizing: border-box; }
 }
 
 .want-sheet {

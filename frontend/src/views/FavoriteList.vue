@@ -1,11 +1,9 @@
 <script setup>
-import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { closeToast, showFailToast, showSuccessToast } from 'vant'
 import { deleteFavorite, pageFavorite } from '../api/favorite'
 import { getRecipesBatch, toggleRecipeLike } from '../api/recipe'
-import { createWantedRecipe } from '../api/want'
-import ActionIcon from '../components/ActionIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadMoreSentinel from '../components/LoadMoreSentinel.vue'
 import RecipeCard from '../components/RecipeCard.vue'
@@ -16,7 +14,6 @@ const CACHE_MAX_AGE = 60 * 1000
 const favoriteListCache = {
   userId: '',
   list: [],
-  wantedMap: {},
   page: 0,
   total: 0,
   savedAt: 0,
@@ -30,17 +27,10 @@ const page = ref(favoriteListCache.userId === userStore.userId ? favoriteListCac
 const total = ref(favoriteListCache.userId === userStore.userId ? favoriteListCache.total : 0)
 let requestVersion = 0
 const list = ref(favoriteListCache.userId === userStore.userId ? [...favoriteListCache.list] : [])
-const wantedMap = ref(favoriteListCache.userId === userStore.userId ? { ...favoriteListCache.wantedMap } : {})
-const wantedPendingMap = ref({})
 const likePendingMap = ref({})
-const wantActionVisible = ref(false)
-const wantDateVisible = ref(false)
-const wantTargetRecipe = ref(null)
-const customWantDate = ref('')
 const watchedDataScopes = [DATA_SCOPE.favorites, DATA_SCOPE.wanted, DATA_SCOPE.recipes]
 const seenDataVersions = {}
 
-const minWantDate = computed(() => formatDate(new Date()))
 
 onMounted(() => {
   window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
@@ -92,7 +82,6 @@ async function loadFavorite(options = {}) {
     list.value = options.append ? [...list.value, ...enriched] : enriched
     page.value = nextPage
     total.value = Number(res.data.total || 0)
-    list.value.forEach((item) => { wantedMap.value[item.id] = Boolean(item.wanted) })
     saveFavoriteCache()
     rememberDataVersions(watchedDataScopes, seenDataVersions)
   } catch (error) {
@@ -116,7 +105,6 @@ function isCacheStale() {
 function saveFavoriteCache() {
   favoriteListCache.userId = userStore.userId || ''
   favoriteListCache.list = [...list.value]
-  favoriteListCache.wantedMap = { ...wantedMap.value }
   favoriteListCache.page = page.value
   favoriteListCache.total = total.value
   favoriteListCache.savedAt = Date.now()
@@ -187,73 +175,6 @@ async function toggleLikeOnCard(item) {
   }
 }
 
-function formatDate(date) {
-  const target = new Date(date)
-  const year = target.getFullYear()
-  const month = String(target.getMonth() + 1).padStart(2, '0')
-  const day = String(target.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function addDays(days) {
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  return formatDate(date)
-}
-
-function openWantAction(item) {
-  if (!userStore.userId) {
-    closeToast()
-    showFailToast('请先登录后再添加想吃')
-    return
-  }
-  wantTargetRecipe.value = item
-  wantActionVisible.value = true
-}
-
-function openWantDatePicker() {
-  customWantDate.value = minWantDate.value
-  wantActionVisible.value = false
-  wantDateVisible.value = true
-}
-
-function closeWantPanels() {
-  wantActionVisible.value = false
-  wantDateVisible.value = false
-  wantTargetRecipe.value = null
-}
-
-async function addWantedByDate(plannedDate) {
-  const recipe = wantTargetRecipe.value
-  if (!recipe || wantedPendingMap.value[recipe.id]) return
-  wantedPendingMap.value[recipe.id] = true
-  try {
-    const res = await createWantedRecipe({
-      userId: userStore.userId,
-      recipeId: recipe.id,
-      plannedDate,
-    })
-    wantedMap.value[recipe.id] = true
-    markDataStale([DATA_SCOPE.wanted, DATA_SCOPE.todos])
-    closeToast()
-    showSuccessToast({ message: res.message || '已添加到想吃', duration: 1400 })
-    closeWantPanels()
-    saveFavoriteCache()
-  } catch (error) {
-    closeToast()
-    showFailToast({ message: error.message || '添加想吃失败', duration: 1800 })
-  } finally {
-    wantedPendingMap.value[recipe.id] = false
-  }
-}
-
-function submitCustomWantDate() {
-  if (!customWantDate.value) {
-    showFailToast('请选择想吃日期')
-    return
-  }
-  addWantedByDate(customWantDate.value)
-}
 </script>
 
 <template>
@@ -283,48 +204,20 @@ function submitCustomWantDate() {
       <RecipeCard
         v-for="item in list"
         :key="item.favoriteId"
+        class="favorite-recipe-card"
         :recipe="item"
         favorite
-        :wanted="Boolean(wantedMap[item.id])"
         :liked="Boolean(item.liked)"
         :like-count="Number(item.likeCount || 0)"
         :show-like-button="userStore.canMutate"
         :show-favorite-button="userStore.canMutate"
-        :show-want-button="userStore.canMutate"
         @open="router.push(`/recipe/${item.id}`)"
         @favorite="removeSafe"
-        @want="openWantAction"
         @like="toggleLikeOnCard"
       />
       <LoadMoreSentinel v-if="list.length < total" :loading="loadingMore" @load="loadFavorite({ append: true, keepExisting: true })" />
     </div>
 
-    <van-popup v-model:show="wantActionVisible" position="bottom" round>
-      <div class="want-sheet">
-        <h3>{{ wantTargetRecipe?.recipeName || '这道菜' }}</h3>
-        <button type="button" class="want-sheet-primary" @click="openWantDatePicker">
-          <ActionIcon name="cart" :size="17" />
-          想吃
-        </button>
-        <button type="button" @click="closeWantPanels">取消</button>
-      </div>
-    </van-popup>
-
-    <van-popup v-model:show="wantDateVisible" position="bottom" round>
-      <div class="want-sheet">
-        <h3>选择想吃日期</h3>
-        <div class="want-date-actions">
-          <button type="button" @click="addWantedByDate(addDays(0))">今日</button>
-          <button type="button" @click="addWantedByDate(addDays(1))">明日</button>
-        </div>
-        <label class="want-custom-date">
-          <span>自选日期</span>
-          <input v-model="customWantDate" type="date" :min="minWantDate" />
-        </label>
-        <button type="button" class="want-sheet-primary" @click="submitCustomWantDate">添加到想吃</button>
-        <button type="button" @click="closeWantPanels">取消</button>
-      </div>
-    </van-popup>
   </section>
 </template>
 
@@ -373,68 +266,27 @@ function submitCustomWantDate() {
 
 .cards {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-}
-
-.want-sheet {
-  padding: 18px 14px max(18px, env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: #fffaf2;
-}
-
-.want-sheet h3 {
-  margin: 0 0 4px;
-  color: var(--app-text);
-  font-size: 17px;
-  line-height: 1.35;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-
-.want-sheet button {
-  width: 100%;
-  height: 44px;
-  border: 1px solid var(--app-border);
-  border-radius: 999px;
-  background: #fff;
-  color: #7c5c46;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-weight: 800;
-}
-
-.want-sheet button.want-sheet-primary,
-.want-date-actions button {
-  background: var(--app-primary);
-  color: #fff;
-  border-color: var(--app-primary);
-}
-
-.want-date-actions {
-  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.want-custom-date {
-  display: grid;
-  gap: 6px;
-  color: var(--app-muted);
-  font-size: 13px;
+@media (max-width: 759px) {
+  .favorite-page :deep(.favorite-recipe-card .body) { padding: 10px; }
+  .favorite-page :deep(.favorite-recipe-card .title-row) { flex-wrap: wrap; gap: 2px 6px; }
+  .favorite-page :deep(.favorite-recipe-card .title-row h3) { flex: 1 1 100%; font-size: 15px; }
+  .favorite-page :deep(.favorite-recipe-card .title-row span) { line-height: 1.4; }
+  .favorite-page :deep(.favorite-recipe-card .tags-row) { gap: 5px; margin-top: 8px; }
+  .favorite-page :deep(.favorite-recipe-card .tags-meta) { flex-wrap: wrap; margin-left: 0; min-width: 0; max-width: 100%; }
+  .favorite-page :deep(.favorite-recipe-card .tag) { overflow-wrap: anywhere; line-height: 1.25; }
+  .favorite-page :deep(.favorite-recipe-card .favorite) { width: 38px; height: 38px; }
+  .favorite-page :deep(.favorite-recipe-card .favorite.has-count) { width: auto; max-width: 60%; }
+  .favorite-page :deep(.favorite-recipe-card .like-pill) { min-width: 38px; height: 38px; box-sizing: border-box; }
 }
 
-.want-custom-date input {
-  height: 42px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  padding: 0 11px;
-  background: #fff;
-  color: var(--app-text);
-  outline: 0;
-}
+
+
+
+
+
+
 </style>

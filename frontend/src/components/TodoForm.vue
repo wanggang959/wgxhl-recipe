@@ -39,6 +39,7 @@ const repeats = [
   ['QUARTERLY', '每三个月'],
   ['HALF_YEARLY', '每半年'],
   ['YEARLY', '每年'],
+  ['CUSTOM_DAYS', '自定义天数'],
 ]
 
 const noticeOptions = [
@@ -66,6 +67,7 @@ const form = reactive({
   birthdayYear: '',
   description: '',
   repeatType: 'NONE',
+  repeatIntervalDays: 30,
   notifySite: true,
   notifyEmail: false,
   notifyPush: false,
@@ -101,6 +103,7 @@ watch(
       birthdayYear: value.birthdayYear || '',
       description: value.description || '',
       repeatType: value.repeatType || 'NONE',
+      repeatIntervalDays: value.repeatIntervalDays ?? 30,
       notifySite: value.notifySite !== false,
       notifyEmail: Boolean(value.notifyEmail),
       notifyPush: Boolean(value.notifyPush),
@@ -188,6 +191,7 @@ function submit() {
     ownerId: ownerIds[0] || '',
     title: form.title.trim(),
     description: form.description.trim(),
+    repeatIntervalDays: form.repeatType === 'CUSTOM_DAYS' && form.category !== 'BIRTHDAY' ? Number(form.repeatIntervalDays) : null,
     dueCalendar: form.category === 'BIRTHDAY' ? form.dueCalendar : 'SOLAR',
     lunarDueMonth: form.category === 'BIRTHDAY' && form.dueCalendar === 'LUNAR' ? Number(form.lunarDueMonth) : null,
     lunarDueDay: form.category === 'BIRTHDAY' && form.dueCalendar === 'LUNAR' ? Number(form.lunarDueDay) : null,
@@ -229,7 +233,7 @@ function submit() {
     </div>
     <label v-if="form.category !== 'BIRTHDAY'">
       <span>日期时间</span>
-      <input v-model="form.dueTime" type="datetime-local" />
+      <input v-model="form.dueTime" type="datetime-local" :required="form.repeatType === 'CUSTOM_DAYS'" />
     </label>
     <div v-if="form.category === 'BIRTHDAY'" class="birthday-date-box">
       <label>
@@ -269,8 +273,12 @@ function submit() {
     <label>
       <span>重复规则</span>
       <select v-model="form.repeatType">
-        <option v-for="[value, label] in repeats" :key="value" :value="value">{{ label }}</option>
+        <option v-for="[value, label] in repeats" :key="value" :value="value" :disabled="value === 'CUSTOM_DAYS' && form.category === 'BIRTHDAY'">{{ label }}</option>
       </select>
+    </label>
+    <label v-if="form.repeatType === 'CUSTOM_DAYS' && form.category !== 'BIRTHDAY'">
+      <span>每隔多少天</span>
+      <input v-model.number="form.repeatIntervalDays" type="number" min="1" max="3650" step="1" required placeholder="输入 1 至 3650 天" />
     </label>
     <div class="switch-row">
       <label><input v-model="form.notifySite" type="checkbox" />站内通知</label>

@@ -1,7 +1,8 @@
 {
-  "pages": ["pages/login/index", "pages/todos/index", "pages/profile/index", "pages/todo-form/index", "pages/notifications/index", "pages/todo-detail/index"],
+  "pages": ["pages/login/index", "pages/home/index", "pages/recipe-detail/index", "pages/todos/index", "pages/profile/index", "pages/todo-form/index", "pages/notifications/index", "pages/todo-detail/index", "pages/member-form/index", "pages/email-security/index", "pages/household/index", "pages/member-reset/index", "pages/commute/index", "pages/expense/index", "pages/base-manage/index"],
   "window": { "navigationBarTitleText": "王师傅家生活助手", "navigationBarBackgroundColor": "#fff9f2", "navigationBarTextStyle": "black", "backgroundColor": "#fff9f2" },
   "tabBar": { "custom": true, "color": "#927d6e", "selectedColor": "#f47716", "backgroundColor": "#fffdf9", "borderStyle": "white", "list": [
+    { "pagePath": "pages/home/index", "text": "首页" },
     { "pagePath": "pages/todos/index", "text": "家庭待办" },
     { "pagePath": "pages/profile/index", "text": "我的" }
   ] },

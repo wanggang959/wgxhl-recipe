@@ -9,7 +9,7 @@ test('navigation opens available tabs and marks unavailable sections honestly',(
  const p={data:{...tab.data,selected:'todos'}}
  tab.methods.navigate.call(p,{currentTarget:{dataset:{key:'profile'}}})
  tab.methods.navigate.call(p,{currentTarget:{dataset:{key:'home'}}})
- assert.deepEqual(calls,['/pages/profile/index','功能开发中']);delete global.wx
+ assert.deepEqual(calls,['/pages/profile/index','/pages/home/index']);delete global.wx
 })
 test('closing notice sheet does not mutate production messages',()=>{
  const events=[];sheet.methods.close.call({triggerEvent:name=>events.push(name)})

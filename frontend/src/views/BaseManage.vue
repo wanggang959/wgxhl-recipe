@@ -14,6 +14,7 @@ import { DATA_SCOPE, markDataStale } from '../utils/dataRefresh'
 import { transcodeImageToWebp } from '../utils/image'
 import LoadMoreSentinel from '../components/LoadMoreSentinel.vue'
 import { getImageUrl, toObjectPath } from '../utils/imageUrl'
+import { mergePageRecords, overlapStartPage } from '../utils/basePagination'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -247,14 +248,22 @@ async function loadBasePage(kind, fetchPage, target, params, append) {
   if (append && state.loading) return
   const version = ++state.version
   const current = append ? state.page + 1 : 1
+  if (!append) state.deletedSinceLoad = 0
   state.loading = true
   try {
-    const res = await fetchPage({ ...params, current, size: 50 })
+    const start = append ? overlapStartPage(state.page, state.deletedSinceLoad || 0, 50) : current
+    let res
+    let records = []
+    for (let page = start; page <= current; page += 1) {
+      res = await fetchPage({ ...params, current: page, size: 50 })
+      if (version !== state.version) return
+      records = records.concat(res.data.records || [])
+    }
     if (version !== state.version) return
-    const records = res.data.records || []
-    target.value = append ? [...target.value, ...records] : records
+    target.value = append ? mergePageRecords(target.value, records) : records
     state.page = current
     state.total = Number(res.data.total || 0)
+    state.deletedSinceLoad = 0
   } finally {
     if (version === state.version) state.loading = false
   }
@@ -281,6 +290,18 @@ async function loadSeasoning(append = false) {
 }
 
 function loadMore(loader) { loader(true).catch((e) => showFailToast(e.message || '加载失败')) }
+
+function removeFromLoadedPage(kind, target, id, reload) {
+  const state = paging[kind]
+  if (!target.value.some((item) => item.id === id)) return
+  const wasLoading = state.loading
+  state.version += 1
+  state.loading = false
+  state.deletedSinceLoad = (state.deletedSinceLoad || 0) + 1
+  target.value = target.value.filter((item) => item.id !== id)
+  state.total = Math.max(0, state.total - 1)
+  if (wasLoading) reload().catch((error) => showFailToast(error.message || '加载失败'))
+}
 
 async function searchIngredient() {
   await loadIngredient()
@@ -374,7 +395,7 @@ async function removeCategory(item) {
     await deleteCategory(item.id)
     markDataStale([DATA_SCOPE.base, DATA_SCOPE.recipes])
     showActionStatus('分类已删除')
-    await loadCategory()
+    removeFromLoadedPage('category', categoryList, item.id, loadCategory)
   } catch (error) {
     if (error?.message) showFailToast(error.message)
   }
@@ -389,7 +410,7 @@ async function removeIngredient(item) {
     await deleteIngredient(item.id)
     markDataStale(DATA_SCOPE.base)
     showActionStatus('食材已删除')
-    await loadIngredient()
+    removeFromLoadedPage('ingredient', ingredientList, item.id, loadIngredient)
   } catch (error) {
     if (error?.message) showFailToast(error.message)
   }
@@ -404,7 +425,7 @@ async function removeSeasoning(item) {
     await deleteSeasoning(item.id)
     markDataStale(DATA_SCOPE.base)
     showActionStatus('调料已删除')
-    await loadSeasoning()
+    removeFromLoadedPage('seasoning', seasoningList, item.id, loadSeasoning)
   } catch (error) {
     if (error?.message) showFailToast(error.message)
   }

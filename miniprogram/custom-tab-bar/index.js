@@ -1,6 +1,6 @@
 Component({
   data:{selected:'todos',hidden:false,items:[
-    {key:'home',label:'首页',icon:'van-icon-wap-home-o'},
+    {key:'home',label:'首页',icon:'van-icon-wap-home-o',url:'/pages/home/index'},
     {key:'today',label:'今天吃什么',icon:'van-icon-fire-o'},
     {key:'favorites',label:'收藏',icon:'van-icon-star-o'},
     {key:'wanted',label:'想吃',icon:'van-icon-cart-o'},

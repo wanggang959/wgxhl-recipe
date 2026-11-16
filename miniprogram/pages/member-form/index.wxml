@@ -1,0 +1,22 @@
+<view class="page member-form-page">
+  <view class="eyebrow">家庭成员</view><view class="page-title">{{isEditing ? '编辑成员' : '添加成员'}}</view>
+  <view wx:if="{{loading}}" class="state">正在加载</view>
+  <view wx:if="{{!ready && error}}" class="surface state">{{error}}</view>
+  <view wx:if="{{ready}}" class="form surface">
+    <view class="field"><view class="label">用户名</view><input value="{{form.username}}" disabled="{{usernameLocked}}" maxlength="50" placeholder="请输入用户名" data-field="username" bindinput="onInput" /></view>
+    <view class="field"><view class="label">昵称</view><input value="{{form.nickname}}" maxlength="50" placeholder="显示名称" data-field="nickname" bindinput="onInput" /></view>
+    <view class="field"><view class="label">公开昵称</view><input value="{{form.publicName}}" maxlength="20" placeholder="公共菜谱中的显示名称" data-field="publicName" bindinput="onInput" /></view>
+    <view class="field"><view class="label">邮箱</view><input value="{{form.email}}" disabled="{{isEditing}}" type="text" maxlength="200" placeholder="选填，用于登录和提醒" data-field="email" bindinput="onInput" /><view wx:if="{{isEditing}}" class="hint">邮箱由本人在邮箱安全中验证或更换</view></view>
+    <view wx:if="{{!isEditing}}" class="field"><view class="label">密码</view><input value="{{form.password}}" password maxlength="64" placeholder="8 至 64 位" data-field="password" bindinput="onInput" /></view>
+    <view class="field"><view class="label">生日历法</view><view class="segmented"><view class="segment {{form.birthdayCalendar === 'SOLAR' ? 'active' : ''}}" data-value="SOLAR" bindtap="calendar">公历生日</view><view class="segment {{form.birthdayCalendar === 'LUNAR' ? 'active' : ''}}" data-value="LUNAR" bindtap="calendar">农历生日</view></view></view>
+    <view wx:if="{{form.birthdayCalendar === 'SOLAR'}}" class="field"><view class="label">生日</view><picker mode="date" value="{{form.birthday}}" start="1900-01-01" end="2100-12-31" bindchange="changeBirthday"><view class="picker {{form.birthday ? '' : 'placeholder'}}">{{form.birthday || '选择生日（可选）'}}</view></picker></view>
+    <view wx:else class="lunar-fields"><view class="field"><view class="label">出生年</view><input type="number" maxlength="4" value="{{form.lunarBirthdayYear}}" placeholder="出生年" data-field="lunarBirthdayYear" bindinput="onInput" /></view><view class="field"><view class="label">农历月</view><input type="number" maxlength="2" value="{{form.lunarBirthdayMonth}}" data-field="lunarBirthdayMonth" bindinput="onInput" /></view><view class="field"><view class="label">农历日</view><input type="number" maxlength="2" value="{{form.lunarBirthdayDay}}" data-field="lunarBirthdayDay" bindinput="onInput" /></view></view>
+    <checkbox-group wx:if="{{form.birthdayCalendar === 'LUNAR'}}" bindchange="leap"><label class="leap"><checkbox value="leap" checked="{{form.lunarBirthdayLeap}}" color="#ff7614" /> 闰月</label></checkbox-group>
+    <view class="field"><view class="label">家庭角色</view><picker range="{{roles}}" range-key="label" value="{{roleIndex}}" disabled="{{!roleEditable}}" bindchange="role"><view class="picker">{{roles[roleIndex].label}}</view></picker><view wx:if="{{!roleEditable}}" class="hint">家庭角色由家庭所有者调整</view></view>
+    <view class="field"><view class="label">通知偏好</view><picker range="{{notices}}" range-key="label" value="{{noticeIndex}}" bindchange="notice"><view class="picker">{{notices[noticeIndex].label}}</view></picker></view>
+    <view class="field"><view class="label">备注</view><input value="{{form.remark}}" maxlength="500" placeholder="家庭称呼、提醒备注" data-field="remark" bindinput="onInput" /></view>
+    <view class="field"><view class="label">头像</view><scroll-view scroll-x show-scrollbar="{{false}}" class="avatar-scroll"><view class="avatar-list"><view wx:for="{{avatarOptions}}" wx:key="path" class="avatar-option {{form.avatar === item.path ? 'selected' : ''}}" data-path="{{item.path}}" bindtap="avatar"><image src="{{item.image}}" mode="aspectFill"></image></view></view></scroll-view></view>
+    <view wx:if="{{error}}" class="error">{{error}}</view>
+    <button class="save" bindtap="save" loading="{{saving}}" disabled="{{saving}}">保存成员</button>
+  </view>
+</view>

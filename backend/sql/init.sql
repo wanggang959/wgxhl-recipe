@@ -315,6 +315,7 @@ create table todo
     lunar_due_leap tinyint(1) not null default 0 comment '是否农历闰月',
     birthday_year int comment '出生年，用于生日年龄展示',
     repeat_type varchar(32) not null default 'NONE' comment '重复规则',
+    repeat_interval_days int comment '自定义重复间隔天数',
     notify_site tinyint(1) not null default 1 comment '站内通知',
     notify_email tinyint(1) not null default 0 comment '邮箱通知',
     notify_push tinyint(1) not null default 0 comment 'PWA通知',

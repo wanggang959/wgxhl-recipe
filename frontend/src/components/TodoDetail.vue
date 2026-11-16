@@ -24,7 +24,8 @@ const repeatLabels = {
   YEARLY: '每年',
 }
 
-function repeatText(type) {
+function repeatText(type, days) {
+  if (type === 'CUSTOM_DAYS') return days ? `每 ${days} 天` : '自定义天数'
   return repeatLabels[type] || type || '不重复'
 }
 </script>
@@ -47,7 +48,7 @@ function repeatText(type) {
       @delete="emit('delete', todo)"
     />
     <div class="info-grid">
-      <div><span>重复</span><strong>{{ repeatText(todo.repeatType) }}</strong></div>
+      <div><span>重复</span><strong>{{ repeatText(todo.repeatType, todo.repeatIntervalDays) }}</strong></div>
       <div><span>站内</span><strong>{{ todo.notifySite ? '开启' : '关闭' }}</strong></div>
       <div><span>邮箱</span><strong>{{ todo.notifyEmail ? '开启' : '关闭' }}</strong></div>
       <div><span>App</span><strong>{{ todo.notifyPush ? '开启' : '关闭' }}</strong></div>

@@ -1,0 +1,24 @@
+<view class="page security-page">
+  <view class="eyebrow">账号安全</view><view class="page-title">{{mode === 'change' ? '更换邮箱' : mode === 'bind' ? '绑定邮箱' : mode === 'overview' ? '邮箱安全' : '验证当前邮箱'}}</view>
+  <view wx:if="{{loading}}" class="state">正在读取账号信息</view>
+  <view wx:elif="{{done}}" class="surface result"><view class="result-title">邮箱验证成功</view><view class="note">账号安全信息已更新，请重新登录。</view><button class="primary-button" bindtap="login">重新登录</button></view>
+  <view wx:elif="{{status}}" class="surface security-card">
+    <view class="email-status"><view class="note">{{mode === 'change' ? '原邮箱' : '当前邮箱'}}</view><view class="email-address">{{status.email || '尚未绑定邮箱'}}</view><view class="note">{{status.verified ? '已验证' : status.email ? '未验证' : '未绑定'}}</view></view>
+    <view wx:if="{{mode === 'overview'}}"><button class="primary-button" data-mode="change" bindtap="changeMode">更换邮箱</button></view>
+    <view wx:elif="{{!request}}">
+      <view wx:if="{{mode !== 'verify'}}" class="field"><view class="label">{{mode === 'change' ? '新邮箱地址' : '邮箱地址'}}</view><input value="{{newEmail}}" maxlength="200" placeholder="请输入邮箱地址" data-field="newEmail" bindinput="onInput" /></view>
+      <view class="field"><view class="label">生活助手登录密码</view><input password value="{{currentPassword}}" maxlength="64" placeholder="请输入生活助手登录密码" data-field="currentPassword" bindinput="onInput" /></view>
+      <view wx:if="{{mode === 'change'}}" class="note">原邮箱、新邮箱分别验证</view><view class="note">每账号、每邮箱每日最多 3 封 · 发送间隔 60 秒</view>
+      <view wx:if="{{error}}" class="error">{{error}}</view><button class="primary-button" loading="{{busy}}" disabled="{{busy}}" bindtap="send">{{mode === 'change' ? '向两个邮箱发送验证码' : '向此邮箱发送验证码'}}</button>
+      <view wx:if="{{mode === 'verify'}}" class="secondary-button" data-mode="change" bindtap="changeMode">更换邮箱</view>
+      <view wx:if="{{mode === 'change'}}" class="secondary-button" data-mode="{{status.verified ? 'overview' : 'verify'}}" bindtap="changeMode">取消更换</view>
+    </view>
+    <view wx:else>
+      <view wx:if="{{request.needsOldCode}}" class="field"><view class="label">原邮箱验证码</view><view class="note">{{status.email}}</view><input type="number" value="{{oldCode}}" maxlength="6" placeholder="6 位验证码" data-field="oldCode" bindinput="onInput" /></view>
+      <view class="field"><view class="label">{{request.needsOldCode ? '新邮箱验证码' : '邮箱验证码'}}</view><view class="note">{{newEmail}}</view><input type="number" value="{{newCode}}" maxlength="6" placeholder="6 位验证码" data-field="newCode" bindinput="onInput" /></view>
+      <view class="note">验证码 10 分钟内有效，验证成功后需要重新登录。</view><view wx:if="{{error}}" class="error">{{error}}</view>
+      <button class="primary-button" loading="{{busy}}" disabled="{{busy}}" bindtap="confirm">确认验证</button><view class="secondary-button" bindtap="revise">返回修改</view>
+    </view>
+  </view>
+  <view wx:else class="surface state">{{error}}<view class="secondary-button" bindtap="load">重新加载</view></view>
+</view>

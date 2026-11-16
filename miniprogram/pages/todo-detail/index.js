@@ -16,7 +16,7 @@ Page({
       const user=session.get() || {}
       const guest=String(user.userRole || '').toLowerCase()==='guest' || String(user.memberRole || '').toLowerCase()==='guest'
       const canManage=!guest && (user.memberRole==='owner' || user.memberRole==='admin' || user.userRole==='super_admin' || todo.createUserId===user.id || todo.ownerId===user.id || (todo.ownerIds || []).includes(user.id))
-      const repeatLabel=repeats.find(item=>item.value===todo.repeatType)?.label || '不重复'
+      const repeatLabel=todo.repeatType==='CUSTOM_DAYS' && todo.repeatIntervalDays ? `每 ${todo.repeatIntervalDays} 天` : repeats.find(item=>item.value===todo.repeatType)?.label || '不重复'
       this.setData({todo:present(todo),canManage,repeatLabel})
     } catch(error) { this.setData({todo:null,error:error.message || '待办加载失败'}) }
     finally { this.setData({loading:false}) }

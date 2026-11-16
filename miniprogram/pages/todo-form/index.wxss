@@ -1,1 +1,8 @@
 .form{padding:28rpx;margin-top:28rpx}.field{margin-bottom:24rpx}.label{font-size:24rpx;color:#826653;margin-bottom:10rpx;font-weight:600}input,.picker,textarea{box-sizing:border-box;width:100%;border:1rpx solid #f1d9c7;border-radius:12rpx;background:#fffdfb;padding:20rpx;font-size:27rpx;color:#392e28}input,.picker{height:84rpx}textarea{height:150rpx}.picker text{float:right;color:#a48b79}.date-grid{display:grid;grid-template-columns:1fr 1fr;gap:16rpx}.owners,.notices{display:flex;flex-wrap:wrap;gap:12rpx}.owner,.notices label{display:flex;align-items:center;font-size:25rpx;background:#fff9f3;border:1rpx solid #f2dfcf;border-radius:10rpx;padding:10rpx}.owner checkbox,.notices checkbox{transform:scale(.75)}.hint{margin-top:10rpx;color:#9a8373;font-size:23rpx}.switch-row{display:flex;align-items:center;justify-content:space-between;padding:12rpx 0;font-size:26rpx;border-bottom:1rpx solid #fbf1e9}.switch-row switch{transform:scale(.8);transform-origin:right center}.cycle-tip{color:#975320;background:#fff2e3;padding:20rpx;border-radius:10rpx;margin-bottom:24rpx;font-size:25rpx}
+.repeat-field{position:relative;z-index:3}
+.repeat-field.open{z-index:4}
+.repeat-trigger{cursor:pointer}
+.repeat-options{position:absolute;top:100%;left:0;right:0;z-index:10;background:#fff;border:1rpx solid #c2c2c2;box-shadow:0 4rpx 8rpx rgba(0,0,0,.15);box-sizing:border-box}
+.category-options{height:480rpx}
+.repeat-option{box-sizing:border-box;min-height:58rpx;padding:12rpx 20rpx;font-size:27rpx;line-height:34rpx;color:#252525}
+.repeat-option.selected{background:#b0dfed}

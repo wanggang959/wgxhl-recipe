@@ -1,6 +1,6 @@
 @import "../../assets/vant-icons.wxss";
 .van-icon-plus::before{content:"\e6fa"}.van-icon-apps-o::before{content:"\e665"}.van-icon-logistics::before{content:"\e6df"}.van-icon-balance-list-o::before{content:"\e673"}.van-icon-arrow::before{content:"\e660"}.van-icon-friends-o::before{content:"\e6c2"}
-.profile-page{padding-bottom:40rpx}
+.profile-page{padding-bottom:calc(150rpx + env(safe-area-inset-bottom))}
 .app-header{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;margin:-32rpx -28rpx 20rpx;padding:20rpx 28rpx;background:#fff9f2;border-bottom:1rpx solid #f5e6d8}.app-name{font-size:30rpx;font-weight:700;line-height:1.2}.header-actions{display:flex;align-items:center;gap:12rpx}.bell-button,.header-add{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:68rpx;height:68rpx;line-height:1;padding:0;margin:0;border:1rpx solid #f5ddca;border-radius:50%;background:#fff;color:#ff7614;font-size:34rpx;box-sizing:border-box}.header-add{background:#ff7614;border-color:#ff7614;color:#fff;font-size:40rpx}.bell-badge{position:absolute;top:-5rpx;right:-5rpx;min-width:28rpx;height:28rpx;padding:0 4rpx;border-radius:20rpx;background:#e63d37;color:#fff;font-size:19rpx;line-height:28rpx;text-align:center;box-sizing:border-box}
 .profile-card{display:flex;align-items:center;gap:24rpx;padding:26rpx;margin-bottom:22rpx;border-radius:28rpx;box-shadow:0 10rpx 26rpx rgba(154,52,18,.06)}.profile-avatar{width:100rpx;height:100rpx;flex:none;border-radius:26rpx;background:#fff0dc}.profile-main{min-width:0}.profile-name{font-size:36rpx;line-height:1.25;font-weight:700;word-break:break-all}.profile-role{font-size:23rpx;color:#937e6b;margin-top:6rpx}
 .section{padding:26rpx;margin-bottom:22rpx;border-radius:28rpx;box-shadow:0 10rpx 26rpx rgba(154,52,18,.05)}.section-title{font-size:30rpx;font-weight:700;color:#30241d}.section-caption{font-size:21rpx;color:#9b8472;margin-top:6rpx}.row{display:flex;align-items:center;justify-content:space-between;gap:18rpx;min-height:68rpx;border-bottom:1rpx solid #faf1e9;font-size:25rpx}.row-value{max-width:60%;text-align:right;color:#998879;word-break:break-all}.link-row .van-icon{color:#b6a193}.outline-command{display:inline-flex;align-items:center;justify-content:center;height:58rpx;padding:0 22rpx;margin-top:18rpx;border:1rpx solid #f9a869;border-radius:32rpx;color:#dc6c20;font-size:24rpx}
@@ -19,4 +19,7 @@
 .password-actions{display:flex;gap:16rpx;margin-top:22rpx}
 .password-actions button{display:flex;align-items:center;justify-content:center;flex:none;width:112rpx;height:64rpx;line-height:1;margin:0;padding:0;border-radius:32rpx;font-size:25rpx}
 .password-cancel{background:#fff;border:1rpx solid #f5ddca;color:#765b47}
+.member-edit{display:inline-flex;align-items:center;justify-content:center;margin-top:12rpx;padding:8rpx 18rpx;border-radius:25rpx;background:#fff3e6;color:#d36517;font-size:22rpx}
+.member-action-disabled{opacity:.55}
+.member-remove{margin-left:10rpx;background:#fff3f3;color:#c84747}
 

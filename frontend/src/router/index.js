@@ -92,6 +92,12 @@ const routes = [
         component: () => import('../views/SpecialExpenseView.vue'),
       },
       { path: '/commute', name: 'Commute', component: () => import('../views/CommuteView.vue') },
+      {
+        path: '/recipe/:id',
+        name: 'RecipeDetail',
+        component: () => import('../views/RecipeDetail.vue'),
+        meta: { bareShell: true },
+      },
     ],
   },
   {
@@ -108,11 +114,6 @@ const routes = [
     path: '/recipe/:id/edit',
     name: 'RecipeEdit',
     component: () => import('../views/RecipeEditor.vue'),
-  },
-  {
-    path: '/recipe/:id',
-    name: 'RecipeDetail',
-    component: () => import('../views/RecipeDetail.vue'),
   },
 ]
 

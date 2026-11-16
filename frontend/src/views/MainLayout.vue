@@ -10,12 +10,13 @@ const router = useRouter()
 const userStore = useUserStore()
 const isShowcase = computed(() => route.query.mode === 'showcase')
 const isTodayMode = computed(() => route.query.pick === 'today')
+const bareShell = computed(() => Boolean(route.meta.bareShell))
 const familyName = computed(() => userStore.user?.householdName || '王师傅家')
 </script>
 
 <template>
   <div class="app-shell" :class="{ 'showcase-shell': isShowcase }">
-    <header v-if="!isShowcase" class="top-bar">
+    <header v-if="!isShowcase && !bareShell" class="top-bar">
       <div class="top-bar-row">
         <button class="brand" type="button" @click="router.push('/recipes')">
           <span>{{ familyName }}</span>
@@ -38,8 +39,9 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
     </header>
 
     <main
-      class="page-wrap content"
-      :class="{ 'showcase-content': isShowcase, 'profile-shell': route.path === '/profile' && userStore.canViewMembers }"
+      :class="bareShell
+        ? 'bare-main'
+        : ['page-wrap content', { 'showcase-content': isShowcase, 'profile-shell': route.path === '/profile' && userStore.canViewMembers }]"
     >
       <router-view v-slot="{ Component, route: viewRoute }">
         <keep-alive>
@@ -49,7 +51,7 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
       </router-view>
     </main>
 
-    <BottomNav v-if="!isShowcase" />
+    <BottomNav v-if="!isShowcase && !bareShell" />
   </div>
 </template>
 
@@ -129,6 +131,12 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
 
 .content {
   padding-top: 10px;
+}
+
+.bare-main {
+  width: min(100vw, var(--app-shell-width));
+  min-height: var(--app-viewport-height);
+  margin: 0 auto;
 }
 
 .showcase-shell {

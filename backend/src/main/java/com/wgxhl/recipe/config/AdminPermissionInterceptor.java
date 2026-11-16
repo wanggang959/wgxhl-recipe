@@ -34,6 +34,7 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
 
     private static final Set<String> PUBLIC_USER_PATHS = new HashSet<>(Arrays.asList(
             "/user/login",
+            "/user/wechat/login",
             "/user/guestLogin",
             "/user/preview",
             "/user/register/sendCode",

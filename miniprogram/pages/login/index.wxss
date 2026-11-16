@@ -91,3 +91,5 @@
 .footer-note{gap:10px;margin-top:24px;font-size:17px}
 .footer-note .van-icon{font-size:18px}
 @media (max-width:360px){.login-content{padding-right:16px;padding-left:16px}.brand-main{font-size:26px}.welcome-house{font-size:23px}.welcome-kicker,.login-tip{font-size:15px}.form-card{padding-right:14px;padding-left:14px}}
+.wechat-bind{min-height:32px;margin:-12px 4px 16px;color:#8e7d70;font-size:14px;line-height:1.4}
+.wechat-login { margin: 20rpx auto 0; text-align: center; color: #18864b; font-size: 27rpx; font-weight: 600; }

@@ -297,6 +297,17 @@ engine=innodb
 default charset=utf8mb4
 comment='用户信息表';
 
+create table user_wechat_binding
+(
+    user_id varchar(36) not null,
+    app_id varchar(64) character set ascii collate ascii_bin not null,
+    open_id varchar(128) character set ascii collate ascii_bin not null,
+    created_at timestamp not null default current_timestamp,
+    primary key (user_id, app_id),
+    unique key uk_wechat_identity (app_id, open_id),
+    constraint fk_wechat_user foreign key (user_id) references app_user(id) on delete cascade
+) engine=innodb default charset=utf8mb4;
+
 
 create table todo
 (

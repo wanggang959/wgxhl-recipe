@@ -69,6 +69,17 @@ class AppUserLoginTest {
     }
 
     @Test
+    void wechatLoginRejectsDisabledAndGuestAccounts() {
+        user.setStatus("disabled");
+        when(mapper.selectById("user-1")).thenReturn(user);
+        assertNotEquals(200, service.loginWithWechatBinding("user-1").getStatus());
+        AppUser guest = new AppUser(); guest.setId("guest"); guest.setUsername("guest"); guest.setStatus("normal");
+        when(mapper.selectById("guest")).thenReturn(guest);
+        assertNotEquals(200, service.loginWithWechatBinding("guest").getStatus());
+        verifyNoInteractions(jwt);
+    }
+
+    @Test
     void usernameAndEmailBothAuthenticate() {
         when(mapper.findLoginByUsername("cook")).thenReturn(Collections.singletonList(user));
         assertEquals(200, service.login(login(" cook ", "password"), "ip1").getStatus());

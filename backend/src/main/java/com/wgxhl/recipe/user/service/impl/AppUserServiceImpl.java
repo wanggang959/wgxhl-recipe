@@ -621,6 +621,22 @@ public class AppUserServiceImpl extends ServiceImpl<AppUserMapper, AppUser>
     }
 
     @Override
+    public ApiResponse<AppUser> loginWithWechatBinding(String userId) {
+        AppUser user = super.getById(userId);
+        if (user == null || GUEST_ID.equals(user.getId()) || GUEST_USERNAME.equals(user.getUsername())) {
+            return ApiResponse.fail("微信账号未绑定，请先使用账号密码登录并绑定");
+        }
+        if (!STATUS_NORMAL.equals(user.getStatus())) {
+            return ApiResponse.fail(disabledLoginMessage(user));
+        }
+        ApiResponse<AppUser> householdResult = applyLoginHousehold(user);
+        if (householdResult != null) return householdResult;
+        user.setToken(jwtAuthUtil.createToken(user, user.getHouseholdId()));
+        maskPassword(user);
+        return ApiResponse.success(user);
+    }
+
+    @Override
     public ApiResponse<AppUser> guestLogin() {
         AppUser guest = super.getById(GUEST_ID);
         if (guest == null) {

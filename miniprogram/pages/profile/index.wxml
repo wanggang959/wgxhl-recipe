@@ -8,7 +8,7 @@
   <view wx:if="{{!isGuest}}" class="shortcut-grid"><view class="shortcut" role="button" bindtap="addRecipe"><text class="van-icon van-icon-plus"></text> 添加菜谱</view><view class="shortcut" role="button" bindtap="openBaseManage"><text class="van-icon van-icon-apps-o"></text> 基础数据</view></view>
 
   <view class="section surface"><view class="section-title">账号</view><view class="row"><text>当前用户</text><text class="row-value">{{profile.nickname || profile.username}}</text></view><view class="row"><text>权限</text><text class="row-value">{{profile.roleLabel}}</text></view>
-    <block wx:if="{{!isGuest}}"><view wx:if="{{canAccessAdmin}}" class="row link-row" role="button" bindtap="openAdmin"><text>系统管理</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openEmailSecurity"><text>邮箱安全</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openPassword"><text>修改密码</text><text class="van-icon van-icon-arrow"></text></view><view class="push-setting"><view><view class="push-title">微信通知</view><view class="push-caption">暂未接入</view></view><text class="pending">开发中</text></view></block>
+    <block wx:if="{{!isGuest}}"><view wx:if="{{canAccessAdmin}}" class="row link-row" role="button" bindtap="openAdmin"><text>系统管理</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openEmailSecurity"><text>邮箱安全</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openPassword"><text>修改密码</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openWechat"><text>微信绑定</text><view class="wechat-state"><text>{{wechatStatusLoading ? '加载中' : wechatStatusError ? '加载失败，点击重试' : wechatBound ? '已绑定' : '未绑定'}}</text><text class="van-icon van-icon-arrow"></text></view></view><view class="push-setting"><view><view class="push-title">微信通知</view><view class="push-caption">暂未接入</view></view><text class="pending">开发中</text></view></block>
     <view class="logout" role="button" bindtap="logout">退出登录</view>
   </view>
 
@@ -24,6 +24,15 @@
     <view wx:elif="{{membersError}}" class="member-state">{{membersError}} <text class="retry" bindtap="retryMembers">重试</text></view>
     <view wx:elif="{{!members.length}}" class="member-state">暂无家庭成员</view>
     <view wx:elif="{{members.length >= membersTotal}}" class="member-state">没有更多成员了</view>
+  </view>
+</view>
+<view wx:if="{{wechatOpen}}" class="password-layer" bindtap="closeWechat">
+  <view class="password-panel" catchtap="swallow">
+    <view class="password-head"><view class="password-title">{{wechatBound ? '解绑微信' : '绑定微信'}}</view><view class="password-close" role="button" aria-label="关闭" bindtap="closeWechat">×</view></view>
+    <view class="password-hint">{{wechatBound ? '解绑后可继续使用账号密码登录。' : '绑定当前微信后，可使用微信登录。'}}</view>
+    <view class="password-field"><view>账号密码</view><input password value="{{wechatPassword}}" maxlength="64" placeholder="请输入当前账号密码" bindinput="onWechatPassword" /></view>
+    <view wx:if="{{wechatError}}" class="password-error">{{wechatError}}</view>
+    <view class="password-actions"><button class="password-submit" loading="{{wechatBusy}}" disabled="{{wechatBusy}}" bindtap="submitWechat">{{wechatBound ? '解绑' : '绑定'}}</button><button class="password-cancel" disabled="{{wechatBusy}}" bindtap="closeWechat">取消</button></view>
   </view>
 </view>
 <notice-panel visible="{{noticeOpen}}" bind:close="closeNotifications" bind:change="refreshUnread" />

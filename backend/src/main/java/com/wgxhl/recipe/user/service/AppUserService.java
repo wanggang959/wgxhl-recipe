@@ -24,6 +24,8 @@ public interface AppUserService extends IService<AppUser> {
 
     ApiResponse<AppUser> login(UserLoginDTO dto, String clientIp);
 
+    ApiResponse<AppUser> loginWithWechatBinding(String userId);
+
     ApiResponse<AppUser> guestLogin();
 
     ApiResponse<UserPreviewVO> previewByUsername(String username);

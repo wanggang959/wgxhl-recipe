@@ -3,6 +3,12 @@ const { loadPage, makePage, stubStorage } = require('./page-helper')
 const api = require('../services/api'), session = require('../services/session')
 const definition = loadPage('../pages/login/index')
 
+test('wechat binding option matches the other login options', () => {
+  const fs = require('node:fs')
+  const styles = fs.readFileSync(require('node:path').join(__dirname, '../pages/login/index.wxss'), 'utf8')
+  assert.match(styles, /\.wechat-bind\s*\{[^}]*color:\s*#8e7d70[^}]*font-size:\s*14px/)
+})
+
 function setup(calls) {
   session.get = () => null
   let saved = null
@@ -55,4 +61,25 @@ test('guest login uses the public endpoint and stores a guest session', async ()
   assert.equal(calls[0].path, '/user/guestLogin')
   assert.deepEqual(calls[0].options, { public: true })
   assert.equal(page.saved().id, 'guest')
+})
+
+test('wechat login sends the one-time code and stores the returned session', async () => {
+  const calls = [], page = setup(calls)
+  wx.login = ({ success }) => success({ code: 'temporary-code' })
+  api.post = async (path, data, options) => { calls.push({ path, data, options }); return { id: 'u1', token: 'token' } }
+  await withoutTimer(() => page.wechatLogin())
+  assert.equal(calls[0].path, '/user/wechat/login')
+  assert.equal(calls[0].data.code, 'temporary-code')
+  assert.equal(calls[0].options.public, true)
+  assert.equal(page.saved().id, 'u1')
+})
+
+test('binding occurs only after account login', async () => {
+  const calls = [], page = setup(calls)
+  wx.login = ({ success }) => success({ code: 'temporary-code' })
+  api.post = async (path, data) => { calls.push({ path, data }); return path === '/user/login' ? { id: 'u1', token: 'token' } : null }
+  page.setData({ username: 'u1', password: 'password', bindWechat: true })
+  await withoutTimer(() => page.submit())
+  assert.deepEqual(calls.map(item => item.path), ['/user/login', '/user/wechat/bind'])
+  assert.equal(calls[1].data.code, 'temporary-code')
 })

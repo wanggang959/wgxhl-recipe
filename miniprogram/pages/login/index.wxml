@@ -41,8 +41,10 @@
         <view class="forgot" role="button" bindtap="forgotPassword"><text>忘记密码？</text><text class="van-icon van-icon-arrow"></text></view>
       </view>
 
+      <view class="remember wechat-bind" role="checkbox" aria-checked="{{bindWechat}}" bindtap="toggleBindWechat"><view class="checkbox {{bindWechat ? 'checked' : ''}}"><text wx:if="{{bindWechat}}" class="van-icon van-icon-success"></text></view><text>登录并绑定当前微信</text></view>
       <view class="login-button {{loading ? 'is-loading' : ''}}" role="button" aria-label="{{loading ? '正在登录' : '进入生活助手'}}" aria-disabled="{{loading}}" bindtap="submit">{{loading ? '正在进家门...' : '进入生活助手'}}</view>
 
+      <view class="wechat-login" role="button" aria-disabled="{{loading}}" bindtap="wechatLogin">微信登录</view>
       <view class="guest-row"><text>还没有账号？</text><text class="link" bindtap="register">注册账号</text><text>·</text><text class="link" bindtap="guestLogin">游客登录</text></view>
 
       <view class="family-frame"><image class="family-illustration" src="/assets/login/login-family.webp" mode="widthFix" /></view>

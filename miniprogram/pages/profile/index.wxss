@@ -22,4 +22,5 @@
 .member-edit{display:inline-flex;align-items:center;justify-content:center;margin-top:12rpx;padding:8rpx 18rpx;border-radius:25rpx;background:#fff3e6;color:#d36517;font-size:22rpx}
 .member-action-disabled{opacity:.55}
 .member-remove{margin-left:10rpx;background:#fff3f3;color:#c84747}
+.wechat-state{display:flex;align-items:center;gap:10rpx;color:#998879;font-size:23rpx}
 

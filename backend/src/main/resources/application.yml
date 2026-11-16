@@ -78,3 +78,7 @@ push:
     private-key: ${PUSH_VAPID_PRIVATE_KEY:}
     subject: ${PUSH_VAPID_SUBJECT:}
   ttl-seconds: ${PUSH_TTL_SECONDS:604800}
+wechat:
+  miniapp:
+    app-id: ${WECHAT_MINIAPP_APP_ID:}
+    app-secret: ${WECHAT_MINIAPP_APP_SECRET:}

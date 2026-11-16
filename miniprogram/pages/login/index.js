@@ -2,6 +2,12 @@ const api = require('../../services/api')
 const session = require('../../services/session')
 const { avatarUrl } = require('../../utils/profile')
 const REMEMBER_USERNAME_KEY = 'wgxhl_recipe_login_username'
+function wechatCode() {
+  return new Promise((resolve, reject) => wx.login({
+    success: result => result.code ? resolve(result.code) : reject(new Error('获取微信登录凭证失败')),
+    fail: () => reject(new Error('微信登录暂不可用，请稍后重试')),
+  }))
+}
 Page({
   data: {
     statusBarHeight: 0,
@@ -9,6 +15,7 @@ Page({
     password: '',
     passwordVisible: false,
     rememberMe: false,
+    bindWechat: false,
     loading: false,
     statusText: '',
     statusType: 'success',
@@ -39,6 +46,7 @@ Page({
   onPassword(e) { this.setData({ password: e.detail.value, statusText: '' }) },
   togglePassword() { this.setData({ passwordVisible: !this.data.passwordVisible }) },
   toggleRemember() { this.setData({ rememberMe: !this.data.rememberMe }) },
+  toggleBindWechat() { this.setData({ bindWechat: !this.data.bindWechat }) },
   async fetchPreview(username) {
     const name = String(username || '').trim()
     if (!name || name.includes('@')) {
@@ -66,13 +74,32 @@ Page({
       if (!user?.id || !user?.token) throw new Error('登录结果不完整，请稍后重试')
       session.set(user)
       this.saveRememberedUsername()
+      if (this.data.bindWechat) {
+        const code = await wechatCode()
+        await api.post('/user/wechat/bind', { code, username, password })
+      }
       this.showStatus('登录成功，正在进入生活助手...')
       setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 260)
     } catch (error) {
+      if (this.data.bindWechat) session.clear()
       this.showStatus(error.message || '您的帐号已被禁用，请联系王师傅处理', 'error')
     } finally {
       this.setData({ loading: false })
     }
+  },
+  async wechatLogin() {
+    if (this.data.loading) return
+    this.setData({ loading: true, statusText: '' })
+    try {
+      const code = await wechatCode()
+      const user = await api.post('/user/wechat/login', { code }, { public: true })
+      if (!user?.id || !user?.token) throw new Error('登录结果不完整，请稍后重试')
+      session.set(user)
+      this.showStatus('登录成功，正在进入生活助手...')
+      setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 260)
+    } catch (error) {
+      this.showStatus(error.message || '微信登录失败，请稍后重试', 'error')
+    } finally { this.setData({ loading: false }) }
   },
   async guestLogin() {
     if (this.data.loading) return

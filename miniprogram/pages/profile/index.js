@@ -2,10 +2,10 @@ const session = require('../../services/session')
 const api = require('../../services/api')
 const {displayMember,isGuest} = require('../../utils/profile')
 Page({
-  data:{ user:null, profile:null, members:[], membersPage:0, membersTotal:0, membersLoading:false, membersError:'', guestStatusBusy:false, isGuest:false, canManage:false, unread:0, noticeOpen:false, passwordOpen:false, passwordBusy:false, passwordError:'', oldPassword:'', newPassword:'', confirmPassword:'' },
-  onShow() { const user=session.get(); if (!user?.token) { wx.reLaunch({url:'/pages/login/index'}); return } this.getTabBar()?.setData({selected:'profile',hidden:false}); const guest=isGuest(user); this.setData({user,profile:displayMember(user),isGuest:guest,canManage:!guest && (['owner','admin'].includes(user.memberRole) || user.userRole==='super_admin')}); if(!guest)this.loadMembers(true); else { this.membersRequestVersion=(this.membersRequestVersion||0)+1; this.setData({members:[],membersPage:0,membersTotal:0,membersLoading:false,membersError:''}) } this.checkAdminAccess(); this.refreshUnread(); this.stopUnreadRefresh(); this.unreadTimer=setInterval(()=>this.refreshUnread(),60000) },
+  data:{ user:null, profile:null, members:[], membersPage:0, membersTotal:0, membersLoading:false, membersError:'', guestStatusBusy:false, isGuest:false, canManage:false, unread:0, noticeOpen:false, passwordOpen:false, passwordBusy:false, passwordError:'', oldPassword:'', newPassword:'', confirmPassword:'', wechatBound:null, wechatStatusLoading:false, wechatStatusError:false, wechatOpen:false, wechatBusy:false, wechatPassword:'', wechatError:'' },
+  onShow() { const user=session.get(); if (!user?.token) { wx.reLaunch({url:'/pages/login/index'}); return } this.getTabBar()?.setData({selected:'profile',hidden:false}); const guest=isGuest(user); this.setData({user,profile:displayMember(user),isGuest:guest,canManage:!guest && (['owner','admin'].includes(user.memberRole) || user.userRole==='super_admin')}); if(!guest){this.loadMembers(true);this.loadWechatStatus()} else { this.membersRequestVersion=(this.membersRequestVersion||0)+1; this.setData({members:[],membersPage:0,membersTotal:0,membersLoading:false,membersError:''}) } this.checkAdminAccess(); this.refreshUnread(); this.stopUnreadRefresh(); this.unreadTimer=setInterval(()=>this.refreshUnread(),60000) },
   onReachBottom() { if(!this.data.isGuest && !this.data.membersError && this.data.membersPage>0 && this.data.members.length<this.data.membersTotal)this.loadMembers(false) },
-  onHide() { this.stopUnreadRefresh(); this.closeNotifications(); this.closePassword() },
+  onHide() { this.stopUnreadRefresh(); this.closeNotifications(); this.closePassword(); this.closeWechat(); this.setData({wechatPassword:''}) },
   onUnload() { this.stopUnreadRefresh() },
   stopUnreadRefresh() { if(this.unreadTimer)clearInterval(this.unreadTimer); this.unreadTimer=null },
   async refreshUnread() { try { const count=await api.post('/notification/unreadCount'); this.setData({unread:Math.max(0,Number(count)||0)}) } catch(_) {} },
@@ -35,6 +35,51 @@ Page({
     finally { if(version===this.membersRequestVersion)this.setData({membersLoading:false}) }
   },
   retryMembers() { this.loadMembers(this.data.membersPage===0) },
+  async loadWechatStatus() {
+    if(this.data.isGuest)return
+    const userId=this.data.user?.id, version=(this.wechatStatusVersion||0)+1
+    this.wechatStatusVersion=version
+    this.setData({wechatStatusLoading:true,wechatStatusError:false,wechatBound:null})
+    try {
+      const status=await api.post('/user/wechat/status')
+      if(version===this.wechatStatusVersion && this.data.user?.id===userId)this.setData({wechatBound:Boolean(status?.bound)})
+    } catch(_) { if(version===this.wechatStatusVersion && this.data.user?.id===userId)this.setData({wechatStatusError:true}) }
+    finally { if(version===this.wechatStatusVersion && this.data.user?.id===userId)this.setData({wechatStatusLoading:false}) }
+  },
+  openWechat() {
+    if(this.data.isGuest || this.data.wechatStatusLoading)return
+    if(this.data.wechatStatusError || this.data.wechatBound===null){this.loadWechatStatus();return}
+    this.setData({wechatOpen:true,wechatPassword:'',wechatError:''})
+    this.getTabBar()?.setData({hidden:true})
+    wx.hideTabBar({animation:false,fail:()=>{}})
+  },
+  closeWechat() {
+    if(!this.data.wechatOpen || this.data.wechatBusy)return
+    this.setData({wechatOpen:false,wechatPassword:'',wechatError:''})
+    this.getTabBar()?.setData({hidden:false})
+    wx.showTabBar({animation:false,fail:()=>{}})
+  },
+  onWechatPassword(e) { this.setData({wechatPassword:e.detail.value,wechatError:''}) },
+  async submitWechat() {
+    if(this.data.wechatBusy || this.data.isGuest || this.data.wechatBound===null)return
+    const password=this.data.wechatPassword, bound=this.data.wechatBound
+    if(!password){this.setData({wechatError:'请输入当前账号密码'});return}
+    this.setData({wechatBusy:true,wechatError:''})
+    try {
+      if(bound) {
+        await api.post('/user/wechat/unbind',{password})
+      } else {
+        const code=await new Promise((resolve,reject)=>wx.login({success:r=>r.code?resolve(r.code):reject(new Error('获取微信登录凭证失败')),fail:()=>reject(new Error('微信登录暂不可用，请稍后重试'))}))
+        await api.post('/user/wechat/bind',{code,username:this.data.user.username,password})
+      }
+      this.wechatStatusVersion=(this.wechatStatusVersion||0)+1
+      this.setData({wechatBound:!bound,wechatOpen:false,wechatPassword:'',wechatError:'',wechatStatusLoading:false,wechatStatusError:false})
+      this.getTabBar()?.setData({hidden:false})
+      wx.showTabBar({animation:false,fail:()=>{}})
+      wx.showToast({title:bound?'已解除绑定':'微信绑定成功',icon:'none'})
+    } catch(error) { this.setData({wechatError:error.message || '操作失败，请稍后重试'}) }
+    finally { this.setData({wechatBusy:false}) }
+  },
   async checkAdminAccess() { const user=this.data.user;this.setData({canAccessAdmin:false});if(!user?.token || !(user.userRole==='super_admin'||user.username==='王师傅'))return;try{const allowed=await api.get('/platform-admin/access');if(this.data.user?.id===user.id)this.setData({canAccessAdmin:Boolean(allowed)})}catch(_){} },
   openAdmin() { if(this.data.canAccessAdmin)wx.navigateTo({url:'/pages/platform-admin/index'}) },
   addRecipe() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/recipe-form/index'}) },

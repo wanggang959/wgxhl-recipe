@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="hint">橙色「我的」仅自己可见，可跨家庭使用；蓝色「公共」所有人可用。</view>
+  <view class="tabs"><view wx:for="{{[{key:'category',label:'分类管理'},{key:'ingredient',label:'食材管理'},{key:'seasoning',label:'调料管理'}]}}" wx:key="key" class="tab {{kind===item.key?'active':''}}" data-kind="{{item.key}}" bindtap="switchKind">{{item.label}}</view></view>
+  <view class="bar"><text class="title">{{kindLabel}}列表</text><view class="add" bindtap="add">＋ 新增{{kindLabel}}</view></view>
+  <view wx:if="{{kind!=='category'}}" class="search"><input value="{{keyword}}" placeholder="搜索{{kindLabel}}名称" confirm-type="search" bindinput="inputKeyword" bindconfirm="search"/><text wx:if="{{keyword}}" bindtap="clearSearch">清空</text><text bindtap="search">搜索</text></view>
+  <view wx:for="{{items}}" wx:key="id" class="item">
+    <image wx:if="{{item.imageUrl}}" class="thumb" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
+    <view wx:elif="{{kind!=='category'}}" class="thumb placeholder">图</view>
+    <view class="info"><view class="item-title"><text class="scope {{item.scope==='platform'?'public':''}}">{{item.scopeLabel}}</text><text>{{item.name}}</text></view><view wx:if="{{kind==='category'}}" class="detail">{{item.categoryCode || '未设置编码'}} · 排序 {{item.sortNo}}</view><view wx:else class="detail">{{item.description || '暂无描述'}}</view></view>
+    <view wx:if="{{item.canManage}}" class="actions"><text data-id="{{item.id}}" bindtap="edit">编辑</text><text class="danger" data-id="{{item.id}}" bindtap="remove">删除</text></view>
+  </view>
+  <view wx:if="{{loading}}" class="state">正在加载...</view><view wx:elif="{{error}}" class="state" bindtap="retry">{{error}}，点击重试</view><view wx:elif="{{!items.length}}" class="state">暂无{{kindLabel}}</view><view wx:elif="{{items.length>=total}}" class="state">已显示全部</view>
+</view>
+<view wx:if="{{formOpen}}" class="overlay" bindtap="closeForm"><view class="sheet" catchtap="swallow">
+  <view class="sheet-head"><text>{{form.id?'编辑':'新增'}}{{kindLabel}}</text><text class="close" bindtap="closeForm">×</text></view>
+  <scroll-view scroll-y class="form-scroll"><view class="field"><text>{{kindLabel}}名称</text><input value="{{form.name}}" data-field="name" bindinput="inputForm" placeholder="请输入{{kindLabel}}名称" maxlength="100"/></view>
+  <block wx:if="{{kind==='category'}}"><view class="field"><text>分类编码</text><input value="{{form.code}}" data-field="code" bindinput="inputForm" placeholder="如：home" maxlength="100"/></view><view class="field"><text>排序号</text><input type="number" value="{{form.sortNo}}" data-field="sortNo" bindinput="inputForm"/></view></block>
+  <view wx:else class="field"><text>{{kindLabel}}图片</text><view class="image-row"><image wx:if="{{formImageUrl}}" class="preview" src="{{formImageUrl}}" mode="aspectFill"/><view class="image-add" bindtap="chooseImage">{{uploading?'上传中...':(form.image?'更换图片':'＋ 选择图片')}}</view><text wx:if="{{form.image}}" class="danger" bindtap="removeImage">移除</text></view></view>
+  <view class="field"><text>描述</text><textarea value="{{form.description}}" data-field="description" bindinput="inputForm" placeholder="添加描述" maxlength="500"/></view><view wx:if="{{formError}}" class="error">{{formError}}</view></scroll-view>
+  <view class="form-actions"><view class="cancel" bindtap="closeForm">取消</view><view class="save" bindtap="save">{{saving?'保存中...':'保存'}}</view></view>
+</view></view>

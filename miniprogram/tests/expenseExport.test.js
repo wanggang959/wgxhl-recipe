@@ -1,0 +1,8 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+const {totalCents,money,wrap,layout,loadEntries}=require('../utils/expenseExport')
+const ctx={measureText:text=>({width:Array.from(text).length*10})}
+test('totals decimals accurately including cancelled rows',()=>{const items=[{actualAmount:'0.10'},{actualAmount:'0.20',status:'CANCELLED'},{actualAmount:null}];assert.equal(totalCents(items),30);assert.equal(money(totalCents(items)),'0.30')})
+test('wraps long names without dropping content and limits image height',()=>{assert.deepEqual(wrap(ctx,'一二三四',20),['一二','三四']);assert.throws(()=>layout(ctx,'测试',[]),/没有开支/);assert.throws(()=>layout(ctx,'测试',Array.from({length:200},()=>({itemName:'a'}))),/清单过长/)})
+test('exports every filtered page and keeps unfinished records first',async()=>{const calls=[];const entries=await loadEntries(async(path,data)=>{calls.push({path,data});return {records:data.current===1?[{id:'a',status:'DONE'}]:[{id:'b',status:'TODO'}],total:2}},{projectId:'p',category:'FOOD',status:''});assert.deepEqual(entries.map(i=>i.id),['b','a']);assert.equal(calls.length,2);assert.equal(calls[1].data.category,'FOOD');assert.equal(calls[0].data.size,50)})
+test('does not silently export an incomplete paginated list',async()=>{await assert.rejects(loadEntries(async(_path,data)=>({records:data.current===1?[{id:'a'}]:[],total:2}),{projectId:'p'}),/读取不完整/)})
+test('refuses changed or excessively long lists',async()=>{await assert.rejects(loadEntries(async()=>({records:[],total:122}),{}),/清单过长/);await assert.rejects(loadEntries(async(_path,data)=>({records:[{id:'a'}],total:data.current===1?2:3}),{}),/清单发生变化/)})

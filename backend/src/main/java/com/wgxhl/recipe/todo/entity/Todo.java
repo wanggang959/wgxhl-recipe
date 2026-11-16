@@ -47,6 +47,8 @@ public class Todo {
 
     private String repeatType;
 
+    private Integer repeatIntervalDays;
+
     private Boolean notifySite;
 
     private Boolean notifyEmail;

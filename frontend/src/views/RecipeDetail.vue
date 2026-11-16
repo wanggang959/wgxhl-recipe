@@ -217,7 +217,7 @@ async function removeRecipe() {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="detail-root">
     <main class="page-wrap detail-page">
       <van-loading v-if="loading" size="24px" class="loading">加载中...</van-loading>
       <div v-else-if="errorText" class="error-card">
@@ -251,6 +251,7 @@ async function removeRecipe() {
 <style scoped>
 .detail-page {
   min-height: 100vh;
+  padding-bottom: 24px;
 }
 
 .loading {

@@ -1,0 +1,5 @@
+@import "../assets/vant-icons.wxss";
+.van-icon-wap-home-o::before{content:"\e73e"}.van-icon-star-o::before{content:"\e722"}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:flex-start;height:calc(102rpx + env(safe-area-inset-bottom));padding:12rpx 6rpx env(safe-area-inset-bottom);box-sizing:border-box;border-top:1rpx solid #f5ddca;background:#fffaf4}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5rpx;flex:1;min-width:0;color:#9b7a64}.tab.active{color:#ff7614}.tab-icon{font-size:36rpx;line-height:1}.tab-label{font-size:19rpx;white-space:nowrap;line-height:1.2}
+

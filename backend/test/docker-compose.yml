@@ -29,6 +29,10 @@ services:
       - ../sql/add_recipe_random_key.sql:/docker-entrypoint-initdb.d/17-recipe-random-key.sql:ro
       - ../sql/add_reminder_history_retention_indexes.sql:/docker-entrypoint-initdb.d/18-reminder-history-retention.sql:ro
       - ../sql/add_reminder_retry_time.sql:/docker-entrypoint-initdb.d/19-reminder-retry-time.sql:ro
+      - ../sql/commute_v1.sql:/docker-entrypoint-initdb.d/20-commute.sql:ro
+      - ../sql/commute_channels.sql:/docker-entrypoint-initdb.d/21-commute-channels.sql:ro
+      - ../sql/commute_notice_day.sql:/docker-entrypoint-initdb.d/22-commute-notice-day.sql:ro
+      - ../sql/commute_actual_rain.sql:/docker-entrypoint-initdb.d/23-commute-actual-rain.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u recipe_test -plocal-test-only --silent"]
       interval: 5s

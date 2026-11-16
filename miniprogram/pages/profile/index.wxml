@@ -1,0 +1,40 @@
+<view class="page profile-page">
+  <view class="app-header"><view><view class="eyebrow">{{user.householdName || '王师傅家'}}</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view wx:if="{{!isGuest}}" class="header-add" role="button" aria-label="添加菜谱" bindtap="addRecipe">＋</view></view></view>
+
+  <view class="profile-card surface"><image class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill"></image><view class="profile-main"><view class="eyebrow">我的</view><view class="profile-name">{{profile.nickname || profile.username}}</view><view class="profile-role">{{profile.roleLabel}}</view></view></view>
+
+  <view wx:if="{{!isGuest}}" class="section surface"><view class="section-title">家庭</view><view class="row"><text>当前家庭</text><text class="row-value">{{user.householdName || '未加入'}}</text></view><view class="outline-command" role="button" bindtap="openHousehold">切换 / 创建家庭</view></view>
+
+  <view wx:if="{{!isGuest}}" class="shortcut-grid"><view class="shortcut" role="button" bindtap="addRecipe"><text class="van-icon van-icon-plus"></text> 添加菜谱</view><view class="shortcut" role="button" bindtap="openBaseManage"><text class="van-icon van-icon-apps-o"></text> 基础数据</view></view>
+
+  <view class="section surface"><view class="section-title">账号</view><view class="row"><text>当前用户</text><text class="row-value">{{profile.nickname || profile.username}}</text></view><view class="row"><text>权限</text><text class="row-value">{{profile.roleLabel}}</text></view>
+    <block wx:if="{{!isGuest}}"><view wx:if="{{canAccessAdmin}}" class="row link-row" role="button" bindtap="openAdmin"><text>系统管理</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openEmailSecurity"><text>邮箱安全</text><text class="van-icon van-icon-arrow"></text></view><view class="row link-row" role="button" bindtap="openPassword"><text>修改密码</text><text class="van-icon van-icon-arrow"></text></view><view class="push-setting"><view><view class="push-title">微信通知</view><view class="push-caption">暂未接入</view></view><text class="pending">开发中</text></view></block>
+    <view class="logout" role="button" bindtap="logout">退出登录</view>
+  </view>
+
+  <view wx:if="{{!isGuest}}" class="section surface"><view class="section-title">生活工具</view>
+    <view class="tool-entry" role="button" bindtap="openCommute"><view class="tool-icon"><text class="van-icon van-icon-logistics"></text></view><view class="tool-copy"><view class="tool-title">通勤记录</view><view class="tool-subtitle">记录每日上班通勤耗时</view></view><text class="van-icon van-icon-arrow"></text></view>
+    <view class="tool-entry" role="button" bindtap="openExpense"><view class="tool-icon"><text class="van-icon van-icon-balance-list-o"></text></view><view class="tool-copy"><view class="tool-title">专项开支</view><view class="tool-subtitle">婚礼、装修、搬家这类阶段性采购记录</view></view><text class="van-icon van-icon-arrow"></text></view>
+  </view>
+
+  <view wx:if="{{!isGuest}}" class="section surface member-section">
+    <view class="member-heading"><view class="member-heading-icon"><text class="van-icon van-icon-friends-o"></text></view><view class="member-heading-copy"><view class="section-title">家庭成员</view><view class="section-caption">{{canManage ? '管理家人账号，设置家庭角色' : '查看家人，维护自己的资料'}}</view></view><view wx:if="{{canManage}}" class="member-add" role="button" bindtap="addMember">＋ 添加成员</view></view>
+    <view wx:if="{{members.length}}" class="member-list"><view wx:for="{{members}}" wx:key="id" class="member-card"><image class="member-avatar" src="{{item.avatarUrl}}" mode="aspectFill"></image><view class="member-info"><view class="member-top"><view class="member-name">{{item.nickname || item.username}}</view><view class="role-badge">{{item.roleLabel}}</view></view><view class="member-line">用户名：{{item.username}}</view><view class="member-line">状态：{{item.statusLabel}}</view><view class="member-line">{{item.email || '未填写邮箱'}}</view><view class="member-line"><text class="birthday">{{item.birthdayLabel}}</text><text> · 近期待办：{{item.recentTodoCount || 0}}</text></view><view wx:if="{{item.canEdit}}" class="member-edit" role="button" data-id="{{item.id}}" bindtap="editMember">编辑</view><view wx:if="{{item.canReset}}" class="member-edit" role="button" data-id="{{item.id}}" bindtap="resetMemberPassword">重置密码</view><block wx:if="{{item.canManageStatus}}"><view wx:if="{{item.isGuestAccount}}" class="member-edit {{guestStatusBusy ? 'member-action-disabled' : ''}}" role="button" data-id="{{item.id}}" bindtap="toggleGuestStatus">{{item.status === 'disabled' ? '启用' : '禁用'}}</view><view wx:else class="member-edit {{guestStatusBusy ? 'member-action-disabled' : ''}}" role="button" data-id="{{item.id}}" bindtap="toggleMemberStatus">{{item.status === 'disabled' ? '启用' : '禁用'}}</view></block><view wx:if="{{item.canDelete}}" class="member-edit member-remove" role="button" data-id="{{item.id}}" bindtap="removeMember">删除</view></view></view></view>
+    <view wx:if="{{membersLoading}}" class="member-state">正在加载</view>
+    <view wx:elif="{{membersError}}" class="member-state">{{membersError}} <text class="retry" bindtap="retryMembers">重试</text></view>
+    <view wx:elif="{{!members.length}}" class="member-state">暂无家庭成员</view>
+    <view wx:elif="{{members.length >= membersTotal}}" class="member-state">没有更多成员了</view>
+  </view>
+</view>
+<notice-panel visible="{{noticeOpen}}" bind:close="closeNotifications" bind:change="refreshUnread" />
+<view wx:if="{{passwordOpen}}" class="password-layer" bindtap="closePassword">
+  <view class="password-panel" catchtap="swallow">
+    <view class="password-head"><view class="password-title">修改密码</view><view class="password-close" role="button" aria-label="关闭" bindtap="closePassword">×</view></view>
+    <view class="password-hint">修改后需要重新登录。</view>
+    <view class="password-field"><view>原密码</view><input password value="{{oldPassword}}" maxlength="64" placeholder="请输入当前密码" data-field="oldPassword" bindinput="onPasswordInput" /></view>
+    <view class="password-field"><view>新密码</view><input password value="{{newPassword}}" maxlength="64" placeholder="8 至 64 位" data-field="newPassword" bindinput="onPasswordInput" /></view>
+    <view class="password-field"><view>确认新密码</view><input password value="{{confirmPassword}}" maxlength="64" placeholder="再次输入新密码" data-field="confirmPassword" bindinput="onPasswordInput" /></view>
+    <view wx:if="{{passwordError}}" class="password-error">{{passwordError}}</view>
+    <view class="password-actions"><button class="password-submit" loading="{{passwordBusy}}" disabled="{{passwordBusy}}" bindtap="submitPassword">保存</button><button class="password-cancel" disabled="{{passwordBusy}}" bindtap="closePassword">取消</button></view>
+  </view>
+</view>

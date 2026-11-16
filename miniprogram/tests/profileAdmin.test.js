@@ -1,0 +1,4 @@
+const test=require('node:test'),assert=require('node:assert/strict'),{loadPage,makePage}=require('./page-helper'),api=require('../services/api')
+const definition=loadPage('../pages/profile/index')
+test('the admin entry requires a successful server permission check',async()=>{let count=0;api.get=async()=>{count++;throw Error('无权访问')};const p=makePage(definition,{user:{id:'u',token:'x',userRole:'super_admin'}});await p.checkAdminAccess();assert.equal(p.data.canAccessAdmin,false);assert.equal(count,1);api.get=async()=>true;await p.checkAdminAccess();assert.equal(p.data.canAccessAdmin,true)})
+test('ordinary members do not query the admin endpoint',async()=>{let count=0;api.get=async()=>{count++};const p=makePage(definition,{user:{id:'u',token:'x',userRole:'user'}});await p.checkAdminAccess();assert.equal(count,0);assert.equal(p.data.canAccessAdmin,false)})

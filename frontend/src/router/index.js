@@ -91,6 +91,13 @@ const routes = [
         name: 'SpecialExpense',
         component: () => import('../views/SpecialExpenseView.vue'),
       },
+      { path: '/commute', name: 'Commute', component: () => import('../views/CommuteView.vue') },
+      {
+        path: '/recipe/:id',
+        name: 'RecipeDetail',
+        component: () => import('../views/RecipeDetail.vue'),
+        meta: { bareShell: true },
+      },
     ],
   },
   {
@@ -107,11 +114,6 @@ const routes = [
     path: '/recipe/:id/edit',
     name: 'RecipeEdit',
     component: () => import('../views/RecipeEditor.vue'),
-  },
-  {
-    path: '/recipe/:id',
-    name: 'RecipeDetail',
-    component: () => import('../views/RecipeDetail.vue'),
   },
 ]
 
@@ -137,6 +139,7 @@ function getCurrentUser() {
 }
 
 router.beforeEach((to) => {
+  if (to.path === '/recipes' && (to.query.pick === 'today' || to.query.mode === 'showcase')) return { path: '/recipes', replace: true }
   if (to.path === '/reset-password') return true
   const user = getCurrentUser()
   const isLogin = Boolean(user?.id && user?.token && user?.userRole)
@@ -168,6 +171,7 @@ router.beforeEach((to) => {
       || to.path === '/todo'
       || to.path.startsWith('/todo/')
       || to.path === '/expenses'
+      || to.path === '/commute'
     if (guestFamilyOnly) return '/recipes'
     const guestWriteBlocked = to.path === '/account/email'
       || to.path === '/recipe/create'

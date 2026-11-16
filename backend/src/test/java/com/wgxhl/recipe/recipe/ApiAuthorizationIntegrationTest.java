@@ -47,16 +47,16 @@ class ApiAuthorizationIntegrationTest {
     }
 
     @Test
-    void guestCannotReadAccountDetailsAndReceivesOnlyBasicMemberProfiles() throws Exception {
+    void guestOnlyReadsPublicRecipesAndNeverFamilyData() throws Exception {
         String member=account(true);
         assertEquals(403, call("/user/getById", Map.of("id", member), "guest").get("status").asInt());
-        JsonNode profiles=call("/user/page", Map.of("current",1,"size",50,"username",member), "guest");
-        assertEquals(200, profiles.get("status").asInt());
-        JsonNode profile=profiles.get("data").get("records").get(0);
-        assertEquals(member,profile.get("id").asText());
-        assertNoValue(profile,"email","birthday","password","remark","authVersion","accountOrigin");
-        JsonNode members=call("/user/members",Map.of(),"guest").get("data");
-        for (JsonNode item : members) assertNoValue(item,"email","birthday","notificationPreference");
+        assertEquals(403, call("/user/page", Map.of("current",1,"size",50,"username",member), "guest").get("status").asInt());
+        assertEquals(403, call("/user/members",Map.of(),"guest").get("status").asInt());
+        assertEquals(403, call("/expense/project/page",Map.of("current",1,"size",50),"guest").get("status").asInt());
+        assertEquals(403, call("/todo/page",Map.of("current",1,"size",50),"guest").get("status").asInt());
+        assertEquals(403, call("/favorite/page",Map.of("current",1,"size",50),"guest").get("status").asInt());
+        assertEquals(403, call("/want/page",Map.of("current",1,"size",50),"guest").get("status").asInt());
+        assertEquals(200, call("/recipe/page",Map.of("current",1,"size",10,"scope","public"),"guest").get("status").asInt());
     }
 
     @Test

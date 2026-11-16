@@ -1,0 +1,24 @@
+<view class="page favorite-page">
+  <view class="app-header"><view><view class="eyebrow">{{user.householdName || '王师傅家'}}</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view wx:if="{{!guest}}" class="header-add" role="button" aria-label="添加菜谱" bindtap="add">＋</view></view></view>
+  <view class="page-head"><view><view class="eyebrow">我的菜单</view><view class="page-title">收藏</view></view><view class="page-count">{{total}} 道</view></view>
+  <view wx:if="{{guest}}" class="surface state">游客只能浏览公共菜谱，收藏是家庭成员的功能。</view>
+  <view wx:elif="{{loading}}" class="state">正在加载...</view>
+  <view wx:elif="{{error}}" class="surface state" bindtap="retry">{{error}}，点击重试</view>
+  <view wx:elif="{{!list.length}}" class="surface state">还没有收藏菜谱，去首页挑一道吧。</view>
+  <block wx:else>
+    <view class="recipe-grid">
+      <view wx:for="{{list}}" wx:key="favoriteId" class="recipe-card" data-id="{{item.recipeId}}" bindtap="openRecipe">
+        <view class="cover-wrap">
+          <image wx:if="{{item.coverUrl}}" class="cover" src="{{item.coverUrl}}" mode="aspectFill" lazy-load/>
+          <view wx:else class="cover placeholder">暂无封面</view>
+          <view class="favorite active" role="button" aria-label="取消收藏" data-id="{{item.favoriteId}}" catchtap="removeFavorite"><text class="van-icon van-icon-like"></text><text wx:if="{{item.favoriteCount>0}}" class="favorite-count">{{item.favoriteCount}}</text></view>
+          <view class="like-pill {{item.liked?'active':''}} {{!item.liked && !item.likeCount?'is-icon-only':''}}" role="button" aria-label="{{item.liked?'取消点赞':'点赞'}}" data-id="{{item.recipeId}}" catchtap="toggleLike"><text class="van-icon {{item.liked?'van-icon-good-job':'van-icon-good-job-o'}}"></text><text wx:if="{{item.liked || item.likeCount>0}}">{{item.likeCount}}</text></view>
+        </view>
+        <view class="recipe-body"><view class="recipe-title">{{item.recipeName}}</view><view class="recipe-meta">{{item.categoryLabel}} · {{item.tasteLabel}}</view><view class="recipe-meta">{{item.timeLabel}} · {{item.difficultyLabel}}</view><view wx:if="{{item.ownerName}}" class="recipe-owner">{{item.ownerName}}</view></view>
+      </view>
+    </view>
+    <view wx:if="{{loadingMore}}" class="state">正在加载...</view>
+    <view wx:elif="{{list.length>=total}}" class="state">已显示全部</view>
+  </block>
+</view>
+<notice-panel visible="{{noticeOpen}}" bind:close="closeNotifications" bind:change="refreshUnread" />

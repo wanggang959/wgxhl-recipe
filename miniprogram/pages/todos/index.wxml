@@ -1,0 +1,39 @@
+<view class="page todo-page">
+  <view class="app-header"><view><view class="eyebrow">王师傅家</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view class="header-add" role="button" aria-label="新增待办" bindtap="add">＋</view></view></view>
+  <view class="overview surface">
+    <view class="overview-main"><view class="eyebrow">待办清单</view><view class="overview-title">今日 {{todayCount}} 件</view><view class="overview-detail">已完成 {{summary.doneCount || 0}} 件 · 近期待办 {{dueSoonCount}} 件</view></view>
+    <view class="overview-actions"><button class="summary-button" bindtap="openSummary"><text class="van-icon van-icon-cart-o"></text> 采购汇总</button><button class="add-button ghost" bindtap="add">＋ 新增待办</button></view>
+  </view>
+  <view class="filters surface">
+    <view class="filter-row"><text class="filter-label">范围</text><scroll-view class="filter-scroll" scroll-x show-scrollbar="{{false}}"><view class="filter-options"><view wx:for="{{ranges}}" wx:key="value" class="filter-chip {{range === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseRange">{{item.label}}</view></view></scroll-view></view>
+    <view class="filter-row"><text class="filter-label">类型</text><scroll-view class="filter-scroll" scroll-x show-scrollbar="{{false}}"><view class="filter-options"><view wx:for="{{categories}}" wx:key="value" class="filter-chip {{category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseCategory">{{item.label}}</view></view></scroll-view></view>
+  </view>
+  <view wx:if="{{error || planError}}" class="surface state">{{error || planError}}<button class="retry" bindtap="retry">重新加载</button></view>
+  <view wx:elif="{{loading || planLoading}}" class="state">正在加载</view>
+  <view wx:elif="{{!groups.length}}" class="surface state">这个筛选下还没有待办</view>
+  <block wx:else>
+    <view wx:for="{{groups}}" wx:for-item="group" wx:key="key" class="group">
+      <view class="group-title">{{group.label}}</view>
+      <view wx:for="{{group.items}}" wx:for-item="entry" wx:key="id" class="surface todo">
+        <view class="todo-icon"><text class="van-icon {{entry.type === 'wanted' || entry.category === 'COOK' ? 'van-icon-fire-o' : entry.category === 'BIRTHDAY' ? 'van-icon-birthday-cake-o' : entry.category === 'GROCERY' ? 'van-icon-cart-o' : entry.category === 'PAYMENT' ? 'van-icon-balance-pay' : entry.category === 'SERVER' ? 'van-icon-desktop-o' : entry.category === 'DOMAIN' ? 'van-icon-cluster-o' : entry.category === 'SSL' ? 'van-icon-shield-o' : entry.category === 'ANNIVERSARY' ? 'van-icon-like-o' : entry.category === 'LIFE' ? 'van-icon-notes-o' : 'van-icon-todo-list-o'}}"></text></view>
+        <view class="todo-content">
+          <view class="todo-head"><text wx:if="{{entry.type === 'todo'}}" class="todo-title" data-id="{{entry.id}}" bindtap="openDetail">{{entry.data.title}}</text><text wx:else class="todo-title">{{entry.data.recipeName}}</text><text class="tag">{{entry.type === 'wanted' ? '做饭' : entry.data.categoryLabel}}</text></view>
+          <block wx:if="{{entry.type === 'wanted'}}">
+            <view class="detail">{{entry.data.displayOwner}} · 计划 {{entry.data.plannedDate}}</view>
+            <view class="actions"><button class="done-action" data-id="{{entry.id}}" bindtap="finishPlan">✓ 完成</button></view>
+          </block>
+          <block wx:else>
+            <view wx:if="{{entry.data.ownerName}}" class="detail"><text class="van-icon van-icon-contact-o"></text><text>负责人：{{entry.data.ownerName}}</text></view>
+            <view wx:if="{{entry.data.birthdayDisplayText}}" class="detail"><text class="van-icon van-icon-birthday-cake-o"></text><text>{{entry.data.birthdayDisplayText}}</text></view>
+            <view class="detail"><text class="van-icon {{entry.data.birthdaySolarLabel ? 'van-icon-calendar-o' : 'van-icon-clock-o'}}"></text><text>{{entry.data.displayDate}}</text></view>
+            <view wx:if="{{entry.data.lastOccurrenceLabel}}" class="detail"><text class="van-icon van-icon-underway-o"></text><text>{{entry.data.lastOccurrenceLabel}}</text></view>
+            <view wx:if="{{entry.data.remainText || entry.data.nextNotifyLabel}}" class="detail"><text class="van-icon van-icon-bell"></text><text>{{entry.data.remainText}}<block wx:if="{{entry.data.remainText}}"><block wx:if="{{entry.data.nextNotifyLabel}}"> · </block></block><block wx:if="{{entry.data.nextNotifyLabel}}">提醒 {{entry.data.nextNotifyLabel}}</block></text></view>
+            <view wx:if="{{entry.data.description}}" class="description">{{entry.data.description}}</view>
+            <view wx:if="{{entry.data.canManage}}" class="actions"><button wx:if="{{entry.data.status !== 'DONE'}}" class="done-action {{entry.data.canComplete === false ? 'is-disabled' : ''}}" data-id="{{entry.id}}" bindtap="finish"><text class="van-icon van-icon-success"></text> 完成</button><button data-id="{{entry.id}}" bindtap="edit"><text class="van-icon van-icon-edit"></text> 编辑</button><button class="delete-action" aria-label="删除" data-id="{{entry.id}}" bindtap="remove"><text class="van-icon van-icon-delete-o"></text></button></view>
+          </block>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>
+<notice-panel visible="{{noticeOpen}}" bind:close="closeNotifications" bind:change="refreshUnread" />

@@ -1,7 +1,7 @@
 <script setup>
 import { loadAllPages } from '../utils/pagination'
 import LoadMoreSentinel from '../components/LoadMoreSentinel.vue'
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import {
   archiveExpenseProject,
@@ -19,6 +19,7 @@ import { listMembers } from '../api/user'
 import EmptyState from '../components/EmptyState.vue'
 import { useUserStore } from '../stores/user'
 import { DATA_SCOPE, markDataChanged } from '../utils/dataRefresh'
+import { createExpenseListImage } from '../utils/expenseListImage'
 
 const userStore = useUserStore()
 const loading = ref(false)
@@ -36,6 +37,10 @@ const projectPopupVisible = ref(false)
 const itemPopupVisible = ref(false)
 const savingProject = ref(false)
 const savingItem = ref(false)
+const exporting = ref(false)
+const exportVisible = ref(false)
+const exportUrl = ref('')
+const exportFile = ref(null)
 const showArchived = ref(false)
 const summary = ref({
   totalBudget: 0,
@@ -145,6 +150,30 @@ const spendPercent = computed(() => {
 onMounted(async () => {
   await Promise.all([loadMembers(), loadProjects()])
 })
+onUnmounted(() => { if (exportUrl.value) URL.revokeObjectURL(exportUrl.value) })
+
+async function exportImage() {
+  if (!selectedProject.value || exporting.value) return
+  const project = selectedProject.value
+  const filters = { projectId: project.id, category: itemCategoryFilter.value, status: itemStatusFilter.value }
+  exporting.value = true
+  try {
+    const result = await loadAllPages(pageExpenseItems, filters)
+    const entries = [...result.data.records].sort((a, b) => (a.status === 'DONE' ? 1 : 0) - (b.status === 'DONE' ? 1 : 0))
+    const blob = await createExpenseListImage(project.projectName, entries)
+    if (exportUrl.value) URL.revokeObjectURL(exportUrl.value)
+    exportUrl.value = URL.createObjectURL(blob)
+    exportFile.value = new File([blob], `${project.projectName.replace(/[\\/:*?"<>|]/g, '_') || '专项开支'}清单.png`, { type: 'image/png' })
+    exportVisible.value = true
+  } catch (error) { showFailToast(error.message || '图片生成失败') }
+  finally { exporting.value = false }
+}
+
+async function shareImage() {
+  try { await navigator.share({ files: [exportFile.value], title: '专项开支清单' }) }
+  catch (error) { if (error.name !== 'AbortError') showFailToast('分享失败，请尝试保存图片') }
+}
+const canShareImage = computed(() => Boolean(exportFile.value && navigator.canShare?.({ files: [exportFile.value] })))
 
 watch(selectedProjectId, () => {
   loadProjectData()
@@ -609,10 +638,12 @@ function dateText(value) {
 
       <div class="list-head">
         <h2>开支清单</h2>
-        <button v-if="canWrite" type="button" @click="openItemForm()">
+        <div class="list-head-actions"><button type="button" class="export-action" :disabled="exporting" @click="exportImage">
+          <van-icon name="photo-o" /> {{ exporting ? '生成中' : '导出图片' }}
+        </button><button v-if="canWrite" type="button" @click="openItemForm()">
           <van-icon name="plus" />
           新增
-        </button>
+        </button></div>
       </div>
 
       <EmptyState
@@ -668,6 +699,13 @@ function dateText(value) {
       </div>
     </template>
 
+    <van-popup v-model:show="exportVisible" position="bottom" round>
+      <div class="export-sheet">
+        <div class="export-sheet-head"><h2>清单图片</h2><button type="button" aria-label="关闭" @click="exportVisible = false"><van-icon name="cross" /></button></div>
+        <div class="export-preview"><img v-if="exportUrl" :src="exportUrl" alt="专项开支清单图片" /></div>
+        <div class="export-buttons"><a :href="exportUrl" :download="exportFile?.name"><van-icon name="down" /> 保存图片</a><button v-if="canShareImage" type="button" @click="shareImage"><van-icon name="share-o" /> 分享</button></div>
+      </div>
+    </van-popup>
     <van-popup v-model:show="projectPopupVisible" position="bottom" round>
       <div class="sheet">
         <h2>{{ isEditingProject ? '编辑专项' : '新增专项' }}</h2>
@@ -1087,6 +1125,19 @@ function dateText(value) {
 .list-head h2 {
   margin: 0;
 }
+
+.list-head-actions { display:flex; align-items:center; gap:8px; }
+.list-head-actions .export-action { background:#fff; color:var(--app-primary); border:1px solid var(--app-border); }
+.list-head-actions button:disabled { opacity:.6; }
+.export-sheet { padding:18px 16px max(20px, env(safe-area-inset-bottom)); }
+.export-sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.export-sheet-head h2 { margin:0; font-size:18px; }
+.export-sheet-head button { width:36px; height:36px; border:1px solid var(--app-border); border-radius:8px; background:#fff8ef; color:#81563a; }
+.export-preview { max-height:60dvh; overflow:auto; background:#f3ede7; border:1px solid var(--app-border); border-radius:8px; }
+.export-preview img { display:block; width:100%; height:auto; }
+.export-buttons { display:flex; gap:10px; margin-top:14px; }
+.export-buttons a,.export-buttons button { flex:1; display:flex; align-items:center; justify-content:center; gap:5px; min-height:42px; border:1px solid var(--app-primary); border-radius:8px; color:#fff; background:var(--app-primary); text-decoration:none; font-size:14px; font-weight:700; }
+.export-buttons button { color:var(--app-primary); background:#fff; }
 
 .expense-list {
   display: flex;

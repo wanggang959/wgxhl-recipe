@@ -1,0 +1,65 @@
+@import "../../assets/vant-icons.wxss";
+.summary-page{padding-top:0;padding-bottom:40rpx}
+.page-head{display:flex;align-items:center;gap:20rpx;padding:28rpx;margin-bottom:20rpx;background:#fff;border:1rpx solid #f5ddca;border-radius:32rpx}
+.back-button{flex:none;width:68rpx;height:68rpx;border-radius:50%;background:#fff7e8;color:#ff7614;display:flex;align-items:center;justify-content:center}
+.back-button .van-icon{font-size:32rpx;line-height:1}
+.head-copy{flex:1;min-width:0}
+.page-title{font-size:48rpx;font-weight:700;line-height:1.2;margin-top:4rpx}
+.add-todo-btn{flex:none;width:120rpx;height:64rpx;margin:0;padding:0 12rpx;border:0;border-radius:20rpx;background:#ff7614;color:#fff;font-size:23rpx;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;gap:4rpx;white-space:nowrap;box-sizing:border-box;box-shadow:0 8rpx 18rpx rgba(249,115,22,.24)}
+.add-todo-btn .van-icon{font-size:28rpx;line-height:1}
+.range-scroll{width:100%;white-space:nowrap;margin-bottom:20rpx}
+.range-tabs{display:inline-flex;gap:14rpx}
+.range-tab{height:68rpx;padding:0 24rpx;border:1rpx solid #f0dac7;border-radius:34rpx;background:#fff;color:#7c5c46;font-size:24rpx;font-weight:800;display:flex;align-items:center;white-space:nowrap}
+.range-tab.active{background:#ff7614;color:#fff;border-color:#ff7614}
+.summary-section{padding:28rpx;margin-bottom:20rpx;border-radius:28rpx;background:#fff;border:1rpx solid #f5ddca;box-shadow:0 12rpx 26rpx rgba(154,52,18,.08);display:flex;flex-direction:column;gap:20rpx}
+.section-title{font-size:36rpx;font-weight:700;color:#392e28}
+.simple-empty{font-size:26rpx;color:#927d6e}
+.swipe-row{position:relative;overflow:hidden;border-radius:28rpx}
+.swipe-actions{position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1}
+.swipe-action{width:58px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:26rpx;font-weight:900}
+.swipe-action.enough{background:#6b7280}
+.swipe-action.buy{background:#ff7614}
+.swipe-action.clear{background:#9b7d66}
+.summary-item,.seasoning-item{position:relative;z-index:2;box-sizing:border-box;border:1rpx solid #f5ddca;border-radius:28rpx;display:grid;grid-template-columns:84rpx minmax(0,1fr);align-items:center;gap:20rpx;padding:16rpx;transition:transform .12s ease}
+.summary-item{min-height:124rpx;background:#fff}
+.seasoning-item{min-width:0;background:#fffaf2}
+.summary-item image,.seasoning-item image,.item-placeholder{width:84rpx;height:84rpx;border-radius:24rpx;flex:none}
+.summary-item image,.seasoning-item image{object-fit:cover}
+.item-placeholder{background:#fff7e8;color:#ff7614;display:flex;align-items:center;justify-content:center;font-size:32rpx}
+.item-main{min-width:0;display:flex;flex-direction:column;align-items:flex-start}
+.item-name{max-width:100%;color:#392e28;font-size:28rpx;line-height:1.35;overflow-wrap:anywhere}
+.seasoning-item .item-name{font-size:28rpx;font-weight:800}
+.item-amount{margin-top:6rpx;color:#ff7614;font-size:26rpx;font-weight:800;overflow-wrap:anywhere}
+.item-status{display:inline-flex;max-width:100%;margin-top:10rpx;padding:6rpx 14rpx;border-radius:999rpx;background:#fff7e8;color:#c2410c;font-size:24rpx;line-height:1.2;font-weight:900}
+.summary-item.is-enough,.seasoning-item.is-enough{background:#f3f4f6;border-color:#e5e7eb}
+.summary-item.is-enough image,.seasoning-item.is-enough image{opacity:.52}
+.summary-item.is-enough .item-name,.seasoning-item.is-enough .item-name{color:#6b7280}
+.summary-item.is-enough .item-status,.seasoning-item.is-enough .item-status{background:#e5e7eb;color:#4b5563}
+.summary-item.is-buy,.seasoning-item.is-buy{background:#fff7e8;border-color:#fed7aa;box-shadow:inset 6rpx 0 0 #f97316}
+.summary-item.is-buy .item-status,.seasoning-item.is-buy .item-status{background:#ff7614;color:#fff}
+.seasoning-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20rpx}
+.seasoning-swipe{min-width:0}
+.empty-state{min-height:440rpx;padding:60rpx 24rpx;border-radius:18rpx;background:rgba(255,255,255,.72);border:1rpx dashed #f3c89b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22rpx;text-align:center}
+.empty-plate{width:144rpx;height:144rpx;border-radius:50%;background:#ffead7;color:#ff7614;display:flex;align-items:center;justify-content:center}
+.empty-plate .van-icon{font-size:64rpx;line-height:1}
+.empty-text{font-size:28rpx;color:#927d6e}
+.empty-button{margin:0;padding:0 40rpx;height:64rpx;line-height:64rpx;border-radius:32rpx;background:#ff7614;color:#fff;font-size:26rpx;font-weight:600}
+.sheet-layer{position:fixed;inset:0;z-index:600;background:rgba(47,38,31,.32);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:860rpx;box-sizing:border-box;padding:28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));border-radius:24rpx 24rpx 0 0;background:#fffaf2}
+.sheet-title{font-size:34rpx;font-weight:700;color:#392e28;text-align:center;margin-bottom:18rpx;overflow-wrap:anywhere}
+.sheet-field{display:flex;flex-direction:column;gap:10rpx}
+.sheet-label{font-size:24rpx;color:#927d6e}
+.sheet-field input{height:84rpx;box-sizing:border-box;padding:0 22rpx;border:1rpx solid #f0dac7;border-radius:24rpx;background:#fff;font-size:26rpx;color:#392e28}
+.buy-actions{display:flex;flex-direction:column;gap:12rpx;margin-top:20rpx}
+.buy-actions button{height:80rpx;line-height:80rpx;margin:0;padding:0;border-radius:40rpx;font-size:28rpx;font-weight:800}
+.buy-save{background:#ff7614;color:#fff;border:1rpx solid #ff7614}
+.buy-cancel{background:#fff;color:#7c5c46;border:1rpx solid #f0dac7}
+.preview-eyebrow{color:#ff7614;font-size:24rpx;font-weight:900}
+.preview-count{font-size:40rpx;font-weight:700;color:#392e28;margin:6rpx 0 18rpx}
+.preview-list{max-height:42vh;box-sizing:border-box}
+.preview-line{padding:22rpx 24rpx;border:1rpx solid #f0dac7;border-radius:24rpx;background:#fff;color:#392e28;font-size:28rpx;font-weight:800;overflow-wrap:anywhere}
+.preview-line+.preview-line{margin-top:14rpx}
+.preview-actions{display:grid;grid-template-columns:1fr 1fr;gap:20rpx;margin-top:24rpx}
+.preview-actions button{height:84rpx;line-height:84rpx;margin:0;padding:0;border-radius:42rpx;font-size:28rpx;font-weight:900}
+.preview-cancel{background:#fff;color:#7c5c46;border:1rpx solid #f0dac7}
+.preview-submit{background:#ff7614;color:#fff;border:1rpx solid #ff7614;box-shadow:0 8rpx 18rpx rgba(249,115,22,.22)}

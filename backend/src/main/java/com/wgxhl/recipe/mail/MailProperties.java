@@ -26,6 +26,7 @@ public class MailProperties {
         private Long codeTemplateId = 0L;
         private Long resetTemplateId = 0L;
         private Long notificationTemplateId = 0L;
+        private Long commuteTemplateId = 0L;
         private boolean htmlTemplates = false;
     }
 }

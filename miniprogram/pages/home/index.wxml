@@ -1,0 +1,27 @@
+<view class="page home-page">
+  <view class="app-header"><view><view class="eyebrow">{{user.householdName || '王师傅家'}}</view><view class="app-name">家庭生活助手</view></view><view class="header-actions"><view class="bell-button" role="button" aria-label="打开通知" bindtap="openNotifications"><text class="van-icon van-icon-bell"></text><text wx:if="{{unread}}" class="bell-badge">{{unread > 99 ? '99+' : unread}}</text></view><view wx:if="{{!guest}}" class="header-add" role="button" aria-label="添加菜谱" bindtap="add">＋</view></view></view>
+  <view class="hero"><text class="hero-kicker">欢迎回家</text><text class="hero-title">{{user.householdName || '王师傅家'}}的生活日常</text><text class="hero-copy">记录家里的味道，也照管家里的小事。</text></view>
+  <view class="switches"><view wx:if="{{!guest}}" class="segmented"><view class="segment {{scope==='family'?'active':''}}" data-value="family" bindtap="chooseScope">家庭</view><view class="segment {{scope==='public'?'active':''}}" data-value="public" bindtap="chooseScope">公共</view></view><view wx:else class="guest-label">公共菜谱</view><view class="segmented sort"><view wx:for="{{sorts}}" wx:key="value" class="segment {{sort===item.value?'active':''}}" data-value="{{item.value}}" bindtap="chooseSort">{{item.label}}</view></view></view>
+  <view class="search"><text class="van-icon van-icon-search"></text><input value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" confirm-type="search" placeholder="{{scope==='public'?'搜索菜名':'搜索菜名、作者用户名'}}"/><view bindtap="search" class="search-button">搜索</view></view>
+  <scroll-view scroll-x class="category-scroll" show-scrollbar="{{false}}"><view class="category-list"><view class="category {{!categoryId?'active':''}}" data-id="" bindtap="chooseCategory">全部</view><view wx:for="{{categories}}" wx:key="id" class="category {{categoryId===item.id?'active':''}}" data-id="{{item.id}}" bindtap="chooseCategory">{{item.categoryName}}</view></view></scroll-view><view wx:if="{{categoryError}}" class="inline-error" bindtap="retryCategories">分类加载失败，点击重试</view>
+  <view wx:if="{{isSuperAdmin && scope==='family'}}" class="offline-toggle" role="button" bindtap="toggleOffline">{{showOffline?'返回在架菜谱':'查看已下架'}}</view>
+  <view class="list-header"><text>菜单</text><text>{{total}} 道菜</text></view>
+  <view wx:if="{{recipes.length}}" class="recipe-grid">
+    <view wx:for="{{recipes}}" wx:key="id" class="recipe-card" data-id="{{item.id}}" bindtap="openRecipe">
+      <view class="cover-wrap">
+        <image wx:if="{{item.coverUrl}}" class="cover" src="{{item.coverUrl}}" mode="aspectFill" lazy-load/>
+        <view wx:else class="cover placeholder">暂无封面</view>
+        <view wx:if="{{item.status==='下架'}}" class="offline-badge">已下架</view>
+        <view wx:if="{{!guest}}" class="favorite {{item.favorite?'active':''}}" role="button" aria-label="{{item.favorite?'取消收藏':'收藏菜谱'}}" data-id="{{item.id}}" catchtap="toggleFavorite"><text class="van-icon {{item.favorite?'van-icon-like':'van-icon-like-o'}}"></text><text wx:if="{{item.favoriteCount>0}}" class="favorite-count">{{item.favoriteCount}}</text></view>
+        <view wx:elif="{{item.favoriteCount>0}}" class="favorite is-static"><text class="van-icon {{item.favorite?'van-icon-like':'van-icon-like-o'}}"></text><text class="favorite-count">{{item.favoriteCount}}</text></view>
+        <view wx:if="{{!guest}}" class="like-pill {{item.liked?'active':''}} {{!item.liked && !item.likeCount?'is-icon-only':''}}" role="button" aria-label="{{item.liked?'取消点赞':'点赞'}}" data-id="{{item.id}}" catchtap="toggleLike"><text class="van-icon {{item.liked?'van-icon-good-job':'van-icon-good-job-o'}}"></text><text wx:if="{{item.liked || item.likeCount>0}}">{{item.likeCount}}</text></view>
+        <view wx:elif="{{item.likeCount>0}}" class="like-pill is-static"><text class="van-icon van-icon-good-job-o"></text><text>{{item.likeCount}}</text></view>
+        <view wx:if="{{!guest}}" class="want-cart {{item.wanted?'active':''}}" role="button" aria-label="添加到想吃" data-id="{{item.id}}" catchtap="openWant"><text class="van-icon van-icon-cart-o"></text></view>
+      </view>
+      <view class="recipe-body"><view class="recipe-title">{{item.recipeName}}</view><view class="recipe-meta">{{item.categoryLabel}} · {{item.tasteLabel}}</view><view class="recipe-meta">{{item.timeLabel}} · {{item.difficultyLabel}}</view><view wx:if="{{item.ownerName}}" class="recipe-owner">{{item.ownerName}}</view></view>
+    </view>
+  </view>
+  <view wx:if="{{loading}}" class="state">正在加载...</view><view wx:elif="{{error}}" class="state" bindtap="retry">{{error}}，点击重试</view><view wx:elif="{{!recipes.length}}" class="state">还没有符合条件的菜谱</view><view wx:elif="{{recipes.length>=total}}" class="state">已显示全部</view>
+</view>
+<notice-panel visible="{{noticeOpen}}" bind:close="closeNotifications" bind:change="refreshUnread" />
+<view wx:if="{{wantOpen}}" class="want-layer" bindtap="closeWant"><view class="want-sheet" catchtap="swallow"><view class="want-title">{{wantTarget.recipeName}}</view><view class="want-actions"><view role="button" bindtap="wantToday">今天</view><view role="button" bindtap="wantTomorrow">明天</view></view><view class="want-date"><text>自选日期</text><picker mode="date" value="{{wantDate}}" start="{{wantMinDate}}" bindchange="wantDateChange"><view>{{wantDate}} ›</view></picker></view><view class="want-submit {{wantBusy?'busy':''}}" role="button" bindtap="wantCustom">{{wantBusy?'添加中...':'添加到想吃'}}</view><view class="want-cancel" bindtap="closeWant">取消</view></view></view>

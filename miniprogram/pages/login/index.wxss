@@ -1,0 +1,93 @@
+@import "../../assets/vant-icons.wxss";
+.login-page{position:relative;width:100%;max-width:860rpx;min-height:100vh;margin:0 auto;overflow:hidden;color:#3e2818;font-family:"LXGW WenKai","STKaiti","KaiTi","Microsoft YaHei","PingFang SC",sans-serif;background:linear-gradient(180deg,#fff8ec 0%,#fffaf3 48%,#fff6e9 100%)}
+.login-bg{position:absolute;top:0;left:0;z-index:0;display:block;width:100%;height:auto}
+.login-hero{position:relative;z-index:1;height:452rpx;display:flex;align-items:flex-start;justify-content:center;box-sizing:border-box}
+.brand-lockup{display:flex;flex-direction:column;align-items:center;color:#4b2f1c;text-shadow:0 4rpx 28rpx rgba(255,255,255,.7)}
+.chef-mark{position:relative;width:124rpx;height:100rpx;margin-bottom:14rpx;overflow:hidden;border-radius:36rpx;filter:drop-shadow(0 16rpx 24rpx rgba(255,112,18,.16));mix-blend-mode:multiply}
+.chef-mark image{display:block;width:100%;height:100%;transform:scale(3.25)}
+.brand-main{font-family:"STKaiti","KaiTi","FangSong",serif;font-size:56rpx;line-height:1;font-weight:900}
+.brand-sub{display:flex;align-items:center;gap:24rpx;margin-top:20rpx;color:#ff6b18;font-size:30rpx;font-weight:800}
+.brand-sub .line{display:block;width:56rpx;height:4rpx;border-radius:999rpx;background:currentColor;opacity:.7}
+.login-content{position:relative;z-index:2;margin-top:-8rpx;padding:0 44rpx 52rpx}
+.welcome{text-align:center;transform:translateX(16rpx)}
+.welcome-kicker{color:#4b2f1c;font-size:40rpx;line-height:1.2;font-weight:900}
+.welcome-house{margin:14rpx 0 24rpx;color:#ff6b18;font-size:50rpx;line-height:1.16;font-weight:900}
+.login-tip{display:flex;align-items:center;justify-content:center;gap:22rpx;margin-bottom:36rpx;color:#8f7562;font-size:32rpx;font-weight:700}
+.login-tip .diamond{display:block;width:16rpx;height:16rpx;transform:rotate(45deg);background:#ff8a2a}
+.form-card{position:relative;padding:150rpx 36rpx 0;overflow:hidden;border:2rpx solid rgba(244,211,181,.86);border-radius:62rpx;background:linear-gradient(180deg,rgba(255,255,255,.84) 0%,rgba(255,255,255,.97) 42%,rgba(255,249,238,.95) 100%);box-shadow:0 40rpx 84rpx rgba(174,84,13,.15),inset 0 2rpx 0 rgba(255,255,255,.95)}
+.dish-ornament{position:absolute;top:32rpx;left:50%;display:flex;align-items:center;gap:16rpx;color:#ff7a1a;transform:translateX(-50%)}
+.pot-mark{display:block;width:172rpx;height:124rpx;overflow:hidden;border-radius:36rpx;filter:drop-shadow(0 14rpx 24rpx rgba(255,116,18,.18));mix-blend-mode:multiply}
+.pot-mark image{display:block;width:100%;height:100%}
+.steam{width:16rpx;height:32rpx;border:solid #ffbf7a;border-width:0 4rpx 0 0;border-radius:50%}
+.steam-1{transform:rotate(-18deg)}
+.steam-2{height:44rpx}
+.steam-3{transform:rotate(18deg)}
+.status{display:flex;align-items:center;gap:16rpx;margin-bottom:28rpx;padding:20rpx 24rpx;border:2rpx solid rgba(22,163,74,.13);border-radius:28rpx;color:#15803d;background:rgba(236,253,243,.9);font-size:26rpx;line-height:1.35}
+.status.error{border-color:rgba(225,29,72,.12);color:#be123c;background:rgba(255,241,242,.92)}
+.status .van-icon{flex:none;font-size:28rpx;line-height:1}
+.field-group{margin-bottom:36rpx}
+.field-label{display:flex;align-items:center;gap:20rpx;margin:0 0 20rpx 8rpx;color:#4a3323;font-size:32rpx;font-weight:800}
+.field-label .van-icon{color:#ff6b18;font-size:44rpx;line-height:1}
+.input-shell{position:relative;height:104rpx;display:flex;align-items:center;padding:0 28rpx;border:4rpx solid #dfc4b3;border-radius:999rpx;background:#fffaf4;box-shadow:0 0 0 2rpx rgba(255,255,255,.72),inset 0 4rpx 18rpx rgba(117,58,16,.04),0 2rpx 0 rgba(255,255,255,.88);box-sizing:border-box}
+.native-input{width:100%;min-width:0;height:100%;padding:0;border:0;color:#3e2818;background:transparent;font-size:32rpx}
+.username-shell.has-avatar{padding-right:112rpx}
+.native-input.with-avatar{padding-right:12rpx}
+.username-avatar{position:absolute;right:16rpx;top:50%;width:80rpx;height:80rpx;border-radius:50%;box-shadow:0 4rpx 20rpx rgba(154,52,18,.14);transform:translateY(-50%)}
+.password-shell{gap:16rpx}
+.icon-button{width:68rpx;height:68rpx;flex:none;display:flex;align-items:center;justify-content:center;color:#99897d;font-size:42rpx}
+.form-options{display:flex;align-items:center;justify-content:space-between;gap:28rpx;margin:6rpx 8rpx 44rpx;color:#8e7d70;font-size:28rpx}
+.remember{display:flex;align-items:center;gap:12rpx}
+.checkbox{width:36rpx;height:36rpx;flex:none;border-radius:50%;border:2rpx solid #c9b3a2;background:#fff;display:flex;align-items:center;justify-content:center;color:#fff;box-sizing:border-box}
+.checkbox.checked{background:#ff6b18;border-color:#ff6b18}
+.checkbox .van-icon{font-size:24rpx;line-height:1}
+.forgot{display:flex;align-items:center;gap:6rpx;white-space:nowrap}
+.forgot .van-icon{font-size:24rpx;line-height:1}
+.login-button{height:116rpx;line-height:116rpx;margin:0;padding:0;border:0;border-radius:999rpx;color:#fff;font-size:36rpx;font-weight:900;background:linear-gradient(180deg,#ff9424 0%,#ff6814 100%);box-shadow:0 24rpx 44rpx rgba(255,106,22,.28)}
+.guest-row{display:flex;align-items:center;justify-content:center;gap:12rpx;flex-wrap:wrap;margin-top:32rpx;color:#9a8473;font-size:28rpx}
+.guest-row .link{color:#ff6b18;font-weight:800}
+.family-frame{margin:36rpx -36rpx 0;height:320rpx;overflow:hidden;border-radius:0 0 56rpx 56rpx}
+.family-illustration{display:block;width:100%;margin-top:-110rpx;opacity:.92}
+.footer-note{display:flex;align-items:center;justify-content:center;gap:20rpx;margin-top:48rpx;color:#694734;font-size:34rpx;line-height:1.4}
+.footer-note .van-icon{color:#ff8a24;font-size:36rpx;line-height:1}
+
+.login-page{max-width:430px}
+.login-hero{height:226px}
+.chef-mark{width:62px;height:50px;margin-bottom:7px;border-radius:18px}
+.brand-main{font-size:28px}
+.brand-sub{gap:12px;margin-top:10px;font-size:15px}
+.brand-sub .line{width:28px;height:2px}
+.login-content{margin-top:-4px;padding:0 22px 26px}
+.welcome{transform:translateX(8px)}
+.welcome-kicker{font-size:20px}
+.welcome-house{margin:7px 0 12px;font-size:25px}
+.login-tip{gap:11px;margin-bottom:18px;font-size:16px}
+.login-tip .diamond{width:8px;height:8px}
+.form-card{padding:68px 18px 0;border-width:1px;border-radius:31px}
+.dish-ornament{top:16px;gap:8px}
+.pot-mark{width:86px;height:62px;border-radius:18px}
+.steam{width:8px;height:16px;border-width:0 2px 0 0}
+.steam-2{height:22px}
+.field-group{margin-bottom:18px}
+.field-label{gap:10px;margin:0 0 10px 4px;font-size:16px}
+.field-label .van-icon{font-size:22px}
+.input-shell{height:52px;padding:0 14px;border-width:2px}
+.native-input{font-size:16px}
+.username-shell.has-avatar{padding-right:56px}
+.native-input.with-avatar{padding-right:6px}
+.username-avatar{right:8px;width:40px;height:40px}
+.password-shell{gap:8px}
+.icon-button{width:34px;height:34px;font-size:21px}
+.form-options{gap:14px;margin:3px 4px 22px;font-size:14px}
+.remember{gap:6px}
+.checkbox{width:18px;height:18px;border-width:1px}
+.checkbox .van-icon{font-size:12px}
+.forgot{gap:3px}
+.forgot .van-icon{font-size:12px}
+.login-button{box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;height:58px;line-height:1;font-size:18px}
+.guest-row{gap:6px;margin-top:16px;font-size:14px}
+.family-frame{position:relative;height:160px;margin:18px -14px 0;border-radius:0 0 28px 28px}
+.family-illustration{position:absolute;top:0;left:0;width:100%;height:auto;margin:0;transform:translateY(-17%)}
+.login-button.is-loading{opacity:.7}
+.footer-note{gap:10px;margin-top:24px;font-size:17px}
+.footer-note .van-icon{font-size:18px}
+@media (max-width:360px){.login-content{padding-right:16px;padding-left:16px}.brand-main{font-size:26px}.welcome-house{font-size:23px}.welcome-kicker,.login-tip{font-size:15px}.form-card{padding-right:14px;padding-left:14px}}

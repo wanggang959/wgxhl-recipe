@@ -1,0 +1,16 @@
+<view class="page security-page">
+  <view class="eyebrow">账号安全</view><view class="page-title">重置成员密码</view>
+  <view wx:if="{{loading}}" class="state">正在确认操作权限</view>
+  <view wx:elif="{{done}}" class="surface security-card"><view class="result-title">{{mode === 'DIRECT' ? '密码已重置' : '重置邮件已发送'}}</view><view class="note">{{mode === 'DIRECT' ? '请成员使用新密码重新登录。' : '请成员查收本人邮箱，并在 30 分钟内设置新密码。'}}</view><button class="primary-button" bindtap="back">返回我的</button></view>
+  <view wx:elif="{{mode === 'DIRECT' || mode === 'EMAIL'}}" class="surface security-card">
+    <view wx:if="{{memberName}}" class="note">成员：{{memberName}}</view>
+    <block wx:if="{{mode === 'DIRECT'}}">
+      <view class="field"><view class="label">你的当前密码</view><input password value="{{currentPassword}}" maxlength="64" placeholder="验证家庭所有者身份" data-field="currentPassword" bindinput="input" /></view>
+      <view class="field"><view class="label">成员新密码</view><input password value="{{password}}" maxlength="64" placeholder="8 至 64 位" data-field="password" bindinput="input" /></view>
+      <view class="field"><view class="label">确认成员新密码</view><input password value="{{confirmation}}" maxlength="64" placeholder="再次输入新密码" data-field="confirmation" bindinput="input" /></view>
+    </block>
+    <view wx:else class="note">此账号由成员独立注册或加入了其他家庭，密码只能由成员本人通过已验证邮箱设置。</view>
+    <view wx:if="{{error}}" class="error">{{error}}</view><button class="primary-button" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{mode === 'DIRECT' ? '重置密码' : '发送重置邮件'}}</button>
+  </view>
+  <view wx:else class="surface state">{{error || '请该成员先验证邮箱，再申请重置。'}}<view class="secondary-button" bindtap="load">重新检查</view></view>
+</view>

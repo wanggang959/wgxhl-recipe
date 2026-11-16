@@ -1,0 +1,22 @@
+<view class="page household-page">
+  <view class="eyebrow">家庭设置</view><view class="page-title">我的家庭</view>
+  <view wx:if="{{loading && !households.length}}" class="state">正在加载</view>
+  <view wx:if="{{error}}" class="error surface">{{error}}<text wx:if="{{!households.length}}" class="retry" bindtap="load"> 重新加载</text></view>
+  <block wx:if="{{user}}">
+  <view wx:if="{{households.length}}" class="section surface">
+    <view class="section-title">我的家庭</view>
+    <view wx:for="{{households}}" wx:key="id" class="household-row" data-id="{{item.id}}" bindtap="switchHousehold">
+      <view><view class="household-name">{{item.householdName}}</view><view class="hint">{{item.roleLabel}} · {{item.memberCount}} 人</view></view><text class="active-label">{{item.active ? '当前家庭' : '切换 ›'}}</text>
+    </view>
+  </view>
+  <view class="section surface"><view class="section-title">创建家庭</view><input value="{{name}}" maxlength="64" placeholder="输入家庭名称" data-field="name" bindinput="input" /><button class="primary-button" loading="{{busy}}" disabled="{{busy}}" bindtap="create">创建并切换</button></view>
+  <view wx:if="{{canManage}}" class="section surface"><view class="section-title">邀请成员</view><view class="role-row"><view class="role {{inviteRole === 'member' ? 'active' : ''}}" data-role="member" bindtap="role">家人</view><view wx:if="{{isOwner}}" class="role {{inviteRole === 'admin' ? 'active' : ''}}" data-role="admin" bindtap="role">管理员</view></view><button class="primary-button" disabled="{{busy}}" bindtap="invite">生成邀请码</button><view class="hint">邀请码有效期 72 小时，可使用一次</view>
+    <view wx:for="{{invites}}" wx:key="id" class="invite"><view class="invite-code">{{item.inviteCode}}</view><view class="hint">{{item.roleLabel}} · {{item.usedCount}} / {{item.maxUses}} · {{item.expiresLabel}}</view><view class="actions"><view data-code="{{item.inviteCode}}" bindtap="copy">复制码</view><view data-code="{{item.inviteCode}}" bindtap="copyLink">复制链接</view><view class="danger-text" data-id="{{item.id}}" bindtap="revoke">撤销</view></view></view>
+  </view>
+  <view class="section surface"><view class="section-title">加入家庭</view><input value="{{joinCode}}" maxlength="16" placeholder="输入邀请码" data-field="joinCode" bindinput="input" /><button class="primary-button" disabled="{{busy}}" bindtap="join">加入家庭</button></view>
+  <view class="section surface"><view class="section-title">家庭管理</view>
+    <block wx:if="{{isOwner}}"><picker wx:if="{{transferOptions.length}}" range="{{transferOptions}}" range-key="nickname" value="{{transferIndex}}" bindchange="chooseTransfer"><view class="picker">{{transferOptions[transferIndex].nickname || transferOptions[transferIndex].username}}</view></picker><view wx:else class="hint">暂无可转让成员</view><button class="secondary-button" disabled="{{busy || !transferOptions.length}}" bindtap="transfer">转让所有权</button><button class="danger-button" disabled="{{busy}}" bindtap="dissolve">解散家庭</button></block>
+    <button wx:else class="danger-button" disabled="{{busy}}" bindtap="leave">退出当前家庭</button>
+  </view>
+  </block>
+</view>

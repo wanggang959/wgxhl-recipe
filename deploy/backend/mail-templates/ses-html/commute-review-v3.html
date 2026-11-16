@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>通勤出门提醒</title>
+</head>
+<body style="margin:0;padding:0;background:#f7f2eb;color:#2f2925;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">这次几点出门更合适？你的通勤建议已经准备好了。</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#f7f2eb;">
+    <tr><td align="center" style="padding:28px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;border-collapse:collapse;">
+        <tr><td style="padding:0 10px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td style="vertical-align:middle;">
+              <div style="font-size:12px;line-height:1.4;color:#ff7913;font-weight:700;letter-spacing:0;">王师傅家</div>
+              <div style="margin-top:2px;font-size:17px;line-height:1.4;color:#2f2925;font-weight:800;">生活助手</div>
+            </td>
+            <td align="right" style="vertical-align:middle;">
+              <span style="display:inline-block;padding:7px 10px;border:1px solid #f0dfcf;border-radius:999px;background:#fffaf5;font-size:12px;color:#8a7767;">通勤提醒</span>
+            </td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #f0dfcf;box-shadow:0 10px 32px rgba(91,62,37,.06);">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
+            <td style="padding:28px 26px 22px;background:#fff8f0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                <td style="vertical-align:top;">
+                  <div style="font-size:13px;line-height:1.6;color:#9a7d66;">{{sendDate}}</div>
+                  <h1 style="margin:6px 0 0;font-size:24px;line-height:1.45;overflow-wrap:anywhere;word-break:break-word;font-weight:800;color:#2f2925;">{{dayLabel}}出门建议</h1>
+                </td>
+                <td align="right" style="width:56px;vertical-align:top;">
+                  <div style="width:48px;height:48px;border-radius:16px;background:#ff7913;color:#fff;font-size:25px;line-height:48px;text-align:center;">&#x23F0;</div>
+                </td>
+              </tr></table>
+            </td>
+          </tr></table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
+            <td style="padding:26px 26px 8px;">
+              <div style="font-size:13px;line-height:1.6;color:#8a7767;">建议出门时间</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-collapse:separate;border-spacing:8px 8px;margin:8px -8px 0;">
+                <tr>
+                  <td style="width:50%;padding:14px 10px;background:#fff8f0;border:1px solid #f3e5d8;border-radius:12px;vertical-align:top;">
+                    <div style="font-size:13px;line-height:1.5;color:#806e5d;">不下雨</div>
+                    <div style="margin-top:6px;font-size:28px;line-height:1.3;font-weight:800;color:#e96d0a;overflow-wrap:anywhere;word-break:break-word;">{{dryDepartureTime}}</div>
+                    <div style="margin-top:6px;font-size:12px;line-height:1.7;color:#8a7767;overflow-wrap:anywhere;word-break:break-word;">{{dryBasis}}</div>
+                  </td>
+                  <td style="width:50%;padding:14px 10px;background:#f7fbff;border:1px solid #dfeaf2;border-radius:12px;vertical-align:top;">
+                    <div style="font-size:13px;line-height:1.5;color:#607386;">下雨</div>
+                    <div style="margin-top:6px;font-size:28px;line-height:1.3;font-weight:800;color:#487691;overflow-wrap:anywhere;word-break:break-word;">{{rainDepartureTime}}</div>
+                    <div style="margin-top:6px;font-size:12px;line-height:1.7;color:#718291;overflow-wrap:anywhere;word-break:break-word;">{{rainBasis}}</div>
+                  </td>
+                </tr>
+              </table>
+              <div style="margin-top:8px;font-size:13px;line-height:1.7;color:#6e6258;">建议在对应时间之前出门，已包含预留时间。</div>
+            </td>
+          </tr></table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-collapse:separate;border-spacing:8px 8px;padding:8px 18px 0;">
+            <tr>
+              <td style="width:50%;padding:15px 10px;background:#fffaf5;border:1px solid #f3e5d8;border-radius:14px;text-align:center;"><div style="font-size:11px;line-height:1.5;color:#9b8878;">期望到达</div><div style="margin-top:4px;font-size:16px;line-height:1.4;font-weight:700;color:#2f2925;overflow-wrap:anywhere;word-break:break-word;">{{arrivalTime}}</div></td>
+              <td style="width:50%;padding:15px 10px;background:#fffaf5;border:1px solid #f3e5d8;border-radius:14px;text-align:center;"><div style="font-size:11px;line-height:1.5;color:#9b8878;">预留时间</div><div style="margin-top:4px;font-size:16px;line-height:1.4;font-weight:700;color:#2f2925;overflow-wrap:anywhere;word-break:break-word;">{{bufferMinutes}} 分钟</div></td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
+            <td style="padding:20px 26px 0;">
+              <div style="padding:18px;background:#f7fbff;border:1px solid #dfeaf2;border-radius:16px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                  <td style="width:38px;vertical-align:top;font-size:24px;line-height:1.2;">&#x1F324;&#xFE0F;</td>
+                  <td style="vertical-align:top;"><div style="font-size:14px;line-height:1.5;font-weight:700;color:#35495a;">{{dayLabel}}天气</div><div style="margin-top:4px;font-size:12px;line-height:1.8;color:#687b8b;">白天预报</div><div style="margin-top:6px;font-size:14px;line-height:1.9;color:#5e6c78;white-space:pre-line;overflow-wrap:anywhere;word-break:break-word;">{{weatherSummary}}</div></td>
+                </tr></table>
+              </div>
+            </td>
+          </tr></table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
+            <td style="padding:24px 26px 10px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                <td align="center" bgcolor="#ff7913" style="border-radius:14px;"><a href="https://recipe.wgxhl.space/#/commute" style="display:block;padding:15px 14px;color:#ffffff;font-size:15px;line-height:1.5;font-weight:700;text-decoration:none;">查看我的通勤记录</a></td>
+              </tr></table>
+            </td>
+          </tr></table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
+            <td style="padding:12px 26px 26px;">
+              <div style="padding-top:18px;border-top:1px solid #f1e7dd;font-size:12px;line-height:1.9;color:#a09183;">出门建议基于历史通勤记录和天气预报，不包含实时路况，请结合实际出行情况安排时间。天气来源：<a href="https://developer.qweather.com/attribution.html" style="color:#a09183;text-decoration:underline;">和风天气</a></div>
+            </td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="padding:18px 10px 0;text-align:center;font-size:12px;line-height:1.9;color:#9c8e82;">此邮件来自你本人在「王师傅家 · 生活助手」中开启的通勤提醒。<br>可在「我的 → 通勤记录 → 设置」中关闭邮箱通知。<br><span style="color:#b4a89e;">这是一封系统邮件，请勿直接回复。</span></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

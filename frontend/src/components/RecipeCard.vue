@@ -13,14 +13,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  wanted: {
-    type: Boolean,
-    default: false,
-  },
-  showWantButton: {
-    type: Boolean,
-    default: true,
-  },
   showFavoriteButton: {
     type: Boolean,
     default: true,
@@ -43,7 +35,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['open', 'favorite', 'want', 'edit', 'delete', 'like'])
+const emit = defineEmits(['open', 'favorite', 'edit', 'delete', 'like'])
 
 const cover = computed(() => getRecipeImage(props.recipe.coverImage))
 const taste = computed(() => props.recipe.taste || '家常')
@@ -63,6 +55,7 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
         v-if="showFavoriteButton"
         class="favorite"
         :class="{ active: favorite, 'has-count': recipe.favoriteCount > 0 }"
+        :aria-label="favorite ? '取消收藏' : '收藏菜谱'"
         type="button"
         @click.stop="emit('favorite', recipe)"
       >
@@ -74,18 +67,10 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
         <span>{{ recipe.favoriteCount }}</span>
       </span>
       <button
-        v-if="showWantButton"
-        class="want-cart"
-        :class="{ active: wanted }"
-        type="button"
-        @click.stop="emit('want', recipe)"
-      >
-        <ActionIcon name="cart" :size="18" />
-      </button>
-      <button
         v-if="showLikeButton"
         class="like-pill"
         :class="{ active: liked, 'is-icon-only': !liked && likeCount === 0 }"
+        :aria-label="liked ? '取消点赞' : '点赞'"
         type="button"
         @click.stop="emit('like', recipe)"
       >
@@ -192,40 +177,10 @@ const versionLabel = computed(() => formatRecipeVersionLabel(normalizeRecipeVers
   font-weight: 600;
 }
 
-.want-cart {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 34px;
-  height: 34px;
-  box-sizing: border-box;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(47, 38, 31, 0.34);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  overflow: hidden;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  appearance: none;
-  -webkit-appearance: none;
-  z-index: 2;
-}
-
-.favorite :deep(.action-svg-icon),
-.want-cart :deep(.action-svg-icon) {
+.favorite :deep(.action-svg-icon) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.want-cart.active {
-  background: rgba(255, 247, 237, 0.92);
-  color: #ea580c;
 }
 
 .body {
@@ -305,7 +260,7 @@ h3 {
 
 .like-pill {
   position: absolute;
-  left: 10px;
+  right: 10px;
   bottom: 10px;
   height: 28px;
   padding: 0 10px;

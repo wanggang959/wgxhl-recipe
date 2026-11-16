@@ -93,6 +93,18 @@ class MailDeliveryServiceTest {
     }
 
     @Test
+    void commuteUsesDedicatedTemplateAndEscapesWeather() throws Exception {
+        properties.getSes().setCommuteTemplateId(67557L);
+        java.util.Map<String,String> v=new java.util.LinkedHashMap<>();
+        v.put("sendDate","2026-11-03 星期二"); v.put("dayLabel","明天");v.put("dryDepartureTime","08:05");v.put("rainDepartureTime","07:55");v.put("dryBasis","4 条记录");v.put("rainBasis","记录不足");v.put("arrivalTime","09:00");v.put("bufferMinutes","10");v.put("weatherSummary","地点 <测试> & 雨");
+        delivery.sendCommute("user@example.test",v,"测试");
+        SendEmailRequest req=request();assertEquals(67557L,req.getTemplate().getTemplateID());
+        JsonNode vars=json.readTree(req.getTemplate().getTemplateData());
+        assertEquals("地点 &lt;测试&gt; &amp; 雨",vars.get("weatherSummary").asText());
+        assertEquals(9,vars.size());assertEquals("明天",vars.get("dayLabel").asText());
+    }
+
+    @Test
     void htmlTemplateEscapesUserContentWithoutChangingThePlainTextMode() throws Exception {
         properties.getSes().setHtmlTemplates(true);
         delivery.sendNotification("user@example.test", MailDeliveryService.ReminderType.TODO,

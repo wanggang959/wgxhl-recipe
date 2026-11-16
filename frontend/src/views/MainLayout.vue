@@ -8,14 +8,13 @@ import { useUserStore } from '../stores/user'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const isShowcase = computed(() => route.query.mode === 'showcase')
-const isTodayMode = computed(() => route.query.pick === 'today')
+const bareShell = computed(() => Boolean(route.meta.bareShell))
 const familyName = computed(() => userStore.user?.householdName || '王师傅家')
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'showcase-shell': isShowcase }">
-    <header v-if="!isShowcase" class="top-bar">
+  <div class="app-shell">
+    <header v-if="!bareShell" class="top-bar">
       <div class="top-bar-row">
         <button class="brand" type="button" @click="router.push('/recipes')">
           <span>{{ familyName }}</span>
@@ -24,7 +23,7 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
         <div class="top-actions">
           <NotificationBell />
           <button
-            v-if="!isTodayMode && userStore.canMutate"
+            v-if="userStore.canMutate"
             class="top-icon-button"
             type="button"
             aria-label="添加菜谱"
@@ -38,8 +37,9 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
     </header>
 
     <main
-      class="page-wrap content"
-      :class="{ 'showcase-content': isShowcase, 'profile-shell': route.path === '/profile' && userStore.canViewMembers }"
+      :class="bareShell
+        ? 'bare-main'
+        : ['page-wrap content', { 'profile-shell': route.path === '/profile' && userStore.canViewMembers }]"
     >
       <router-view v-slot="{ Component, route: viewRoute }">
         <keep-alive>
@@ -49,7 +49,7 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
       </router-view>
     </main>
 
-    <BottomNav v-if="!isShowcase" />
+    <BottomNav v-if="!bareShell" />
   </div>
 </template>
 
@@ -131,14 +131,10 @@ const familyName = computed(() => userStore.user?.householdName || '王师傅家
   padding-top: 10px;
 }
 
-.showcase-shell {
-  width: min(100%, 1180px);
-  background: #fff7ed;
-}
-
-.showcase-content {
-  width: min(100%, 1180px);
-  padding: 0;
+.bare-main {
+  width: min(100vw, var(--app-shell-width));
+  min-height: var(--app-viewport-height);
+  margin: 0 auto;
 }
 
 .profile-shell {

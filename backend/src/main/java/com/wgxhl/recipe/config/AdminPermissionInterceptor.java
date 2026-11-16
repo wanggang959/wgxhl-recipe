@@ -45,6 +45,21 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             "/user/security/confirmReset"
     ));
 
+    /**
+     * 游客只能浏览公开菜谱和自己的通知，不得读取家庭待办、开支、成员等家庭数据。
+     */
+    private static final Set<String> GUEST_READ_PATHS = new HashSet<>(Arrays.asList(
+            "/recipe/page",
+            "/recipe/getById",
+            "/recipe/batch",
+            "/category/page",
+            "/favorite/check",
+            "/want/check",
+            "/notification/page",
+            "/notification/unreadCount",
+            "/push/status"
+    ));
+
     private final ObjectMapper objectMapper;
     private final JwtAuthUtil jwtAuthUtil;
     private final AppUserMapper appUserMapper;
@@ -166,25 +181,11 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
         return user != null && (GUEST_ID.equals(user.getId()) || GUEST_USERNAME.equals(user.getUsername()));
     }
 
-    private boolean isReadOnlyPath(String path) {
-        if ("/health".equals(path)) {
+    static boolean isReadOnlyPath(String path) {
+        if ("/health".equals(path) || PUBLIC_USER_PATHS.contains(path)) {
             return true;
         }
-        if (PUBLIC_USER_PATHS.contains(path)) {
-            return true;
-        }
-        if ("/user/members".equals(path) || "/push/status".equals(path) || "/recipe/batch".equals(path)
-                || "/household/me".equals(path) || "/household/list".equals(path)) {
-            return true;
-        }
-        return path.endsWith("/page")
-                || path.endsWith("/getById")
-                || path.endsWith("/check")
-                || path.endsWith("/listByRecipeId")
-                || path.endsWith("/summary")
-                || path.endsWith("/upcoming")
-                || path.endsWith("/unreadCount")
-                || path.endsWith("/dateList");
+        return GUEST_READ_PATHS.contains(path);
     }
 
     private String disabledAccountMessage(AppUser user) {

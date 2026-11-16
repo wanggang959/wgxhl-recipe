@@ -49,7 +49,7 @@ function formatTime(value) {
           <p>{{ item.content }}</p>
           <span class="notice-meta">
             <time>{{ formatTime(item.createTime) }}</time>
-            <span v-if="item.relatedId">待办详情</span>
+            <span v-if="item.relatedId">{{ item.notificationType==='COMMUTE'?'通勤记录':'待办详情' }}</span>
           </span>
         </span>
         <span v-if="!readonly && !item.isRead" class="read-link" @click.stop="emit('read', item)">标为已读</span>

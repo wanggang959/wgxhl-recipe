@@ -253,6 +253,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (!StringUtils.hasText(entity.getCategory())) {
             entity.setCategory("OTHER");
         }
+        String repeatError = CustomDayRepeat.validate(entity, null);
+        if (repeatError != null) return ApiResponse.fail(repeatError);
         if (actor != null) {
             entity.setCreateUserId(actor.getId());
         }
@@ -290,6 +292,10 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (editDenied != null) {
             return ApiResponse.fail(403, editDenied);
         }
+        String repeatError = CustomDayRepeat.validate(entity, existing);
+        if (repeatError != null) return ApiResponse.fail(repeatError);
+        if (!StringUtils.hasText(entity.getRepeatType())) entity.setRepeatType(existing.getRepeatType());
+        if ("CUSTOM_DAYS".equals(entity.getRepeatType()) && entity.getRepeatIntervalDays() == null) entity.setRepeatIntervalDays(existing.getRepeatIntervalDays());
         if (!CollectionUtils.isEmpty(entity.getOwnerIds())) {
             entity.setOwnerId(firstOwnerId(entity.getOwnerIds()));
         }
@@ -1169,6 +1175,9 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             return previousDate == null ? null : LocalDateTime.of(previousDate, todo.getDueTime().toLocalTime());
         }
         String repeatType = todo.getRepeatType();
+        if ("CUSTOM_DAYS".equals(repeatType)) {
+            return CustomDayRepeat.validInterval(todo.getRepeatIntervalDays()) ? todo.getDueTime().minusDays(todo.getRepeatIntervalDays()) : null;
+        }
         if ("DAILY".equals(repeatType)) {
             return todo.getDueTime().minusDays(1);
         }
@@ -1221,6 +1230,9 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private LocalDateTime resolveNextRepeatDueTime(Todo todo) {
         if (todo == null || todo.getDueTime() == null) {
             return null;
+        }
+        if ("CUSTOM_DAYS".equals(todo.getRepeatType()) && !"BIRTHDAY".equals(todo.getCategory())) {
+            return CustomDayRepeat.next(todo.getDueTime(), todo.getRepeatIntervalDays(), LocalDateTime.now());
         }
         LocalTime time = todo.getDueTime().toLocalTime();
         if ("BIRTHDAY".equals(todo.getCategory())) {

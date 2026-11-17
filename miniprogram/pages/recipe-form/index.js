@@ -317,7 +317,7 @@ Page({
     }catch(error){wx.showToast({title:error.message||'保存失败',icon:'none'})}
     finally{this.setData({saving:false})}
   },
-  hideTabBar(){this.getTabBar?.()?.setData({hidden:true});wx.hideTabBar({animation:false,fail:()=>{}})},
-  showTabBar(){if(this.data.baseOpen||this.data.quickOpen)return;this.getTabBar?.()?.setData({hidden:false});wx.showTabBar({animation:false,fail:()=>{}})},
+  hideTabBar(){this.getTabBar?.()?.setData({hidden:true})},
+  showTabBar(){if(this.data.baseOpen||this.data.quickOpen)return;this.getTabBar?.()?.setData({hidden:false})},
   swallow(){}
 })

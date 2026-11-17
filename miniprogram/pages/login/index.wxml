@@ -1,8 +1,8 @@
 <view class="login-page">
-  <image class="login-bg" src="/assets/login/login-bg.webp" mode="widthFix" />
+  <image class="login-bg" src="/assets/login/login-bg.png" mode="widthFix" />
   <view class="login-hero" style="padding-top:{{statusBarHeight + 8 > 50 ? statusBarHeight + 8 : 50}}px">
     <view class="brand-lockup">
-      <view class="chef-mark"><image src="/assets/login/login-chef.webp" mode="aspectFill" /></view>
+      <view class="chef-mark"><image src="/assets/login/login-chef.png" mode="aspectFill" /></view>
       <view class="brand-main">王师傅家</view>
       <view class="brand-sub"><text class="line"></text><text>生活助手</text><text class="line"></text></view>
     </view>
@@ -16,7 +16,7 @@
     </view>
 
     <view class="form-card">
-      <view class="dish-ornament"><view class="steam steam-1"></view><view class="steam steam-2"></view><view class="pot-mark"><image src="/assets/login/login-pot.webp" mode="aspectFill" /></view><view class="steam steam-3"></view></view>
+      <view class="dish-ornament"><view class="steam steam-1"></view><view class="steam steam-2"></view><view class="pot-mark"><image src="/assets/login/login-pot.png" mode="aspectFill" /></view><view class="steam steam-3"></view></view>
 
       <view wx:if="{{statusText}}" class="status {{statusType === 'error' ? 'error' : ''}}"><text class="van-icon {{statusType === 'error' ? 'van-icon-warning-o' : 'van-icon-checked'}}"></text><text>{{statusText}}</text></view>
 
@@ -47,7 +47,7 @@
       <view class="wechat-login" role="button" aria-disabled="{{loading}}" bindtap="wechatLogin">微信登录</view>
       <view class="guest-row"><text>还没有账号？</text><text class="link" bindtap="register">注册账号</text><text>·</text><text class="link" bindtap="guestLogin">游客登录</text></view>
 
-      <view class="family-frame"><image class="family-illustration" src="/assets/login/login-family.webp" mode="widthFix" /></view>
+      <view class="family-frame"><image class="family-illustration" src="/assets/login/login-family.png" mode="widthFix" /></view>
     </view>
 
     <view class="footer-note"><text class="van-icon van-icon-like"></text><text>记录一家人的吃穿用度，把日子过明白</text><text class="van-icon van-icon-like"></text></view>

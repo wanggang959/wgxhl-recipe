@@ -8,8 +8,9 @@
     <view class="filter-row"><text class="filter-label">范围</text><scroll-view class="filter-scroll" scroll-x show-scrollbar="{{false}}"><view class="filter-options"><view wx:for="{{ranges}}" wx:key="value" class="filter-chip {{range === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseRange">{{item.label}}</view></view></scroll-view></view>
     <view class="filter-row"><text class="filter-label">类型</text><scroll-view class="filter-scroll" scroll-x show-scrollbar="{{false}}"><view class="filter-options"><view wx:for="{{categories}}" wx:key="value" class="filter-chip {{category === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseCategory">{{item.label}}</view></view></scroll-view></view>
   </view>
-  <view wx:if="{{error || planError}}" class="surface state">{{error || planError}}<button class="retry" bindtap="retry">重新加载</button></view>
-  <view wx:elif="{{loading || planLoading}}" class="state">正在加载</view>
+  <view wx:if="{{(error || planError) && hasSnapshot}}" class="refresh-error" bindtap="retry">更新失败，点击重试</view>
+  <view wx:if="{{(error || planError) && !hasSnapshot}}" class="surface state">{{error || planError}}<button class="retry" bindtap="retry">重新加载</button></view>
+  <view wx:elif="{{(loading || planLoading) && !hasSnapshot}}" class="state">正在加载</view>
   <view wx:elif="{{!groups.length}}" class="surface state">这个筛选下还没有待办</view>
   <block wx:else>
     <view wx:for="{{groups}}" wx:for-item="group" wx:key="key" class="group">

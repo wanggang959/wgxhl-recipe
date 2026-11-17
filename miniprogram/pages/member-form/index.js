@@ -3,7 +3,7 @@ const session=require('../../services/session')
 const {isGuest}=require('../../utils/profile')
 const {notices,roles,empty,fromUser,build}=require('../../utils/memberForm')
 Page({
-  data:{form:empty(),notices,roles,noticeIndex:0,roleIndex:0,loading:false,saving:false,error:'',ready:false,isEditing:false,roleEditable:false,usernameLocked:false,avatarOptions:Array.from({length:15},(_,i)=>{const num=String(i+1).padStart(2,'0');return {path:`/avatars/${num}.png`,image:`/assets/avatars/${num}.webp`}})},
+  data:{form:empty(),notices,roles,noticeIndex:0,roleIndex:0,loading:false,saving:false,error:'',ready:false,isEditing:false,roleEditable:false,usernameLocked:false,avatarOptions:Array.from({length:15},(_,i)=>{const num=String(i+1).padStart(2,'0');return {path:`/avatars/${num}.png`,image:`/assets/avatars/${num}.png`}})},
   onLoad(options){
     const user=session.get()
     if(!user?.token){wx.reLaunch({url:'/pages/login/index'});return}

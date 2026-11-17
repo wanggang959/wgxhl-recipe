@@ -36,6 +36,10 @@
       {
         "value": "README.md",
         "type": "file"
+      },
+      {
+        "value": "assets/(avatars|login)/.*\\.webp$",
+        "type": "regexp"
       }
     ],
     "include": []

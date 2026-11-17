@@ -30,8 +30,8 @@ Page({
   onUnload(){this.stopTimer();this.requestVersion=(this.requestVersion||0)+1;this.categoryVersion=(this.categoryVersion||0)+1},
   stopTimer(){if(this.unreadTimer)clearInterval(this.unreadTimer);this.unreadTimer=null},
   async refreshUnread(){try{const value=await api.post('/notification/unreadCount');this.setData({unread:Math.max(0,Number(value)||0)})}catch(_){}},
-  openNotifications(){this.setData({noticeOpen:true});this.getTabBar()?.setData({hidden:true});wx.hideTabBar({animation:false,fail:()=>{}})},
-  closeNotifications(){if(!this.data.noticeOpen)return;this.setData({noticeOpen:false});this.getTabBar()?.setData({hidden:false});wx.showTabBar({animation:false,fail:()=>{}});this.refreshUnread()},
+  openNotifications(){this.setData({noticeOpen:true});this.getTabBar()?.setData({hidden:true})},
+  closeNotifications(){if(!this.data.noticeOpen)return;this.setData({noticeOpen:false});this.getTabBar()?.setData({hidden:false});this.refreshUnread()},
   add(){wx.navigateTo({url:'/pages/recipe-form/index'})},
   async loadCategories(){const version=(this.categoryVersion||0)+1;this.categoryVersion=version;this.setData({categoryError:''});try{let records=[],page=1,total=0;do{const data=await api.post('/category/page',{current:page,size:50});if(version!==this.categoryVersion)return;const chunk=data?.records||[];records=records.concat(chunk);total=Number(data?.total||0);if(!chunk.length)break;page++}while(records.length<total&&page<=10000);this.setData({categories:records})}catch(error){if(version===this.categoryVersion)this.setData({categoryError:error.message||'分类加载失败'})}},
   async load(reset){
@@ -91,8 +91,8 @@ Page({
     }catch(error){wx.showToast({title:error.message||'点赞失败',icon:'none'})}
     finally{this.setData({likeBusyId:''})}
   },
-  openWant(e){const item=this.findRecipe(e.currentTarget.dataset.id);if(!item||this.data.guest||this.data.wantBusy)return;const today=dateText();this.setData({wantOpen:true,wantTarget:item,wantDate:today,wantMinDate:today});this.getTabBar()?.setData({hidden:true});wx.hideTabBar({animation:false,fail:()=>{}})},
-  closeWant(){if(!this.data.wantOpen||this.data.wantBusy)return;this.setData({wantOpen:false,wantTarget:null});this.getTabBar()?.setData({hidden:false});wx.showTabBar({animation:false,fail:()=>{}})},
+  openWant(e){const item=this.findRecipe(e.currentTarget.dataset.id);if(!item||this.data.guest||this.data.wantBusy)return;const today=dateText();this.setData({wantOpen:true,wantTarget:item,wantDate:today,wantMinDate:today});this.getTabBar()?.setData({hidden:true})},
+  closeWant(){if(!this.data.wantOpen||this.data.wantBusy)return;this.setData({wantOpen:false,wantTarget:null});this.getTabBar()?.setData({hidden:false})},
   wantDateChange(e){this.setData({wantDate:e.detail.value})},
   wantToday(){this.submitWant(dateText())},
   wantTomorrow(){this.submitWant(addDays(1))},

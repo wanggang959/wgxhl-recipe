@@ -39,6 +39,9 @@ public class SpecialExpenseItem {
 
     private LocalDateTime plannedTime;
 
+    @TableField(exist = false)
+    private Boolean clearPlannedTime;
+
     private String purchaseChannel;
 
     private String purchaseLink;

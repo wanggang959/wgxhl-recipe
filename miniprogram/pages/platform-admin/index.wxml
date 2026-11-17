@@ -1,1 +1,44 @@
-<view class="admin-page"><view class="header"><view class="eyebrow">王师傅家</view><view class="title">系统管理</view></view><view wx:if="{{error && !authorized}}" class="state" bindtap="retry">{{error}}，点击重试</view><block wx:elif="{{authorized}}"><view class="tabs"><view class="tab {{tab==='summary'?'active':''}}" data-tab="summary" bindtap="switchTab">系统概览</view><view class="tab {{tab==='users'?'active':''}}" data-tab="users" bindtap="switchTab">用户管理</view></view><view wx:if="{{error}}" class="error" bindtap="retry">{{error}}，点击重试</view><block wx:if="{{tab==='summary'}}"><view class="section-head"><text>运行情况</text><text class="refresh" bindtap="loadSummary">刷新</text></view><view wx:if="{{summary}}" class="stats"><view><text>账号总数</text><text>{{summary.users}}</text></view><view><text>家庭总数</text><text>{{summary.households}}</text></view><view><text>菜谱总数</text><text>{{summary.recipes}}</text></view><view><text>未完成待办</text><text>{{summary.todos}}</text></view></view></block><block wx:else><view class="section-head"><text>用户管理</text><text class="count">{{total}} 人</text></view><view class="search"><input value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" confirm-type="search" placeholder="搜索用户名、昵称或邮箱" maxlength="100"/><view bindtap="search">搜索</view></view><view wx:for="{{users}}" wx:key="id" class="user-row"><view class="user-main"><view class="name">{{item.nickname || item.username}}</view><view class="muted">用户名：{{item.username}}</view><view class="muted">邮箱：{{item.email || '未填写'}}</view><view class="muted">家庭：{{item.households || '暂无'}}</view><view class="muted">注册：{{item.createLabel || '暂无'}}</view></view><view class="user-actions"><text class="status {{item.status==='normal'?'normal':'stopped'}}">{{item.status==='normal'?'正常':'已停用'}}</text><view wx:if="{{item.canChange}}" class="action" data-id="{{item.id}}" bindtap="changeStatus">{{item.status==='normal'?'停用':'恢复'}}</view><text wx:else class="muted">当前账号</text></view></view><view wx:if="{{!loading && !error && !users.length}}" class="state">没有找到用户</view><view wx:elif="{{!loading && users.length>=total && users.length}}" class="state">已显示全部</view></block></block><view wx:if="{{loading}}" class="state">正在加载...</view></view>
+<view class="admin-page">
+  <view class="header"><view class="eyebrow">王师傅家</view><view class="title">系统管理</view></view>
+  <view wx:if="{{error && !authorized}}" class="state" bindtap="retry">{{error}}，点击重试</view>
+  <block wx:elif="{{authorized}}">
+    <scroll-view scroll-x class="tabs-scroll" show-scrollbar="{{false}}"><view class="tabs">
+      <view class="tab {{tab==='summary'?'active':''}}" data-tab="summary" bindtap="switchTab">系统概览</view>
+      <view class="tab {{tab==='users'?'active':''}}" data-tab="users" bindtap="switchTab">用户管理</view>
+      <view class="tab {{tab==='notices'?'active':''}}" data-tab="notices" bindtap="switchTab">通知记录</view>
+      <view class="tab {{tab==='uncertain'?'active':''}}" data-tab="uncertain" bindtap="switchTab">需处理</view>
+    </view></scroll-view>
+    <view wx:if="{{error}}" class="error" bindtap="retry">{{error}}，点击重试</view>
+    <block wx:if="{{tab==='summary'}}">
+      <view class="section-head"><text>运行情况</text><text class="refresh" bindtap="loadSummary">刷新</text></view>
+      <view wx:if="{{summary}}" class="stats">
+        <view><text>账号总数</text><text>{{summary.users}}</text></view><view><text>家庭总数</text><text>{{summary.households}}</text></view>
+        <view><text>菜谱总数</text><text>{{summary.recipes}}</text></view><view><text>未完成待办</text><text>{{summary.todos}}</text></view>
+        <view><text>近24小时成功</text><text>{{summary.sent24h}}</text></view><view><text>近24小时失败</text><text>{{summary.failed24h}}</text></view>
+      </view>
+      <view wx:if="{{summary}}" class="scan-row"><text>提醒扫描</text><text>{{summary.scanRunning ? '扫描中' : '等待下一次'}}</text></view>
+    </block>
+    <block wx:elif="{{tab==='users'}}">
+      <view class="section-head"><text>用户管理</text><text class="count">{{total}} 人</text></view>
+      <view class="search"><input value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" confirm-type="search" placeholder="搜索用户名、昵称或邮箱" maxlength="100"/><view bindtap="search">搜索</view></view>
+      <view wx:for="{{users}}" wx:key="id" class="user-row"><view class="user-main"><view class="name">{{item.nickname || item.username}}</view><view class="muted">用户名：{{item.username}}</view><view class="muted">邮箱：{{item.email || '未填写'}}</view><view class="muted">家庭：{{item.households || '暂无'}}</view><view class="muted">注册：{{item.createLabel || '暂无'}}</view></view><view class="user-actions"><text class="status {{item.status==='normal'?'normal':'stopped'}}">{{item.status==='normal'?'正常':'已停用'}}</text><view wx:if="{{item.canChange}}" class="action" data-id="{{item.id}}" bindtap="changeStatus">{{item.status==='normal'?'停用':'恢复'}}</view><text wx:else class="muted">当前账号</text></view></view>
+      <view wx:if="{{!loading && !error && !users.length}}" class="state">没有找到用户</view><view wx:elif="{{!loading && users.length>=total && users.length}}" class="state">已显示全部</view>
+    </block>
+    <block wx:elif="{{tab==='notices'}}">
+      <view class="section-head"><text>通知记录</text><text class="count">{{noticeTotal}} 条</text></view>
+      <view class="search"><input value="{{noticeKeyword}}" bindinput="noticeKeywordInput" bindconfirm="searchNotices" confirm-type="search" placeholder="搜索接收人" maxlength="100"/><view bindtap="searchNotices">搜索</view></view>
+      <view class="filter-row"><picker range="{{noticeStatuses}}" range-key="label" value="{{statusIndex}}" data-kind="status" bindchange="noticeFilter"><view class="filter">{{noticeStatuses[statusIndex].label}} ▾</view></picker><picker range="{{noticeChannels}}" range-key="label" value="{{channelIndex}}" data-kind="channel" bindchange="noticeFilter"><view class="filter">{{noticeChannels[channelIndex].label}} ▾</view></picker></view>
+      <view class="filter-row"><picker mode="date" value="{{noticeFilters.from}}" data-kind="from" bindchange="noticeDate"><view class="filter">{{noticeFilters.from || '开始日期'}}</view></picker><picker mode="date" value="{{noticeFilters.to}}" data-kind="to" bindchange="noticeDate"><view class="filter">{{noticeFilters.to || '结束日期'}}</view></picker><view class="filter-command" bindtap="clearNoticeDates">清除</view><view class="filter-command" bindtap="searchNotices">筛选</view></view>
+      <view wx:for="{{noticeItems}}" wx:key="id" class="record-row"><view class="record-head"><text class="name">{{item.recipient_name || item.recipient_id || '未指定'}}</text><text class="status {{item.send_status==='FAIL'?'stopped':'normal'}}">{{item.statusLabel}}</text></view><view class="muted">{{item.channelLabel}} · {{item.sendLabel}}</view><view class="muted">计划时间：{{item.targetLabel}}</view><view wx:if="{{item.error_msg}}" class="reason">{{item.error_msg}}</view></view>
+      <view wx:if="{{!loading && !error && !noticeItems.length}}" class="state">暂无通知记录</view><view wx:elif="{{!loading && noticeItems.length>=noticeTotal && noticeItems.length}}" class="state">已显示全部</view>
+    </block>
+    <block wx:elif="{{tab==='uncertain'}}">
+      <view class="section-head"><text>需处理提醒</text><text class="count">{{uncertainTotal}} 条</text></view>
+      <view class="hint">补发前请先核查接收记录，原通知可能已经送达。</view>
+      <view wx:for="{{uncertainItems}}" wx:key="_key" class="record-row"><view class="record-head"><text class="name">{{item.todo_title || '待办已删除'}}</text><text class="status stopped">{{item.channelLabel}}</text></view><view class="muted">{{item.household_name || item.household_id}} · {{item.recipient_name || item.recipient_key || '未指定'}}</view><view class="muted">计划：{{item.targetLabel}}</view><view class="muted">记录：{{item.updateLabel}}</view><view class="reason">{{item.recovery_reason}}</view><view class="record-actions"><button wx:if="{{item.todo_title}}" class="action-button" data-index="{{index}}" data-action="RETRY" disabled="{{busy}}" bindtap="recoverNotice">确认补发</button><button class="action-button secondary" data-index="{{index}}" data-action="CLOSE" disabled="{{busy}}" bindtap="recoverNotice">核实关闭</button></view></view>
+      <view wx:if="{{!loading && !error && !uncertainItems.length}}" class="state">暂无需处理记录</view><view wx:elif="{{!loading && uncertainItems.length>=uncertainTotal && uncertainItems.length}}" class="state">已显示全部</view>
+      <block wx:if="{{gaps.length}}"><view class="section-head"><text>超过补扫范围的时间段</text></view><view class="hint">这些时间段可能有未发送提醒，请核查。</view><view wx:for="{{gaps}}" wx:key="household_id" class="record-row"><view class="name">{{item.household_name || item.household_id}}</view><view class="muted">{{item.startLabel}} 至 {{item.endLabel}}</view></view></block>
+    </block>
+  </block>
+  <view wx:if="{{loading}}" class="state">正在加载...</view>
+</view>

@@ -11,7 +11,7 @@
         <view class="notice-title-row"><text class="notice-title">{{item.title}}</text><text wx:if="{{!item.isRead}}" class="unread-tag">未读</text></view>
         <view class="notice-content">{{item.content}}</view>
         <view class="notice-time">{{item.displayTime}}</view>
-        <block wx:if="{{item.relatedId}}"><view wx:if="{{item.notificationType === 'TODO'}}" class="notice-actions"><button data-id="{{item.id}}" bindtap="openTodo">查看待办</button></view></block>
+        <view wx:if="{{item.routeLabel}}" class="notice-actions"><button data-id="{{item.id}}" bindtap="openRelated">{{item.routeLabel}}</button></view>
         <view wx:if="{{!readonly}}" class="notice-actions"><button wx:if="{{!item.isRead}}" data-id="{{item.id}}" bindtap="markRead" disabled="{{busy}}">标为已读</button><button class="remove" data-id="{{item.id}}" bindtap="remove" disabled="{{busy}}">删除</button></view>
       </view>
     </view>

@@ -1,9 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict')
 const {avatarUrl,isGuest,roleText,birthdayText}=require('../utils/profile')
 test('local default avatars and stable fallback match the web selection',()=>{
- assert.equal(avatarUrl({avatar:'/avatars/01.png'}),'/assets/avatars/01.webp')
+ assert.equal(avatarUrl({avatar:'/avatars/01.png'}),'/assets/avatars/01.png')
  assert.equal(avatarUrl({id:'123'}),avatarUrl({id:'123'}))
- assert.match(avatarUrl({id:'123'}),/^\/assets\/avatars\/\d{2}\.webp$/)
+ assert.match(avatarUrl({id:'123'}),/^\/assets\/avatars\/\d{2}\.png$/)
 })
 test('recognizes roles and respects lunar and solar birthdays',()=>{
  assert.equal(isGuest({id:'guest'}),true)

@@ -83,3 +83,12 @@ test('binding occurs only after account login', async () => {
   assert.deepEqual(calls.map(item => item.path), ['/user/login', '/user/wechat/bind'])
   assert.equal(calls[1].data.code, 'temporary-code')
 })
+
+test('unbound wechat offers existing login or registration', async () => {
+  const calls=[],page=setup(calls);let modal,url
+  wx.login=({success})=>success({code:'code'});wx.showModal=options=>{modal=options};wx.navigateTo=options=>{url=options.url}
+  api.post=async()=>{const error=new Error('未绑定');error.status=404;throw error}
+  await page.wechatLogin();assert.equal(modal.title,'微信尚未绑定')
+  modal.success({confirm:true});assert.equal(url,'/pages/register/index?bindWechat=1')
+  modal.success({confirm:false});assert.equal(page.data.bindWechat,true)
+})

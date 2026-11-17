@@ -9,8 +9,8 @@ Page({
   onUnload() { this.stopUnreadRefresh() },
   stopUnreadRefresh() { if(this.unreadTimer)clearInterval(this.unreadTimer); this.unreadTimer=null },
   async refreshUnread() { try { const count=await api.post('/notification/unreadCount'); this.setData({unread:Math.max(0,Number(count)||0)}) } catch(_) {} },
-  openNotifications() { this.setData({noticeOpen:true}); this.getTabBar()?.setData({hidden:true}); wx.hideTabBar({animation:false,fail:()=>{}}) },
-  closeNotifications() { if(!this.data.noticeOpen)return; this.setData({noticeOpen:false}); this.getTabBar()?.setData({hidden:false}); wx.showTabBar({animation:false,fail:()=>{}}); this.refreshUnread() },
+  openNotifications() { this.setData({noticeOpen:true}); this.getTabBar()?.setData({hidden:true}) },
+  closeNotifications() { if(!this.data.noticeOpen)return; this.setData({noticeOpen:false}); this.getTabBar()?.setData({hidden:false}); this.refreshUnread() },
   async loadMembers(reset = false) {
     if(!reset && (this.data.membersLoading || (this.data.membersPage>0 && this.data.members.length>=this.data.membersTotal)))return
     const version=(this.membersRequestVersion||0)+1
@@ -51,13 +51,11 @@ Page({
     if(this.data.wechatStatusError || this.data.wechatBound===null){this.loadWechatStatus();return}
     this.setData({wechatOpen:true,wechatPassword:'',wechatError:''})
     this.getTabBar()?.setData({hidden:true})
-    wx.hideTabBar({animation:false,fail:()=>{}})
   },
   closeWechat() {
     if(!this.data.wechatOpen || this.data.wechatBusy)return
     this.setData({wechatOpen:false,wechatPassword:'',wechatError:''})
     this.getTabBar()?.setData({hidden:false})
-    wx.showTabBar({animation:false,fail:()=>{}})
   },
   onWechatPassword(e) { this.setData({wechatPassword:e.detail.value,wechatError:''}) },
   async submitWechat() {
@@ -75,7 +73,6 @@ Page({
       this.wechatStatusVersion=(this.wechatStatusVersion||0)+1
       this.setData({wechatBound:!bound,wechatOpen:false,wechatPassword:'',wechatError:'',wechatStatusLoading:false,wechatStatusError:false})
       this.getTabBar()?.setData({hidden:false})
-      wx.showTabBar({animation:false,fail:()=>{}})
       wx.showToast({title:bound?'已解除绑定':'微信绑定成功',icon:'none'})
     } catch(error) { this.setData({wechatError:error.message || '操作失败，请稍后重试'}) }
     finally { this.setData({wechatBusy:false}) }
@@ -154,13 +151,11 @@ Page({
     if(this.data.isGuest)return
     this.setData({passwordOpen:true,passwordError:'',oldPassword:'',newPassword:'',confirmPassword:''})
     this.getTabBar()?.setData({hidden:true})
-    wx.hideTabBar({animation:false,fail:()=>{}})
   },
   closePassword() {
     if(!this.data.passwordOpen || this.data.passwordBusy)return
     this.setData({passwordOpen:false,passwordError:'',oldPassword:'',newPassword:'',confirmPassword:''})
     this.getTabBar()?.setData({hidden:false})
-    wx.showTabBar({animation:false,fail:()=>{}})
   },
   onPasswordInput(e) {
     const field=e.currentTarget.dataset.field
@@ -180,7 +175,6 @@ Page({
       session.clear()
       this.setData({passwordOpen:false,oldPassword:'',newPassword:'',confirmPassword:''})
       this.getTabBar()?.setData({hidden:false})
-      wx.showTabBar({animation:false,fail:()=>{}})
       wx.showToast({title:'密码已更新，请重新登录',icon:'none'})
       wx.reLaunch({url:'/pages/login/index'})
     } catch(error) { this.setData({passwordError:error.message || '密码修改失败'}) }

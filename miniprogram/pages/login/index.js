@@ -98,7 +98,14 @@ Page({
       this.showStatus('登录成功，正在进入生活助手...')
       setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 260)
     } catch (error) {
-      this.showStatus(error.message || '微信登录失败，请稍后重试', 'error')
+      if (error.status === 404) {
+        wx.showModal({
+          title: '微信尚未绑定',
+          content: '已有账号可以先登录并绑定；没有账号可以注册后自动绑定当前微信。',
+          confirmText: '注册账号', cancelText: '已有账号',
+          success: ({confirm}) => { if (confirm) wx.navigateTo({url:'/pages/register/index?bindWechat=1'}); else this.setData({bindWechat:true}) },
+        })
+      } else this.showStatus(error.message || '微信登录失败，请稍后重试', 'error')
     } finally { this.setData({ loading: false }) }
   },
   async guestLogin() {

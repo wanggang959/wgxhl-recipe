@@ -1,7 +1,8 @@
 <view class="page detail-page">
   <view class="eyebrow">家庭待办</view><view class="page-title">待办详情</view>
-  <view wx:if="{{loading}}" class="state">正在加载</view>
-  <view wx:elif="{{error}}" class="surface state">{{error}}<button class="retry" bindtap="retry">重新加载</button></view>
+  <view wx:if="{{error && todo}}" class="refresh-error" bindtap="retry">更新失败，点击重试</view>
+  <view wx:if="{{loading && !todo}}" class="state">正在加载</view>
+  <view wx:elif="{{error && !todo}}" class="surface state">{{error}}<button class="retry" bindtap="retry">重新加载</button></view>
   <view wx:elif="{{todo}}" class="surface detail-card">
     <view class="title-row"><view class="title">{{todo.title}}</view><text class="tag">{{todo.categoryLabel}}</text></view>
     <view class="details">

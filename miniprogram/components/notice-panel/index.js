@@ -1,5 +1,6 @@
 const api = require('../../services/api')
 const session = require('../../services/session')
+const {withNoticeRoute,openNotice} = require('../../utils/noticeRoute')
 function formatTime(value) { return String(value || '').replace('T',' ').slice(0,16) }
 Component({
   properties:{
@@ -20,7 +21,7 @@ Component({
       const current=reset?1:this.data.page+1
       try{
         const [page,count]=await Promise.all([api.post('/notification/page',{current,size:30}),api.post('/notification/unreadCount')])
-        const records=(page?.records || []).map(item=>({...item,displayTime:formatTime(item.createTime),isRead:!!item.isRead}))
+        const records=(page?.records || []).map(item=>withNoticeRoute({...item,displayTime:formatTime(item.createTime),isRead:!!item.isRead}))
         this.setData({items:reset?records:this.data.items.concat(records),page:current,total:Number(page?.total || 0),unread:Math.max(0,Number(count)||0)})
       }catch(error){this.setData({error:error.message || '通知加载失败'})}
       finally{this.setData({loading:false})}
@@ -60,6 +61,12 @@ Component({
       if(!item || !item.relatedId || item.notificationType!=='TODO')return
       this.close()
       wx.navigateTo({url:`/pages/todo-detail/index?id=${encodeURIComponent(item.relatedId)}`})
+    },
+    openRelated(e){
+      const item=this.data.items.find(notice=>notice.id===e.currentTarget.dataset.id)
+      if(!item || !item.routeLabel)return
+      this.close()
+      openNotice(item)
     }
   }
 })

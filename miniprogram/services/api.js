@@ -22,7 +22,7 @@ function request(method, path, data = {}, options = {}) {
   const user = session.get()
   if (!options.public && !user?.token) return Promise.reject(new Error('请先登录'))
   return new Promise((resolve, reject) => wx.request({
-    url: base + path, method, data, timeout: 15000,
+    url: base + path, method, data, timeout: options.timeout || 15000,
     header: { 'content-type': 'application/json', ...(!options.public ? { Authorization: `Bearer ${user.token}` } : {}) },
     success(response) {
       const body = response.data || {}
@@ -30,7 +30,10 @@ function request(method, path, data = {}, options = {}) {
         if (!options.public) session.clear()
         reject(new Error(body.message || '登录已失效，请重新登录'))
       } else if (response.statusCode < 200 || response.statusCode >= 300 || body.status !== 200) {
-        reject(new Error(body.message || '请求失败，请稍后重试'))
+        const error = new Error(body.message || '请求失败，请稍后重试')
+        error.status = body.status
+        error.httpStatus = response.statusCode
+        reject(error)
       } else resolve(body.data)
     },
     fail(error) { reject(networkError(error)) }

@@ -13,7 +13,7 @@
             <view class="notice-title-row"><text class="notice-title">{{item.title}}</text><text wx:if="{{!item.isRead}}" class="unread-tag">未读</text></view>
             <view class="notice-content">{{item.content}}</view><view class="notice-time">{{item.displayTime}}</view>
             <view class="notice-actions">
-              <block wx:if="{{item.relatedId}}"><view wx:if="{{item.notificationType === 'TODO'}}" class="action" data-id="{{item.id}}" bindtap="openTodo">查看待办</view></block>
+              <view wx:if="{{item.routeLabel}}" class="action" data-id="{{item.id}}" bindtap="openRelated">{{item.routeLabel}}</view>
               <block wx:if="{{!readonly}}"><view wx:if="{{!item.isRead}}" class="action" data-id="{{item.id}}" bindtap="markRead">标为已读</view><view class="action remove" data-id="{{item.id}}" bindtap="remove">删除</view></block>
             </view>
           </view>

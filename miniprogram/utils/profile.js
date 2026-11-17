@@ -8,11 +8,11 @@ function hashString(value) {
 function avatarUrl(user = {}) {
   const avatar=String(user.avatar || '').trim()
   const local=avatar.match(/^\/(?:avatars)\/(\d{2})\.png$/)
-  if(local) return `/assets/avatars/${local[1]}.webp`
+  if(local) return `/assets/avatars/${local[1]}.png`
   if(/^https:\/\//i.test(avatar))return avatar
   if(avatar && !/^https?:\/\//i.test(avatar))return `${config.apiBaseUrl.replace(/\/recipe$/, '')}/${avatar.replace(/^\/+/, '')}`
   const index=hashString(user.id || user.username || 'guest')%15+1
-  return `/assets/avatars/${String(index).padStart(2,'0')}.webp`
+  return `/assets/avatars/${String(index).padStart(2,'0')}.png`
 }
 function isGuest(user={}) {return user.id==='guest' || user.username==='guest' || user.userRole==='guest' || user.memberRole==='guest'}
 function roleText(user={}) {

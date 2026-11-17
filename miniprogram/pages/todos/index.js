@@ -14,49 +14,75 @@ async function allPages(path, query = {}) {
   return records
 }
 Page({
-  data:{ loading:false, loadingMore:false, error:'', items:[], summary:null, page:0, total:0, plans:[], planPage:0, planTotal:0, planError:'', planLoading:false, groups:[], category:'', range:'all', todayCount:0, dueSoonCount:0, unread:0, noticeOpen:false,
+  data:{ loading:false, loadingMore:false, hasSnapshot:false, error:'', items:[], summary:null, page:0, total:0, plans:[], planPage:0, planTotal:0, planError:'', planLoading:false, groups:[], category:'', range:'all', todayCount:0, dueSoonCount:0, unread:0, noticeOpen:false,
     ranges:[{value:'all',label:'全部'},{value:'today',label:'今日'},{value:'three',label:'近三天'},{value:'week',label:'近一周'}],
     categories:[{value:'',label:'全部'},{value:'COOK',label:'做饭'},{value:'GROCERY',label:'采购'},{value:'LIFE',label:'生活'},{value:'BIRTHDAY',label:'生日'},{value:'SERVER',label:'服务器'},{value:'DOMAIN',label:'域名'},{value:'PAYMENT',label:'缴费'},{value:'OTHER',label:'其他'}] },
   updateGroups() { this.setData(groupItems(this.data.items, this.data.plans, this.data.category, this.data.range)) },
   chooseRange(e) { this.setData({range:e.currentTarget.dataset.value}); this.updateGroups() },
   chooseCategory(e) { this.setData({category:e.currentTarget.dataset.value}); this.updateGroups() },
-  onShow() { const user=session.get(); if (!user?.token) { wx.reLaunch({ url:'/pages/login/index' }); return } if (isGuest(user)) { wx.switchTab({ url:'/pages/home/index' }); return } this.getTabBar()?.setData({selected:'todos',hidden:false}); this.load(true); this.loadPlans(true); this.refreshUnread(); this.unreadTimer = setInterval(() => this.refreshUnread(), 60000) },
+  onShow() {
+    const user=session.get()
+    if (!user?.token) { wx.reLaunch({ url:'/pages/login/index' }); return }
+    if (isGuest(user)) { wx.switchTab({ url:'/pages/home/index' }); return }
+    const identity=[user.id,user.householdId].join(':')
+    if(this.loadedIdentity!==identity){
+      this.loadedIdentity=identity
+      this.todoRequestVersion=(this.todoRequestVersion||0)+1
+      this.planRequestVersion=(this.planRequestVersion||0)+1
+      this.setData({hasSnapshot:false,loading:false,loadingMore:false,planLoading:false,items:[],plans:[],groups:[],summary:null,page:0,total:0,planPage:0,planTotal:0,error:'',planError:''})
+    }
+    this.getTabBar()?.setData({selected:'todos',hidden:false})
+    this.refreshAll()
+    this.refreshUnread(); this.stopUnreadRefresh(); this.unreadTimer=setInterval(()=>this.refreshUnread(),60000)
+  },
   onHide() { this.stopUnreadRefresh(); this.closeNotifications() },
   onUnload() { this.stopUnreadRefresh() },
   stopUnreadRefresh() { if (this.unreadTimer) clearInterval(this.unreadTimer); this.unreadTimer = null },
   async refreshUnread() { try { const count = await api.post('/notification/unreadCount'); this.setData({unread:Math.max(0, Number(count) || 0)}) } catch (_) {} },
-  openNotifications() { this.setData({noticeOpen:true}); this.getTabBar()?.setData({hidden:true}); wx.hideTabBar({animation:false,fail:()=>{}}) },  closeNotifications() { if (!this.data.noticeOpen) return; this.setData({noticeOpen:false}); this.getTabBar()?.setData({hidden:false}); wx.showTabBar({animation:false,fail:()=>{}}); this.refreshUnread() },
+  openNotifications() { this.setData({noticeOpen:true}); this.getTabBar()?.setData({hidden:true}) },  closeNotifications() { if (!this.data.noticeOpen) return; this.setData({noticeOpen:false}); this.getTabBar()?.setData({hidden:false}); this.refreshUnread() },
   openSummary() { wx.navigateTo({url:'/pages/todo-summary/index?range=today'}) },
-  onPullDownRefresh() { Promise.all([this.load(true),this.loadPlans(true)]).finally(() => wx.stopPullDownRefresh()) },
+  async refreshAll() {
+    const identity=this.loadedIdentity
+    await Promise.all([this.load(true),this.loadPlans(true)])
+    if(this.loadedIdentity===identity && !this.data.loading && !this.data.planLoading && !this.data.error && !this.data.planError)this.setData({hasSnapshot:true})
+  },
+  onPullDownRefresh() { this.refreshAll().finally(() => wx.stopPullDownRefresh()) },
   onReachBottom() { if (this.data.items.length < this.data.total) this.load(false) },
   async load(reset) {
-    if (this.data.loading || this.data.loadingMore) return
+    if (!reset && (this.data.loading || this.data.loadingMore)) return
+    const version=(this.todoRequestVersion||0)+1
+    this.todoRequestVersion=version
     this.setData(reset ? { loading:true, error:'' } : { loadingMore:true })
     const page = reset ? 1 : this.data.page + 1
     try {
       const requests = [allPages('/todo/page')]
       if (reset) requests.push(api.post('/todo/summary'))
       const [result, summary] = await Promise.all(requests)
+      if(version!==this.todoRequestVersion)return
       const user=session.get() || {}
       const items = result.map(todo => ({ ...present(todo), canManage: user.memberRole === 'owner' || user.memberRole === 'admin' || user.userRole === 'super_admin' || todo.createUserId === user.id || todo.ownerId === user.id || (todo.ownerIds || []).includes(user.id) }))
       this.setData({ items, page, total:items.length, ...(reset ? { summary } : {}) }); this.updateGroups()
     } catch (error) {
+      if(version!==this.todoRequestVersion)return
       this.setData({ error:error.message || '加载失败' })
       if (!session.get()?.token) wx.reLaunch({ url:'/pages/login/index' })
-    } finally { this.setData({ loading:false, loadingMore:false }) }
+    } finally { if(version===this.todoRequestVersion)this.setData({ loading:false, loadingMore:false }) }
   },
-  retry() { this.load(true); this.loadPlans(true) },
+  retry() { this.refreshAll() },
   async loadPlans(reset) {
-    if (this.data.planLoading) return
+    if (!reset && this.data.planLoading) return
+    const version=(this.planRequestVersion||0)+1
+    this.planRequestVersion=version
     this.setData({planLoading:true,planError:''})
     const page=reset?1:this.data.planPage+1, d=new Date(), today=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     try {
       const [result,members]=await Promise.all([allPages('/want/page',{plannedDateStart:today}),api.post('/user/members')])
+      if(version!==this.planRequestVersion)return
       const names=Object.fromEntries((members || []).map(m=>[m.id,m.nickname || m.username || '家人']))
       const plans=result.map(item=>({...item,displayOwner:names[item.userId] || '家人'}))
       this.setData({plans,planPage:page,planTotal:plans.length}); this.updateGroups()
-    } catch(error) { this.setData({planError:error.message || '做饭计划加载失败'}) }
-    finally { this.setData({planLoading:false}) }
+    } catch(error) { if(version===this.planRequestVersion)this.setData({planError:error.message || '做饭计划加载失败'}) }
+    finally { if(version===this.planRequestVersion)this.setData({planLoading:false}) }
   },
   morePlans(){this.loadPlans(false)},
   finishPlan(e){

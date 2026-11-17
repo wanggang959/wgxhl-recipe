@@ -37,6 +37,7 @@ const projectPopupVisible = ref(false)
 const itemPopupVisible = ref(false)
 const savingProject = ref(false)
 const savingItem = ref(false)
+const originalItemPlannedTime = ref('')
 const exporting = ref(false)
 const exportVisible = ref(false)
 const exportUrl = ref('')
@@ -360,6 +361,7 @@ function resetItemForm() {
 
 function openItemForm(item = null) {
   if (!canWrite.value || !selectedProjectId.value) return
+  originalItemPlannedTime.value = item?.plannedTime || ''
   if (item) {
     itemForm.id = item.id
     itemForm.projectId = item.projectId
@@ -388,6 +390,12 @@ async function saveItem() {
     showFailToast('请输入开支名称')
     return
   }
+  const clearPlannedTime = Boolean(isEditingItem.value && originalItemPlannedTime.value && !itemForm.plannedTime)
+  if (clearPlannedTime) {
+    try {
+      await showConfirmDialog({ title: '清除计划时间', message: '保存后将删除此开支自动生成的待办，开支记录会保留。', confirmButtonText: '确认清除' })
+    } catch (_) { return }
+  }
   savingItem.value = true
   try {
     const payload = {
@@ -401,6 +409,7 @@ async function saveItem() {
       ownerId: itemForm.ownerId || null,
       purchaseDate: itemForm.purchaseDate || null,
       plannedTime: fromDateTimeInput(itemForm.plannedTime),
+      clearPlannedTime,
       purchaseChannel: itemForm.purchaseChannel.trim(),
       purchaseLink: itemForm.purchaseLink.trim(),
       remark: itemForm.remark.trim(),

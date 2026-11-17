@@ -75,3 +75,22 @@ test('invite preview and invite registration use the public endpoint', async () 
   assert.deepEqual(request.data, { inviteCode: 'AB12', username: 'invited', nickname: '', password: 'password1' })
   assert.equal(page.saved().token, 'token2')
 })
+
+test('wechat registration binds using a fresh code after registration', async () => {
+  const calls=[],page=setup(calls);let codeCalls=0
+  wx.login=({success})=>{codeCalls++;success({code:'fresh-code'})}
+  api.post=async(path,data,options)=>{calls.push({path,data,options});if(path==='/user/register/email')return {id:'u1',token:'token',username:'newuser'};if(path==='/user/wechat/bind')return null;throw Error('unexpected')}
+  page.setData({bindWechat:true,email:'new@example.com',code:'123456',username:'newuser',password:'password1',confirmPassword:'password1'})
+  await page.submit()
+  assert.deepEqual(calls.map(call=>call.path),['/user/register/email','/user/wechat/bind'])
+  assert.equal(codeCalls,1);assert.equal(calls[1].data.code,'fresh-code');assert.equal(page.saved().id,'u1');assert.equal(page.data.password,'')
+})
+
+test('binding failure keeps the registered account and does not repeat registration', async () => {
+  const calls=[],page=setup(calls);let modal
+  wx.login=({success})=>success({code:'fresh-code'});wx.showModal=options=>{modal=options}
+  api.post=async(path,data)=>{calls.push(path);if(path==='/user/register/email')return {id:'u1',token:'token'};throw Error('binding failed')}
+  page.setData({bindWechat:true,email:'new@example.com',code:'123456',username:'newuser',password:'password1',confirmPassword:'password1'})
+  await page.submit()
+  assert.deepEqual(calls,['/user/register/email','/user/wechat/bind']);assert.equal(page.saved().id,'u1');assert.match(modal.content,/账号已创建/)
+})

@@ -1,17 +1,19 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { completeTodo, deleteTodo, getTodoDetail } from '../api/todo'
 import TodoDetail from '../components/TodoDetail.vue'
 import { useUserStore } from '../stores/user'
 import { markTodoRefreshRequired } from '../utils/todoRefresh'
+import { clearTodoDetail, readTodoDetail, saveTodoDetail } from '../utils/todoDetailCache'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
-const todo = ref(null)
+const todo = ref(readTodoDetail(userStore.userId, userStore.user?.householdId, route.params.id))
+let requestVersion = 0
 
 /** 与后端一致：创建人、负责人可操作，家庭管理员可代管 */
 const canManageTodo = computed(() => {
@@ -25,16 +27,31 @@ const canManageTodo = computed(() => {
 })
 
 onMounted(loadTodo)
+onBeforeUnmount(() => { requestVersion += 1 })
+watch(() => [userStore.userId, userStore.user?.householdId, route.params.id], () => {
+  requestVersion += 1
+  todo.value = readTodoDetail(userStore.userId, userStore.user?.householdId, route.params.id)
+  if (route.name === 'TodoDetail') loadTodo()
+})
 
 async function loadTodo() {
-  loading.value = true
+  const version = ++requestVersion
+  const userId = userStore.userId
+  const householdId = userStore.user?.householdId
+  const todoId = route.params.id
+  loading.value = !todo.value
   try {
-    const res = await getTodoDetail(route.params.id)
+    const res = await getTodoDetail(todoId)
+    if (version !== requestVersion) return
     todo.value = res.data
+    saveTodoDetail(userId, householdId, todoId, res.data)
   } catch (error) {
+    if (version !== requestVersion) return
+    todo.value = null
+    clearTodoDetail()
     showFailToast(error.message || '待办加载失败')
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 
@@ -84,6 +101,7 @@ async function remove() {
       message: `确认删除「${todo.value?.title || ''}」吗？`,
     })
     await deleteTodo(route.params.id)
+    clearTodoDetail()
     markTodoRefreshRequired()
     showSuccessToast('已删除')
     router.replace('/todo')

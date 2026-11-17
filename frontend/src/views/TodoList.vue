@@ -16,6 +16,7 @@ import { DATA_REFRESH_EVENT, DATA_SCOPE, hasDataChanged, hasMatchingScope, markD
 const CACHE_MAX_AGE = 60 * 1000
 const todoListCache = {
   userId: '',
+  householdId: '',
   list: [],
   wantedList: [],
   userNameMap: {},
@@ -41,7 +42,10 @@ function canManageTodo(todo) {
 }
 const loading = ref(false)
 let loadingPromise = null
-const cacheMatchesUser = todoListCache.userId === userStore.userId
+let pendingRefresh = false
+const cacheMatchesUser = Boolean(userStore.userId && userStore.user?.householdId && todoListCache.userId === userStore.userId && todoListCache.householdId === userStore.user.householdId)
+const hasSnapshot = ref(cacheMatchesUser && Boolean(todoListCache.savedAt))
+let requestVersion = 0
 const list = ref(cacheMatchesUser ? [...todoListCache.list] : [])
 const wantedList = ref(cacheMatchesUser ? [...todoListCache.wantedList] : [])
 const userNameMap = ref(cacheMatchesUser ? { ...todoListCache.userNameMap } : {})
@@ -158,9 +162,24 @@ watch(
   },
 )
 
+watch(() => [userStore.userId, userStore.user?.householdId], () => {
+  requestVersion += 1
+  loadingPromise = null
+  pendingRefresh = false
+  loading.value = false
+  hasSnapshot.value = false
+  list.value = []
+  wantedList.value = []
+  userNameMap.value = {}
+  summary.value = { todayCount: 0, doneCount: 0, dueSoonCount: 0, totalCount: 0 }
+  todoListCache.savedAt = 0
+  if (userStore.userId && route.path === '/todo') refreshTodoOnEnter()
+})
+
 function refreshTodoOnEnter() {
-  const hasData = list.value.length > 0 || wantedList.value.length > 0
+  const hasData = hasSnapshot.value
   if (consumeTodoRefreshRequired()) {
+    if (loadingPromise) { pendingRefresh = true; return }
     loadTodo({ showLoading: !hasData, silent: hasData })
     return
   }
@@ -177,13 +196,14 @@ function loadTodo(options = {}) {
   if (!userStore.userId) return Promise.resolve()
   if (loadingPromise) return loadingPromise
 
-  const showLoading = options.showLoading ?? (list.value.length === 0 && wantedList.value.length === 0)
+  const showLoading = options.showLoading ?? !hasSnapshot.value
   if (showLoading) loading.value = true
-  loadingPromise = (async () => {
+  const version = ++requestVersion
+  const currentRequest = (async () => {
     try {
       const todoQuery = { current: 1, size: 200 }
       if (userStore.isGuest) todoQuery.category = 'COOK'
-      const [pageRes, summaryRes, wantedRes] = await Promise.all([
+      const [pageRes, summaryRes, wantedRes, members] = await Promise.all([
         loadAllPages(pageTodo, todoQuery),
         getTodoSummary(),
         loadAllPages(pageWantedRecipe, {
@@ -193,27 +213,38 @@ function loadTodo(options = {}) {
         }),
         loadFamilyMembers(),
       ])
+      if (version !== requestVersion) return
       list.value = pageRes.data.records || []
       summary.value = summaryRes.data || summary.value
       wantedList.value = wantedRes.data.records || []
+      userNameMap.value = members
+      hasSnapshot.value = true
       saveTodoCache()
       rememberDataVersions(watchedDataScopes, seenDataVersions)
     } catch (error) {
-      if (!options.silent || (list.value.length === 0 && wantedList.value.length === 0)) {
+      if (version !== requestVersion) return
+      if (!options.silent || !hasSnapshot.value) {
         showFailToast(error.message || '待办加载失败')
       }
     } finally {
-      if (showLoading) loading.value = false
+      if (version === requestVersion && showLoading) loading.value = false
     }
   })()
 
-  return loadingPromise.finally(() => {
+  loadingPromise = currentRequest
+  return currentRequest.finally(() => {
+    if (loadingPromise !== currentRequest) return
     loadingPromise = null
+    if (pendingRefresh) {
+      pendingRefresh = false
+      loadTodo({ showLoading: false, silent: true })
+    }
   })
 }
 
 function handleDataRefresh(event) {
   if (!hasMatchingScope(event, watchedDataScopes)) return
+  if (loadingPromise) { pendingRefresh = true; return }
   loadTodo({ showLoading: false, silent: true })
 }
 
@@ -223,6 +254,7 @@ function isCacheStale() {
 
 function saveTodoCache() {
   todoListCache.userId = userStore.userId || ''
+  todoListCache.householdId = userStore.user?.householdId || ''
   todoListCache.list = [...list.value]
   todoListCache.wantedList = [...wantedList.value]
   todoListCache.userNameMap = { ...userNameMap.value }
@@ -238,8 +270,7 @@ async function loadFamilyMembers() {
   ;(res.data.records || []).forEach((user) => {
     nextMap[user.id] = user.nickname || user.username || '家人'
   })
-  userNameMap.value = nextMap
-  saveTodoCache()
+  return nextMap
 }
 
 function categoryMatches(item) {

@@ -138,6 +138,26 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
         if (validate.getStatus() != 200) {
             return validate;
         }
+        if (Boolean.TRUE.equals(entity.getClearPlannedTime())) {
+            if (entity.getPlannedTime() != null) return ApiResponse.fail("清除计划时间时不能同时设置新时间");
+            if (StringUtils.hasText(existing.getTodoId())) {
+                Todo linked = todoService.getById(existing.getTodoId());
+                if (linked != null) {
+                    if (!RELATED_TYPE.equals(linked.getRelatedType()) || !existing.getId().equals(linked.getRelatedId())) {
+                        return ApiResponse.fail("关联待办不匹配，请联系管理员处理");
+                    }
+                    ApiResponse<Void> deleted = todoService.delete(linked.getId(), actor);
+                    if (deleted.getStatus() != 200) return deleted;
+                }
+            }
+            entity.setTodoId(null);
+            if (!updateById(entity)) throw new IllegalStateException("更新开支项失败");
+            boolean cleared = lambdaUpdate().eq(SpecialExpenseItem::getId, entity.getId())
+                    .set(SpecialExpenseItem::getPlannedTime, null)
+                    .set(SpecialExpenseItem::getTodoId, null).update();
+            if (!cleared) throw new IllegalStateException("清除计划时间失败");
+            return ApiResponse.success("已更新开支项", null);
+        }
         entity.setTodoId(existing.getTodoId());
         updateById(entity);
         syncTodo(entity, actor);

@@ -30,14 +30,13 @@ Page({
     if(this.data.editOpen||this.data.notifyOpen){
       this.setData({editOpen:false,notifyOpen:false,editTarget:null})
       this.getTabBar()?.setData({hidden:false})
-      wx.showTabBar({animation:false,fail:()=>{}})
     }
   },
   onUnload(){this.stopUnreadTimer()},
   stopUnreadTimer(){if(this.unreadTimer)clearInterval(this.unreadTimer);this.unreadTimer=null},
   async refreshUnread(){try{const value=await api.post('/notification/unreadCount');this.setData({unread:Math.max(0,Number(value)||0)})}catch(_){}},
-  openNotifications(){this.setData({noticeOpen:true});this.getTabBar()?.setData({hidden:true});wx.hideTabBar({animation:false,fail:()=>{}})},
-  closeNotifications(){if(!this.data.noticeOpen)return;this.setData({noticeOpen:false});this.getTabBar()?.setData({hidden:false});wx.showTabBar({animation:false,fail:()=>{}});this.refreshUnread()},
+  openNotifications(){this.setData({noticeOpen:true});this.getTabBar()?.setData({hidden:true})},
+  closeNotifications(){if(!this.data.noticeOpen)return;this.setData({noticeOpen:false});this.getTabBar()?.setData({hidden:false});this.refreshUnread()},
   add(){wx.navigateTo({url:'/pages/recipe-form/index'})},
   onReachBottom(){if(!this.data.guest&&!this.data.error&&this.data.page&&this.data.list.length<this.data.total)this.loadList(false)},
   async refresh(){
@@ -94,8 +93,8 @@ Page({
     this.setData({editOpen:true,editTarget:item,editDate:item.plannedDate||this.data.today})
   },
   closeEdit(){if(!this.data.busy){this.setData({editOpen:false,editTarget:null});this.showTabBar()}},
-  hideTabBar(){this.getTabBar()?.setData({hidden:true});wx.hideTabBar({animation:false,fail:()=>{}})},
-  showTabBar(){if(this.data.notifyOpen||this.data.editOpen)return;this.getTabBar()?.setData({hidden:false});wx.showTabBar({animation:false,fail:()=>{}})},
+  hideTabBar(){this.getTabBar()?.setData({hidden:true})},
+  showTabBar(){if(this.data.notifyOpen||this.data.editOpen)return;this.getTabBar()?.setData({hidden:false})},
   changeEditDate(e){this.setData({editDate:e.detail.value})},
   async submitEdit(){
     const target=this.data.editTarget

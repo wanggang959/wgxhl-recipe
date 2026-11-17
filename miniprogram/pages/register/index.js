@@ -1,8 +1,8 @@
 const api=require('../../services/api')
 const session=require('../../services/session')
 Page({
-  data:{mode:'email',email:'',code:'',username:'',nickname:'',password:'',confirmPassword:'',inviteCode:'',inviteInput:'',inviteInfo:null,sending:false,checking:false,submitting:false,countdown:0,error:''},
-  onLoad(){if(session.get()?.token)wx.switchTab({url:'/pages/home/index'})},
+  data:{mode:'email',email:'',code:'',username:'',nickname:'',password:'',confirmPassword:'',inviteCode:'',inviteInput:'',inviteInfo:null,sending:false,checking:false,submitting:false,countdown:0,error:'',bindWechat:false},
+  onLoad(options={}){if(session.get()?.token){wx.switchTab({url:'/pages/home/index'});return}this.setData({bindWechat:options.bindWechat==='1'})},
   onUnload(){this.stopCountdown()},
   switchMode(e){const mode=e.currentTarget.dataset.mode;if(!['email','invite'].includes(mode)||mode===this.data.mode)return;this.setData({mode,error:''})},
   field(e){const field=e.currentTarget.dataset.field;if(field)this.setData({[field]:e.detail.value,error:''})},
@@ -53,7 +53,7 @@ Page({
     this.setData({submitting:true,error:''})
     try{
       const user=await api.post('/user/register/email',{email,code:this.data.code.trim(),username:this.data.username.trim(),nickname:this.data.nickname.trim(),password:this.data.password,inviteCode:this.data.inviteCode.trim()},{public:true})
-      this.enterApp(user)
+      await this.enterApp(user)
     }catch(error){this.setData({error:error.message||'注册失败'})}
     finally{this.setData({submitting:false})}
   },
@@ -64,13 +64,24 @@ Page({
     this.setData({submitting:true,error:''})
     try{
       const user=await api.post('/user/register/invite',{inviteCode,username:this.data.username.trim(),nickname:this.data.nickname.trim(),password:this.data.password},{public:true})
-      this.enterApp(user)
+      await this.enterApp(user)
     }catch(error){this.setData({error:error.message||'注册失败'})}
     finally{this.setData({submitting:false})}
   },
-  enterApp(user){
+  async enterApp(user){
     if(!user?.id||!user?.token){this.setData({error:'注册结果不完整，请稍后重试'});return}
     session.set(user)
+    if(this.data.bindWechat){
+      try{
+        const code=await new Promise((resolve,reject)=>wx.login({success:r=>r.code?resolve(r.code):reject(new Error('获取微信登录凭证失败')),fail:()=>reject(new Error('微信登录暂不可用'))}))
+        await api.post('/user/wechat/bind',{code,username:this.data.username.trim(),password:this.data.password})
+      }catch(_){
+        this.setData({password:'',confirmPassword:''})
+        wx.showModal({title:'账号已注册',content:'微信绑定未完成。账号已创建，可在“我的 → 微信绑定”中重试。',showCancel:false,success:()=>wx.switchTab({url:'/pages/home/index'})})
+        return
+      }
+    }
+    this.setData({password:'',confirmPassword:''})
     wx.showToast({title:'注册成功',icon:'none'})
     wx.switchTab({url:'/pages/home/index'})
   },

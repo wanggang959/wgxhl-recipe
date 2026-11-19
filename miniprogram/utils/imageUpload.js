@@ -5,6 +5,7 @@ const PRESETS = {
   step: { folder: 'recipe/step', maxEdge: 2048, maxBytes: 1024 * 1024 },
   ingredient: { folder: 'ingredient', maxEdge: 2048, maxBytes: 1024 * 1024 },
   seasoning: { folder: 'seasoning', maxEdge: 2048, maxBytes: 1024 * 1024 },
+  vehicle: { folder: 'vehicle', maxEdge: 1600, maxBytes: 1024 * 1024 },
 }
 
 function chooseImage(count = 1) {

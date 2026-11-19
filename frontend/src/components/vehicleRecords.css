@@ -1,0 +1,90 @@
+.vehicle-records { --records-ink: #162c29; --records-muted: #506761; --records-card: #f9fdf9; min-width: 0; font-variant-numeric: tabular-nums; }
+.records-head { display: grid; grid-template-columns: 76px minmax(0,1fr) 76px; align-items: center; gap: 6px; min-height: 62px; padding-top: env(safe-area-inset-top); }
+.records-head.with-search { grid-template-columns: 36px minmax(0,1fr) 36px; gap: 8px; }
+.head-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.list-icon,.record-ops button,.clear-filters,.year-arrow { display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--records-ink); cursor: pointer; }
+.list-icon { width: 34px; height: 35px; font-size: 19px; }
+.list-icon.is-primary { width: 32px; height: 32px; border-radius: 6px; background: #087e49; color: #fff; }
+.list-icon:disabled,.year-arrow:disabled { opacity: .28; cursor: default; }
+.list-vehicle { min-width: 0; display: flex; justify-content: center; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--records-ink); font-size: 17px; font-weight: 700; padding: 5px 0; overflow-wrap: anywhere; cursor: pointer; }
+.list-vehicle .van-icon { flex: none; font-size: 11px; }
+.record-search { display: flex; align-items: center; min-width: 0; gap: 8px; min-height: 37px; padding: 0 10px; border-radius: 7px; background: #f6faf6; color: var(--records-muted); }
+.record-search input { min-width: 0; width: 100%; border: 0; background: transparent; color: var(--records-ink); padding: 9px 0; font-size: 14px; }
+.record-search:focus-within { outline: 1px solid #087e49; }
+.record-search input:focus { outline: none; }
+.year-summary { background: #e0edf1; border: 1px solid #d1e1e7; border-radius: 8px; padding: 6px 9px 13px; }
+.year-summary select,.filter-total select { max-width: 100%; padding: 4px; border: 0; border-radius: 4px; color: var(--records-ink); background: transparent; font-weight: 700; font-size: 15px; cursor: pointer; }
+.year-summary select { min-height: 36px; font-size: 16px; }
+.year-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.year-actions { display: flex; align-items: center; gap: 2px; }
+.year-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); align-items: center; margin-top: 5px; }
+.year-arrow { width: 36px; height: 36px; font-size: 14px; border-radius: 5px; background: #edf5f7; }
+.year-metric { display: grid; justify-items: center; gap: 4px; padding: 0 3px; min-width: 0; text-align: center; }
+.year-metric + .year-metric { border-left: 1px solid #c7d6d8; }
+.year-metric span,.year-metric small { font-size: 11px; color: var(--records-muted); overflow-wrap: anywhere; }
+.year-metric strong { font-size: 19px; line-height: 1.15; overflow-wrap: anywhere; }
+.year-metric:first-child strong { color: #087e49; }
+.fuel-timeline { list-style: none; padding: 0 0 0 20px; margin: 12px 0 0 8px; border-left: 2px solid #b5d9cb; }
+.fuel-event { position: relative; margin-bottom: 11px; }
+.timeline-symbol { position: absolute; left: -31px; top: 16px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #e3f0f6; color: #22648b; font-size: 14px; }
+.fuel-expanded .timeline-symbol { background: #d4ebf4; color: #155b81; }
+.fuel-card,.expense-card { background: var(--records-card); border: 1px solid #e2ece5; border-radius: 8px; min-width: 0; overflow: hidden; }
+.fuel-line,.expense-line,.month-heading { display: grid; width: 100%; align-items: center; gap: 7px; padding: 0; border: 0; background: transparent; color: var(--records-ink); text-align: left; cursor: pointer; }
+.fuel-line { grid-template-columns: 50px minmax(0,1fr) minmax(0,.9fr) 12px; min-height: 50px; padding: 8px 10px; }
+.fuel-expanded .fuel-card { border-color: #c6e0d1; }
+.fuel-expanded .fuel-line { background: #f0faf2; }
+.fuel-line:focus-visible,.expense-line:focus-visible { outline-offset: -2px; }
+.record-day { border-left: 3px solid #1b9764; padding-left: 6px; line-height: 1.2; font-size: 15px; white-space: nowrap; }
+.record-reading,.record-mileage { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.record-mileage strong,.record-reading strong { font-size: 16px; }
+.record-mileage small,.record-reading small { font-size: 11px; padding-left: 3px; color: var(--records-muted); white-space: nowrap; }
+.fuel-line > .van-icon { font-size: 12px; }
+.above-average { color: #b63539; }
+.record-expansion { padding: 10px 11px 5px; border-top: 1px solid #e4eee7; background: #fff; font-size: 13px; }
+.fuel-values,.trip-interval { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: start; }
+.fuel-values > div,.trip-interval .trip-value { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.fuel-values > div:nth-child(2),.trip-value:nth-child(2) { text-align: center; }
+.fuel-values > div:last-child,.trip-value:nth-child(3) { text-align: right; }
+.fuel-values small,.trip-interval small { color: var(--records-muted); font-size: 11px; line-height: 1.2; }
+.fuel-values span,.trip-interval span { color: var(--records-muted); font-size: 11px; }
+.fuel-values strong { color: var(--records-ink); font-size: 16px; }
+.fuel-flags { display: flex; flex-wrap: wrap; gap: 5px 7px; margin-top: 8px; overflow-wrap: anywhere; }
+.fuel-flags span { padding: 2px 6px; border-radius: 4px; background: #edf1f4; color: #3f5968; font-size: 11px; line-height: 1.35; }
+.fuel-flags .flag-full { color: #126747; background: #e5f3ea; }
+.fuel-flags .flag-warning { color: #a23f26; background: #fbeee7; }
+.record-expansion p { margin: 7px 0 0; color: var(--records-muted); overflow-wrap: anywhere; white-space: pre-line; }
+.detail-foot { display: flex; justify-content: space-between; align-items: center; gap: 7px; color: var(--records-muted); font-size: 12px; }
+.record-expansion .detail-foot { margin-top: 4px; }
+.record-ops { display: flex; gap: 4px; flex: none; }
+.record-ops button { width: 40px; height: 40px; color: #087e49; font-size: 18px; border-radius: 6px; }
+.record-ops button:last-child { color: #b63539; }
+.record-ops button:hover { background: #edf6f0; }
+.record-ops button:last-child:hover { background: #fbeff0; }
+.trip-interval { width: 100%; box-sizing: border-box; grid-template-columns: repeat(3,minmax(0,1fr)) 14px; gap: 5px; align-items: center; margin-top: 6px; min-height: 44px; padding: 7px 8px 7px 10px; background: #e7f4ef; border: 1px solid #d0e7df; border-radius: 7px; text-align: left; color: #235249; cursor: pointer; }
+.trip-interval:hover,.trip-interval:active { background: #dbeee6; }
+.trip-interval strong { color: #235249; font-size: 14px; }
+.expense-record-filters { display: grid; gap: 10px; margin: 0 0 12px; }
+.expense-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 7px; font-size: 12px; }
+.expense-dates > label { position: relative; display: flex; align-items: center; }
+.expense-dates input { width: 103px; min-height: 31px; padding: 0 2px; box-sizing: border-box; border: 0; border-radius: 4px; font: inherit; color: var(--records-ink); background: transparent; }
+.expense-dates .date-blank input { color: transparent; }
+.date-blank input::-webkit-datetime-edit { opacity: 0; }
+.expense-dates label > span { position: absolute; left: 3px; pointer-events: none; }
+.expense-dates .list-vehicle { max-width: 100%; font-size: 13px; margin-left: auto; }
+.filter-total { display: flex; align-items: center; gap: 6px; }
+.filter-total select { min-width: 0; max-width: 44%; font-size: 13px; }
+.clear-filters { color: #126747; width: 30px; min-width: 30px; height: 31px; }
+.expense-total { min-width: 0; margin-left: auto; font-size: 14px; text-align: right; overflow-wrap: anywhere; }
+.expense-total small,.expense-amount small { color: var(--records-muted); font-size: 11px; font-weight: 400; }
+.expense-month { margin: 0 0 18px; }
+.month-heading { grid-template-columns: minmax(0,1fr) minmax(0,1fr); min-height: 35px; font-size: 13px; }
+.month-heading span { color: var(--records-muted); text-align: right; overflow-wrap: anywhere; }
+.month-heading .van-icon { font-size: 10px; }
+.month-entries { display: grid; gap: 4px; }
+.expense-line { grid-template-columns: 19px minmax(0,1fr) minmax(60px,auto); min-height: 53px; padding: 8px 11px; }
+.expense-dot { width: 17px; height: 17px; border: 4px solid currentColor; border-radius: 50%; box-sizing: border-box; }
+.expense-copy { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.expense-copy small { color: var(--records-muted); font-size: 12px; white-space: pre-line; }
+.expense-amount { max-width: 120px; text-align: right; overflow-wrap: anywhere; font-size: 16px; }
+.expense-detail { padding-left: 11px; padding-right: 8px; border-top: 1px solid #e6efe7; }
+.no-records { margin: 0; padding: 28px 0; text-align: center; color: var(--records-muted); font-size: 13px; }

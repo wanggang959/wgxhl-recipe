@@ -33,6 +33,10 @@ services:
       - ../sql/commute_channels.sql:/docker-entrypoint-initdb.d/21-commute-channels.sql:ro
       - ../sql/commute_notice_day.sql:/docker-entrypoint-initdb.d/22-commute-notice-day.sql:ro
       - ../sql/commute_actual_rain.sql:/docker-entrypoint-initdb.d/23-commute-actual-rain.sql:ro
+      - ../sql/household_ledger_v1.sql:/docker-entrypoint-initdb.d/24-household-ledger.sql:ro
+      - ../sql/vehicle_management_v1.sql:/docker-entrypoint-initdb.d/25-vehicle.sql:ro
+      - ../sql/vehicle_image_v2.sql:/docker-entrypoint-initdb.d/26-vehicle-image.sql:ro
+      - ../sql/vehicle_expense_type_v3.sql:/docker-entrypoint-initdb.d/27-vehicle-expense-type.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u recipe_test -plocal-test-only --silent"]
       interval: 5s

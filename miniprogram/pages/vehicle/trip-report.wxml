@@ -1,0 +1,34 @@
+<view wx:if="{{tripReport && current}}" class="trip-report-screen">
+  <view class="report-head">
+    <view bindtap="closeTripReport" aria-role="button" aria-label="返回车辆页面"><text class="van-icon van-icon-arrow-left"></text></view>
+    <text>行程报告</text>
+  </view>
+  <scroll-view scroll-y class="trip-report-scroll">
+    <view class="report-vehicle">
+      <image mode="aspectFit" binderror="resetTripReportPhoto" src="{{tripReportPhoto || (current.vehicleType === 'CAR' ? 'https://recipe.wgxhl.space/vehicle-assets/car-v2.png' : 'https://recipe.wgxhl.space/vehicle-assets/motorcycle.png')}}" />
+      <view class="report-vehicle-copy"><view>{{current.name}}</view><text wx:if="{{current.model}}">{{current.model}}</text><text>已记录 {{tripReport.days}} 天 · {{tripReport.count}} 次加油</text></view>
+    </view>
+    <view class="report-content">
+      <view class="report-period"><text>{{tripReport.date}}</text><text wx:if="{{tripReport.start}}">{{tripReport.start}} 至 {{tripReport.end}}</text></view>
+      <view class="report-highlights">
+        <view><text>区间油耗</text><text class="report-number">{{tripReport.consumption}}</text><text>升/百公里</text></view>
+        <view><text>每公里油费</text><text class="report-number">{{tripReport.perKm}}</text><text>元/公里</text></view>
+      </view>
+      <view wx:if="{{tripReport.warning}}" class="report-notice">{{tripReport.warning}}</view>
+      <view class="report-band">
+        <view class="report-section-title">区间行程</view>
+        <view class="report-metrics">
+          <view wx:for="{{tripReport.journey}}" wx:key="label"><text>{{item.label}}</text><view><text class="report-number">{{item.value}}</text> {{item.unit}}</view></view>
+        </view>
+      </view>
+      <view class="report-band">
+        <view class="report-section-title">加油与优惠</view>
+        <view class="report-metrics">
+          <view><text>本次加油量</text><view><text class="report-number">{{tripReport.added}}</text> 升</view></view>
+          <view><text>本次实付</text><view><text class="report-number">{{tripReport.paid}}</text> 元</view></view>
+          <view wx:for="{{tripReport.savings}}" wx:key="label"><text>{{item.label}}</text><view><text class="report-number">{{item.value}}</text> {{item.unit}}</view></view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

@@ -31,6 +31,9 @@ import com.wgxhl.recipe.expense.mapper.SpecialExpenseItemMapper;
 import com.wgxhl.recipe.expense.mapper.SpecialExpenseProjectMapper;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.ledger.service.LedgerService;
+import com.wgxhl.recipe.vehicle.VehicleMapper;
+import com.wgxhl.recipe.vehicle.VehicleFuelMapper;
+import com.wgxhl.recipe.vehicle.VehicleExpenseMapper;
 import com.wgxhl.recipe.user.service.AppUserService;
 import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
@@ -66,6 +69,9 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
     private final JwtAuthUtil jwtAuthUtil;
     private final AppUserService appUserService;
     private final LedgerService ledgerService;
+    private final VehicleMapper vehicles;
+    private final VehicleFuelMapper vehicleFuel;
+    private final VehicleExpenseMapper vehicleExpenses;
 
     public HouseholdLeaveServiceImpl(HouseholdService householdService,
                                      HouseholdMemberService householdMemberService,
@@ -82,7 +88,8 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
                                      SpecialExpenseItemMapper specialExpenseItemMapper,
                                      SpecialExpenseProjectMapper specialExpenseProjectMapper,
                                      JwtAuthUtil jwtAuthUtil,
-                                     AppUserService appUserService, LedgerService ledgerService) {
+                                     AppUserService appUserService, LedgerService ledgerService,
+                                     VehicleMapper vehicles, VehicleFuelMapper vehicleFuel, VehicleExpenseMapper vehicleExpenses) {
         this.householdService = householdService;
         this.householdMemberService = householdMemberService;
         this.householdInviteService = householdInviteService;
@@ -100,6 +107,9 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
         this.jwtAuthUtil = jwtAuthUtil;
         this.appUserService = appUserService;
         this.ledgerService = ledgerService;
+        this.vehicles = vehicles;
+        this.vehicleFuel = vehicleFuel;
+        this.vehicleExpenses = vehicleExpenses;
     }
 
     @Override
@@ -254,6 +264,9 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
     }
 
     private void deleteHouseholdData(String householdId) {
+        vehicleFuel.delete(new LambdaQueryWrapper<>());
+        vehicleExpenses.delete(new LambdaQueryWrapper<>());
+        vehicles.delete(new LambdaQueryWrapper<>());
         ledgerService.deleteHouseholdData();
         List<Todo> todos = todoMapper.selectList(new LambdaQueryWrapper<>());
         for (Todo todo : todos) {

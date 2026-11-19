@@ -1,0 +1,94 @@
+<view wx:if="{{current && (tab === 'records' || tab === 'expenseRecords')}}" class="vehicle-records">
+  <view class="records-head {{tab === 'expenseRecords' ? 'with-search' : ''}}">
+    <view class="list-icon" bindtap="closeRecordList" aria-role="button" aria-label="{{tab === 'records' ? '返回油耗' : '返回费用'}}"><text class="van-icon van-icon-arrow-left"></text></view>
+    <view wx:if="{{tab === 'records'}}" class="list-vehicle" bindtap="openVehiclePicker" aria-role="button" aria-label="切换车辆">{{current.name}} <text class="van-icon van-icon-arrow-down"></text></view>
+    <view wx:else class="record-search"><text class="van-icon van-icon-search"></text><input value="{{recordFilters.query}}" data-key="query" bindinput="changeRecordFilter" placeholder="搜索类型、备注" aria-label="搜索费用记录" /></view>
+    <view class="head-actions">
+      <view wx:if="{{tab === 'records'}}" class="list-icon is-primary {{!fuelList.entries.length ? 'list-disabled' : ''}}" bindtap="toggleAllRecords" aria-role="button" aria-label="{{recordsAllExpanded ? '全部收起' : '全部展开'}}"><text class="van-icon van-icon-{{recordsAllExpanded ? 'arrow-up' : 'arrow-down'}}"></text></view>
+      <view class="list-icon is-primary" data-type="{{tab === 'records' ? 'fuel' : 'expense'}}" bindtap="open" aria-role="button" aria-label="{{tab === 'records' ? '添加加油记录' : '添加费用记录'}}"><text class="van-icon van-icon-plus"></text></view>
+    </view>
+  </view>
+  <block wx:if="{{tab === 'records'}}">
+    <view class="year-summary">
+      <view class="year-top">
+        <picker value="{{recordYearIndex < 0 ? 0 : recordYearIndex}}" range="{{recordYearLabels}}" disabled="{{!recordYears.length}}" bindchange="selectRecordYear"><view class="year-picker">{{recordYear}}年 <text class="van-icon van-icon-arrow-down"></text></view></picker>
+        <view class="year-actions">
+          <view class="year-arrow {{recordYearIndex < 0 || recordYearIndex + 1 >= recordYears.length ? 'list-disabled' : ''}}" data-step="1" bindtap="stepRecordYear" aria-role="button" aria-label="较早的年份"><text class="van-icon van-icon-arrow-left"></text></view>
+          <view class="year-arrow {{recordYearIndex <= 0 ? 'list-disabled' : ''}}" data-step="-1" bindtap="stepRecordYear" aria-role="button" aria-label="较新的年份"><text class="van-icon van-icon-arrow"></text></view>
+        </view>
+      </view>
+      <view class="year-metrics">
+        <view wx:for="{{fuelList.summary}}" wx:key="title" class="year-metric"><text>{{item.title}}</text><text class="year-value">{{item.value}}</text><text>{{item.unit}}</text></view>
+      </view>
+    </view>
+    <view wx:if="{{!fuelList.entries.length}}" class="no-records">{{loading ? '加载中…' : '暂无记录'}}</view>
+    <view wx:else class="fuel-timeline">
+      <view wx:for="{{fuelList.entries}}" wx:for-item="row" wx:key="id" class="fuel-event {{recordExpanded[row.id] ? 'fuel-expanded' : ''}}">
+        <text class="timeline-symbol van-icon van-icon-fire-o"></text>
+        <view class="fuel-card">
+          <view class="fuel-line" data-id="{{row.id}}" bindtap="toggleRecord" aria-role="button" aria-label="加油记录 {{row.timestamp}}">
+            <text class="record-day">{{row.date}}</text>
+            <view class="record-reading"><text class="{{row.aboveAverage ? 'above-average' : ''}}">{{row.consumption}}</text><text class="row-unit">升/百公里</text></view>
+            <view class="record-mileage"><text>{{row.mileage}}</text><text class="row-unit">公里</text></view>
+            <text class="list-chevron van-icon van-icon-{{recordExpanded[row.id] ? 'arrow-up' : 'arrow-down'}}"></text>
+          </view>
+          <view wx:if="{{recordExpanded[row.id]}}" class="record-expansion">
+            <view class="fuel-values">
+              <view><text class="measure-label">实付</text><view><text class="measure-value">{{row.total}}</text> 元</view></view>
+              <view><text class="measure-label">单价</text><view><text class="measure-value">{{row.unitPrice}}</text> 元/升</view></view>
+              <view><text class="measure-label">加油量</text><view><text class="measure-value">{{row.liters}}</text> 升</view></view>
+            </view>
+            <view class="fuel-flags"><text wx:for="{{row.flags}}" wx:key="*this" class="{{item === '加满' ? 'flag-full' : (item === '亮灯' || item === '上次漏记' ? 'flag-warning' : '')}}">{{item}}</text></view>
+            <view wx:if="{{row.station}}" class="row-note">{{row.station}}</view><view wx:if="{{row.remark}}" class="row-note">{{row.remark}}</view>
+            <view class="detail-foot"><text>{{row.timestamp}}</text><view class="record-ops">
+              <view data-type="fuel" data-id="{{row.id}}" bindtap="open" aria-role="button" aria-label="编辑加油记录"><text class="van-icon van-icon-edit"></text></view>
+              <view wx:if="{{!row.segment}}" data-id="{{row.id}}" bindtap="openTripReport" aria-role="button" aria-label="查看行程报告"><text class="van-icon van-icon-notes-o"></text></view>
+              <view data-type="fuel" data-id="{{row.id}}" bindtap="remove" aria-role="button" aria-label="删除加油记录"><text class="van-icon van-icon-delete-o"></text></view>
+            </view></view>
+          </view>
+        </view>
+        <view wx:if="{{recordExpanded[row.id] && row.segment}}" class="trip-interval" data-id="{{row.id}}" bindtap="openTripReport" hover-class="trip-interval-pressed" aria-role="button" aria-label="查看行程报告 {{row.timestamp}}">
+          <view><text class="measure-label">每公里油费</text><view><text class="measure-value">{{row.segment.cost}}</text> 元/公里</view></view>
+          <view><text class="measure-label">区间用油</text><view><text class="measure-value">{{row.segment.liters}}</text> 升</view></view>
+          <view><text class="measure-label">较上次行驶</text><view><text class="measure-value">+{{row.segment.distance}}</text> 公里</view></view>
+          <text class="van-icon van-icon-arrow"></text>
+        </view>
+      </view>
+    </view>
+  </block>
+  <block wx:else>
+    <view class="expense-record-filters">
+      <view class="expense-dates">
+        <picker mode="date" value="{{recordFilters.start}}" end="{{recordFilters.end || '2099-12-31'}}" data-key="start" bindchange="changeRecordFilter"><view>{{recordFilters.start || '起始日期'}} <text class="van-icon van-icon-arrow-down"></text></view></picker>
+        <text>至</text>
+        <picker mode="date" value="{{recordFilters.end}}" start="{{recordFilters.start || '1900-01-01'}}" data-key="end" bindchange="changeRecordFilter"><view>{{recordFilters.end || '结束日期'}} <text class="van-icon van-icon-arrow-down"></text></view></picker>
+        <view class="list-vehicle" bindtap="openVehiclePicker" aria-role="button" aria-label="切换车辆">{{current.name}} <text class="van-icon van-icon-arrow-down"></text></view>
+      </view>
+      <view class="filter-total">
+        <picker range="{{recordCategoryLabels}}" value="{{recordCategoryIndex}}" bindchange="chooseRecordCategory"><view class="record-type-picker">{{recordFilters.category || '全部类型'}} <text class="van-icon van-icon-arrow-down"></text></view></picker>
+        <view wx:if="{{hasRecordFilters}}" class="clear-filters" bindtap="clearRecordFilters" aria-role="button" aria-label="清除费用筛选"><text class="van-icon van-icon-replay"></text></view>
+        <view class="expense-total">总计：{{expenseList.total || '0.00'}}<text class="row-unit"> 元</text></view>
+      </view>
+    </view>
+    <view wx:if="{{!expenseList.groups.length}}" class="no-records">{{loading ? '加载中…' : expenseList.invalidRange ? '结束日期不能早于起始日期' : hasRecordFilters ? '没有符合筛选条件的费用' : '暂无记录'}}</view>
+    <view wx:for="{{expenseList.groups}}" wx:for-item="group" wx:key="key" class="expense-month">
+      <view class="month-heading" data-key="{{group.key}}" bindtap="toggleExpenseMonth" aria-role="button">
+        <text>{{group.label}} <text class="list-chevron van-icon van-icon-{{recordCollapsed[group.key] ? 'arrow-down' : 'arrow-up'}}"></text></text>
+        <text>支出：{{group.total}} 元</text>
+      </view>
+      <view wx:if="{{!recordCollapsed[group.key]}}" class="month-entries">
+        <view wx:for="{{group.entries}}" wx:for-item="row" wx:key="id" class="expense-card">
+          <view class="expense-line" data-id="{{row.id}}" bindtap="toggleRecord" aria-role="button">
+            <text class="expense-dot" style="color:{{row.color}}"></text>
+            <view class="expense-copy"><text>{{row.date}} {{row.name}}</text><text wx:if="{{row.remark}}">{{row.remark}}</text></view>
+            <view class="expense-amount">{{row.amount}}<text class="row-unit"> 元</text></view>
+          </view>
+          <view wx:if="{{recordExpanded[row.id]}}" class="detail-foot expense-detail"><text>{{row.timestamp}}</text><view class="record-ops">
+            <view data-type="expense" data-id="{{row.id}}" bindtap="open" aria-role="button" aria-label="编辑费用记录"><text class="van-icon van-icon-edit"></text></view>
+            <view data-type="expense" data-id="{{row.id}}" bindtap="remove" aria-role="button" aria-label="删除费用记录"><text class="van-icon van-icon-delete-o"></text></view>
+          </view></view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

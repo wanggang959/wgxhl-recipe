@@ -134,6 +134,10 @@ public class AdminPermissionInterceptor implements HandlerInterceptor {
             writeJson(response, ApiResponse.fail(403, "该账号尚未加入任何家庭，请联系管理员"));
             return false;
         }
+        if (UserContext.MEMBER_GUEST.equals(membership.getMemberRole()) && path.startsWith("/vehicle/")) {
+            writeJson(response, ApiResponse.fail(403, "游客不能查看家庭车辆数据"));
+            return false;
+        }
         Household household = householdService.getById(membership.getHouseholdId());
         if (household == null || !STATUS_NORMAL.equals(household.getStatus())) {
             writeJson(response, ApiResponse.fail(403, "所在家庭已停用，请联系管理员"));

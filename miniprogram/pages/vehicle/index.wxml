@@ -1,0 +1,168 @@
+<template name="chart-range">
+  <picker range="{{labels}}" value="{{index}}" data-field="{{field}}" bindchange="setChartRange"><view class="chart-range">{{labels[index]}} <text class="van-icon van-icon-arrow-down"></text></view></picker>
+</template>
+<view class="page {{current && (tab === 'records' || tab === 'expenseRecords') ? 'records-theme' : (tab === 'expense' ? 'expense-theme' : '')}}">
+  <view wx:if="{{!current || (tab !== 'records' && tab !== 'expenseRecords')}}" class="heading">
+    <view class="back-link" bindtap="backToAssistant" aria-label="返回生活助手"><text class="van-icon van-icon-arrow-left"></text></view>
+    <view class="title">车辆管理</view>
+    <view class="back-link" bindtap="openDetails" aria-label="记录明细"><text class="van-icon van-icon-balance-list-o"></text></view>
+  </view>
+  <view wx:if="{{current && tab !== 'records' && tab !== 'expenseRecords'}}" class="vehicle-current">
+    <view class="vehicle-picker" bindtap="openVehiclePicker" aria-role="button" aria-label="切换车辆：{{current.name}}"><text>{{current.name}}</text><text class="vehicle-caret"></text></view>
+    <view class="vehicle-model">{{current.model || (current.vehicleType === 'CAR' ? '燃油汽车' : '燃油摩托车')}}</view>
+  </view>
+  <view wx:if="{{error}}" class="error" bindtap="loadVehicles">{{error}}，点击重试</view>
+  <view wx:if="{{!current && !error}}" class="empty"><view>还没有车辆</view><button class="primary" data-type="vehicle" bindtap="open">添加车辆</button></view>
+  <block wx:if="{{current && tab === 'fuel'}}">
+    <view class="latest-fuel" data-value="records" bindtap="setTab"><view class="latest-title">最近油耗 <text class="van-icon van-icon-arrow"></text></view><view class="latest-value"><text>{{latestLabel}}</text><text>升/百公里</text></view></view>
+    <view class="dashboard-section">
+      <view class="section-heading"><view class="record-title">统计</view><view class="muted">全部记录</view></view>
+      <view class="metrics"><view wx:for="{{fuelMetrics}}" wx:key="name"><view class="metric-label">{{item.name}}</view><view class="metric">{{item.value}}</view><view class="metric-unit">{{item.unit}}</view></view></view>
+    </view>
+    <view class="dashboard-section trend">
+      <view class="section-heading"><view class="record-title">油耗变化趋势</view><template is="chart-range" data="{{labels:rangeLabels,index:rangeIndexes.trendRange,field:'trendRange'}}"/></view>
+      <view class="muted">升/百公里</view>
+      <canvas wx:if="{{chartPoints.length && !tripReport && !formType && !showImport && !showVehiclePicker && !typesShown}}" canvas-id="vehicle-trend" id="vehicle-trend" class="trend-canvas" bindtap="tapTrend" aria-label="查看油耗数据点"></canvas><view wx:elif="{{chartPoints.length}}" class="trend-canvas"></view><view wx:else class="muted chart-empty">{{loading ? '加载中…' : '该时段暂无可计算的油耗'}}</view>
+      <view wx:if="{{trendIndex >= 0 && chartPoints[trendIndex]}}" class="chart-note"><text>{{chartPoints[trendIndex].day}}</text><text>{{chartPoints[trendIndex].label}} 升/百公里</text></view>
+    </view>
+    <view class="dashboard-section">
+      <view class="section-heading"><view class="record-title">油费月度统计</view><template is="chart-range" data="{{labels:rangeLabels,index:rangeIndexes.fuelRange,field:'fuelRange'}}"/></view>
+      <scroll-view wx:if="{{hasMonthlyFuel}}" scroll-x class="plot-scroll"><view class="monthly-bars" style="min-width:{{overview.months.length * 44}}rpx"><view wx:for="{{overview.months}}" wx:key="key" class="month-bar {{fuelDetail.key === item.key ? 'selected-bar' : ''}}" data-key="{{item.key}}" data-kind="fuel" bindtap="tapBar" aria-role="button" aria-label="{{item.key}} 油费"><view class="bar-track"><view class="fuel-bar" style="height:{{item.height}}%"></view></view><view class="month-label">{{index % 2 === 0 || index === overview.months.length - 1 ? item.label : ''}}</view></view></view></scroll-view>
+      <view wx:else class="muted chart-empty">该时段暂无油费记录</view>
+      <view wx:if="{{fuelDetail}}" class="chart-note"><text>{{fuelDetail.key}}</text><text>油费 ¥{{fuelDetail.label}}</text></view>
+    </view>
+  </block>
+  <block wx:if="{{current && tab === 'expense'}}">
+    <view class="expense-tools"><view class="settings-link" bindtap="openTypes" aria-role="button"><text class="van-icon van-icon-setting-o"></text>费用类型管理</view></view>
+    <view wx:if="{{ownedDays !== null}}" class="ownership">爱车已相伴 <text>{{ownedDays}}</text> 天</view>
+    <view class="dashboard-section"><view class="section-heading"><view class="record-title">统计</view><view class="muted">全部记录</view></view><view class="metrics expense-metrics"><view wx:for="{{expenseMetrics}}" wx:key="name"><view class="metric-label">{{item.name}}</view><view class="metric">{{item.value}}</view><view class="metric-unit">{{item.unit}}</view></view></view></view>
+    <view class="dashboard-section cost-section">
+      <view class="section-heading"><view class="record-title">支出月度统计</view><template is="chart-range" data="{{labels:rangeLabels,index:rangeIndexes.spendRange,field:'spendRange'}}"/></view>
+      <block wx:if="{{spending.total}}">
+        <view class="legend"><view wx:for="{{spending.categories}}" wx:key="name"><text style="background:{{item.color}}"></text>{{item.name}}</view></view>
+        <scroll-view scroll-x class="plot-scroll"><view class="monthly-bars" style="min-width:{{spending.bars.length * 44}}rpx"><view wx:for="{{spending.bars}}" wx:key="key" class="month-bar {{spendDetail.key === item.key ? 'selected-bar' : ''}}" data-key="{{item.key}}" data-kind="spend" bindtap="tapBar" aria-role="button" aria-label="{{item.key}} 支出"><view class="bar-track"><view class="stack" style="height:{{item.height}}%"><view wx:for="{{item.segments}}" wx:for-item="segment" wx:key="name" style="height:{{segment.height}}%;background:{{segment.color}}"></view></view></view><view class="month-label">{{index % 2 === 0 || index === spending.bars.length - 1 ? item.label : ''}}</view></view></view></scroll-view>
+        <view wx:if="{{spendDetail}}" class="chart-note chart-breakdown"><text>{{spendDetail.key}} · 支出 ¥{{spendDetail.label}}</text><view wx:for="{{spendDetail.segments}}" wx:key="name">{{item.name}} ¥{{item.label}}</view></view>
+      </block><view wx:else class="muted chart-empty">该时段暂无支出</view>
+    </view>
+    <view class="dashboard-section cost-section">
+      <view class="section-heading"><view class="record-title">费用构成统计</view><template is="chart-range" data="{{labels:rangeLabels,index:rangeIndexes.compositionRange,field:'compositionRange'}}"/></view>
+      <block wx:if="{{composition.total}}"><view id="expense-donut" class="donut" style="background:conic-gradient({{donut}})" bindtap="tapDonut"><view><text class="donut-total">{{compositionDetail ? compositionDetail.label : compositionTotal}}</text><text class="metric-unit">{{compositionDetail ? compositionDetail.name + ' · ' + compositionDetail.percent + '%' : '费用总计（元）'}}</text></view></view><view class="legend"><view wx:for="{{compositionCategories}}" wx:key="name" class="legend-choice {{compositionDetail.name === item.name ? 'legend-active' : ''}}" data-name="{{item.name}}" bindtap="tapLegend" aria-role="button"><text style="background:{{item.color}}"></text>{{item.name}} ¥{{item.label}}</view></view></block><view wx:else class="muted chart-empty">该时段暂无费用</view>
+    </view>
+    <view class="import-link" data-value="expenseRecords" bindtap="setTab">查看费用明细 <text class="van-icon van-icon-arrow"></text></view>
+  </block>
+  <view wx:if="{{current && tab === 'vehicles'}}" class="dashboard-section">
+    <view class="section-heading"><view class="record-title">我的车辆</view><button class="primary" data-type="vehicle" bindtap="open">＋ 添加</button></view>
+    <view wx:for="{{vehicles}}" wx:key="id" class="record"><image class="manage-image" mode="aspectFit" src="{{item.photoUrl || (item.vehicleType === 'CAR' ? 'https://recipe.wgxhl.space/vehicle-assets/car-v2.png' : 'https://recipe.wgxhl.space/vehicle-assets/motorcycle.png')}}" data-id="{{item.id}}" binderror="photoLoadFailed" /><view class="record-copy"><view class="record-title">{{item.name}}</view><view class="muted">{{item.model || (item.vehicleType === 'CAR' ? '燃油汽车' : '燃油摩托车')}}</view></view><view class="edit" data-type="vehicle" data-id="{{item.id}}" bindtap="open">编辑</view></view>
+    <view class="import-link" bindtap="openImport">导入小熊油耗表格</view>
+  </view>
+  <include src="./records.wxml" />
+  <view wx:if="{{showVehiclePicker}}" class="vehicle-chooser">
+    <view class="vehicle-chooser-backdrop" bindtap="closeVehiclePicker" catchtouchmove="swallow"></view>
+    <view class="vehicle-chooser-body">
+      <view class="vehicle-chooser-panel">
+        <view class="vehicle-chooser-heading" catchtouchmove="swallow">
+          <view class="vehicle-chooser-title">选择车辆</view>
+          <view class="vehicle-chooser-description">请选择当前需要显示的车辆</view>
+        </view>
+        <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="vehicle-chooser-list" style="height:{{(vehicles.length > 5 ? 5 : vehicles.length) * 100}}rpx">
+          <view wx:for="{{vehicles}}" wx:key="id" class="vehicle-chooser-option" data-id="{{item.id}}" bindtap="selectVehicle" aria-role="button">{{item.name}}</view>
+        </scroll-view>
+        <view class="vehicle-chooser-option vehicle-chooser-manage" bindtap="manageVehiclesFromPicker" catchtouchmove="swallow" aria-role="button">车辆管理</view>
+      </view>
+      <view class="vehicle-chooser-option vehicle-chooser-cancel" bindtap="closeVehiclePicker" catchtouchmove="swallow" aria-role="button">取消</view>
+    </view>
+  </view>
+  <view wx:if="{{!current || (tab !== 'records' && tab !== 'expenseRecords')}}" class="vehicle-nav">
+    <view class="nav-item {{tab === 'fuel' ? 'nav-active' : ''}}" data-value="fuel" bindtap="setTab"><text class="van-icon van-icon-fire-o"></text><text>油耗</text></view>
+    <view class="nav-item {{tab === 'expense' || tab === 'expenseRecords' ? 'nav-active' : ''}}" data-value="expense" bindtap="setTab"><text class="van-icon van-icon-balance-list-o"></text><text>费用</text></view>
+    <view class="nav-item nav-add" bindtap="chooseRecord"><view class="add-icon"><text class="van-icon van-icon-plus"></text></view><text>记一笔</text></view>
+    <view class="nav-item {{tab === 'records' ? 'nav-active' : ''}}" data-value="records" bindtap="setTab"><text class="van-icon van-icon-notes-o"></text><text>记录</text></view>
+    <view class="nav-item {{tab === 'vehicles' ? 'nav-active' : ''}}" data-value="vehicles" bindtap="setTab"><text class="van-icon van-icon-logistics"></text><text>车辆</text></view>
+  </view>
+  <view wx:if="{{showImport}}" class="mask" bindtap="closeImport"><view class="sheet" catchtap="swallow"><view class="sheet-head"><view>导入小熊油耗记录</view><view bindtap="closeImport">×</view></view><scroll-view scroll-y class="sheet-content"><view class="label">导出表格</view><view class="input" bindtap="chooseFile">{{importName || '选择微信文件'}}</view><block wx:if="{{importSheets.length}}"><view class="label">工作表</view><picker range="{{importSheets}}" bindchange="importSheetChange"><view class="input">{{importSheet || '请选择'}}</view></picker><view class="label">导入到车辆</view><picker range="{{vehicles}}" range-key="name" bindchange="importVehicleChange"><view class="input">{{importVehicleName || '请选择'}}</view></picker><button class="primary save" disabled="{{importBusy}}" bindtap="previewImport">预览记录</button></block><block wx:if="{{importData}}"><view class="label">共 {{importData.rows.length}} 条 · 重复 {{importDuplicates}} 条 · 错误 {{importErrors}} 条</view><view wx:for="{{importData.rows}}" wx:key="line" class="import-row"><text>第 {{item.line}} 行 </text><text wx:if="{{item.error}}" class="error">{{item.error}}</text><text wx:else>{{item.timeLabel}} · {{importData.type === 'fuel' ? item.record.liters + '升' : item.record.category}} · ¥{{importData.type === 'fuel' ? item.record.paidAmount : item.record.amount}}{{item.duplicate ? ' · 重复' : ''}}</text></view><button class="primary save" disabled="{{importBusy || importErrors > 0}}" bindtap="confirmImport">确认导入</button></block></scroll-view></view></view>
+  <view wx:if="{{formType}}" class="entry-mask"><view class="entry-sheet">
+    <view class="entry-head"><view class="entry-back" bindtap="close"><text class="van-icon van-icon-arrow-left"></text></view><view class="entry-title">{{formType === 'vehicle' ? (form.id ? '编辑车辆' : '添加车辆') : formType === 'fuel' ? '记加油' : '记费用'}}</view><button class="primary" loading="{{saving}}" disabled="{{saving || photoChoosing}}" bindtap="save">保存</button></view>
+    <scroll-view scroll-y class="entry-content">
+      <block wx:if="{{formType === 'vehicle'}}">
+        <view class="label">车辆名称</view><input value="{{form.name}}" data-field="name" bindinput="field" maxlength="80" />
+        <view class="label">车辆类型</view><picker range="{{['燃油汽车','燃油摩托车']}}" value="{{form.vehicleType === 'CAR' ? 0 : 1}}" bindchange="typeChange"><view class="input">{{form.vehicleType === 'CAR' ? '燃油汽车' : '燃油摩托车'}}</view></picker>
+        <view class="label">车型</view><input value="{{form.model}}" data-field="model" bindinput="field" maxlength="120" />
+        <view class="label">购车日期</view><picker mode="date" value="{{form.ownedSince}}" data-field="ownedSince" bindchange="field"><view class="input">{{form.ownedSince || '选择日期'}}</view></picker>
+        <view class="label">车辆图片</view>
+        <view class="vehicle-photo-row">
+          <image wx:if="{{photoPreview}}" class="vehicle-photo-preview" src="{{photoPreview}}" mode="aspectFit" aria-label="车辆图片预览" />
+          <button class="vehicle-photo-select" disabled="{{saving || photoChoosing}}" bindtap="selectPhoto"><text class="van-icon van-icon-photograph"></text>{{photoPreview ? '更换图片' : '选择图片'}}</button>
+          <button wx:if="{{photoPreview}}" class="vehicle-photo-remove" disabled="{{saving || photoChoosing}}" bindtap="removePhoto">移除</button>
+        </view>
+        <view wx:if="{{form.id}}" class="import-link" bindtap="deleteVehicle">删除车辆</view>
+      </block>
+      <block wx:else>
+        <view class="label">{{formType === 'fuel' ? '加油日期' : '日期'}}</view><picker mode="date" value="{{form.date}}" data-field="date" bindchange="field"><view class="input">{{form.date}}</view></picker>
+        <view class="label">时间</view><picker mode="time" value="{{form.time}}" data-field="time" bindchange="field"><view class="input">{{form.time}}</view></picker>
+        <block wx:if="{{formType === 'fuel'}}">
+          <view class="label">当前里程（公里）</view><input type="digit" value="{{form.mileage}}" data-field="mileage" bindinput="field"/><view wx:if="{{form.previousMileage}}" class="muted">上一条 {{form.previousMileage}}</view>
+          <view class="fuel-fields">
+            <view class="fuel-formula">
+              <view class="fuel-field"><view class="label">机显单价</view><view class="fuel-control"><input type="digit" aria-label="机显单价（元/升）" value="{{form.unitPrice}}" data-field="unitPrice" bindinput="field"/><text class="fuel-unit">元/升</text></view></view>
+              <text class="fuel-operator">×</text>
+              <view class="fuel-field"><view class="label">加油量</view><view class="fuel-control"><input type="digit" aria-label="加油量（升）" value="{{form.liters}}" data-field="liters" bindinput="field"/><text class="fuel-unit">升</text></view></view>
+              <text class="fuel-operator">=</text>
+              <view class="fuel-field"><view class="label">机显金额</view><view class="fuel-control"><input type="digit" aria-label="机显金额（元）" value="{{form.displayedAmount}}" data-field="displayedAmount" bindinput="field"/><text class="fuel-unit">元</text></view></view>
+            </view>
+            <view class="fuel-formula fuel-payment">
+              <view class="fuel-field"><view class="label">实付单价</view><view class="fuel-control"><input type="digit" aria-label="实付单价（元/升）" value="{{form.actualUnit}}" bindblur="updateActualUnit"/><text class="fuel-unit">元/升</text></view></view>
+              <view class="fuel-field"><view class="label">优惠金额</view><view class="fuel-control"><input type="digit" aria-label="优惠金额（元）" value="{{form.discount}}" bindblur="updateDiscount"/><text class="fuel-unit">元</text></view></view>
+              <view class="fuel-field"><view class="label">实付金额</view><view class="fuel-control"><input type="digit" aria-label="实付金额（元）" value="{{form.paidAmount}}" data-field="paidAmount" bindinput="field"/><text class="fuel-unit">元</text></view></view>
+            </view>
+          </view>
+          <view class="choice-row"><text>是否加满</text><view class="segmented"><view class="choice {{form.fullTank ? 'choice-active' : ''}}" data-field="fullTank" data-value="{{true}}" bindtap="setChoice">加满</view><view class="choice {{!form.fullTank ? 'choice-active' : ''}}" data-field="fullTank" data-value="{{false}}" bindtap="setChoice">没加满</view></view></view>
+          <view class="choice-row"><text>油量警告灯</text><view class="segmented"><view class="choice {{form.warningLight ? 'choice-active' : ''}}" data-field="warningLight" data-value="{{true}}" bindtap="setChoice">亮了</view><view class="choice {{!form.warningLight ? 'choice-active' : ''}}" data-field="warningLight" data-value="{{false}}" bindtap="setChoice">没亮</view></view></view>
+          <view class="label">加油站</view><input value="{{form.station}}" data-field="station" bindinput="field"/><view class="label">燃油标号</view><input value="{{form.fuelGrade}}" data-field="fuelGrade" bindinput="field"/>
+          <view class="choice-row"><text>上次加油</text><view class="segmented"><view class="choice {{!form.missedPrevious ? 'choice-active' : ''}}" data-field="missedPrevious" data-value="{{false}}" bindtap="setChoice">记录了</view><view class="choice {{form.missedPrevious ? 'choice-active' : ''}}" data-field="missedPrevious" data-value="{{true}}" bindtap="setChoice">没记录</view></view></view>
+        </block>
+        <block wx:else>
+          <view class="label">支出类型</view>
+          <view class="expense-type-field"><picker range="{{expenseChoices}}" range-key="label" disabled="{{saving || !expenseChoices.length}}" bindchange="chooseExpenseType"><view class="input">{{form.category || (typesLoading ? '加载中…' : '请选择支出类型')}}</view></picker><view class="settings-link" bindtap="openTypes" aria-role="button"><text class="van-icon van-icon-setting-o"></text>管理</view></view>
+          <view class="label">支出金额（元）</view><input type="digit" value="{{form.amount}}" data-field="amount" bindinput="field"/>
+        </block>
+        <view class="label">备注</view><textarea value="{{form.remark}}" data-field="remark" bindinput="field" maxlength="1000" />
+      </block>
+      <block wx:if="{{formType !== 'vehicle' && !form.id}}"><view class="switch-row">同时记入家庭账本<switch checked="{{form.includeLedger}}" color="#f97718" data-field="includeLedger" bindchange="toggle"/></view><block wx:if="{{form.includeLedger}}"><view class="label">付款人</view><picker range="{{members}}" range-key="displayName" bindchange="payerChange"><view class="input">{{form.payerName || '请选择'}}</view></picker></block></block>
+      <view wx:if="{{form.id && formType !== 'vehicle'}}" class="muted">如已记账，修改记录不会自动修改账单。</view>
+    </scroll-view>
+  </view></view>
+  <view wx:if="{{typesShown}}" class="types-screen">
+    <view class="types-head">
+      <view class="type-icon" bindtap="closeTypes" aria-role="button" aria-label="返回费用"><text class="van-icon van-icon-arrow-left"></text></view>
+      <text>{{typeDraft ? (typeDraft.key ? '编辑费用类型' : '新增费用类型') : '费用类型管理'}}</text>
+      <view wx:if="{{!typeDraft && !typesLoading && !typesError}}" class="type-tools">
+        <view class="type-icon" bindtap="toggleTypeEditing" aria-role="button" aria-label="{{typeEditing ? '完成类型编辑' : '编辑费用类型'}}"><text class="van-icon van-icon-{{typeEditing ? 'success' : 'edit'}}"></text></view>
+        <view class="type-icon type-add" bindtap="editType" aria-role="button" aria-label="新增费用类型"><text class="van-icon van-icon-plus"></text></view>
+      </view>
+    </view>
+    <scroll-view scroll-y class="types-content">
+      <view wx:if="{{typeDraft}}" class="type-form">
+        <view class="label">类型名称</view><input value="{{typeDraft.name}}" maxlength="80" bindinput="typeName" />
+        <view class="label">颜色</view><view class="palette"><view wx:for="{{typeColors}}" wx:key="*this" class="{{typeDraft.color === item ? 'color-active' : ''}}" style="background:{{item}}" data-color="{{item}}" bindtap="typeColor" aria-role="button" aria-label="颜色 {{item}}"><text wx:if="{{typeDraft.color === item}}" class="van-icon van-icon-success"></text></view></view>
+        <button class="primary save" disabled="{{typeSaving || !typeDraft.name}}" bindtap="saveType">保存</button>
+      </view>
+      <block wx:else>
+        <view class="type-subtitle">支出类型</view>
+        <view wx:if="{{typesLoading}}" class="type-state">加载中…</view>
+        <view wx:elif="{{typesError}}" class="type-state" bindtap="loadTypes">{{typesError}} · 重试</view>
+        <view wx:else class="type-list">
+          <view wx:for="{{expenseTypes}}" wx:key="key" class="type-item {{typeEditing ? 'type-row-managing' : ''}}">
+            <text class="type-dot" style="color:{{item.color}}"></text>
+            <view class="type-label">{{item.name}}<view wx:if="{{!item.enabled}}" class="muted">已停用</view></view>
+            <block wx:if="{{typeEditing}}">
+              <view class="type-icon" data-key="{{item.key}}" bindtap="editType" aria-role="button" aria-label="编辑 {{item.name}}"><text class="van-icon van-icon-edit"></text></view>
+              <view class="type-action" data-key="{{item.key}}" bindtap="toggleType" aria-role="button">{{item.enabled ? '停用' : '启用'}}</view>
+            </block>
+          </view>
+        </view>
+      </block>
+      <view wx:if="{{typeError}}" class="error type-state">{{typeError}}</view>
+    </scroll-view>
+  </view>
+  <include src="./trip-report.wxml" />
+</view>

@@ -1,0 +1,84 @@
+.records-theme { background: linear-gradient(180deg,#e6f7eb,#f2fbef 1600rpx); padding-bottom: calc(48rpx + env(safe-area-inset-bottom)); }
+.vehicle-records { min-width: 0; font-variant-numeric: tabular-nums; }
+.records-head { display: grid; grid-template-columns: 144rpx minmax(0,1fr) 144rpx; align-items: center; gap: 10rpx; min-height: 108rpx; }
+.records-head.with-search { grid-template-columns: 66rpx minmax(0,1fr) 66rpx; gap: 12rpx; }
+.head-actions { display: flex; justify-content: flex-end; gap: 12rpx; }
+.list-icon,.record-ops > view,.clear-filters,.year-arrow { display: grid; place-items: center; color: #162c29; }
+.list-icon { width: 64rpx; height: 65rpx; font-size: 34rpx; }
+.list-icon.is-primary { width: 62rpx; height: 62rpx; border-radius: 12rpx; background: #087e49; color: #fff; }
+.list-disabled { opacity: .28; }
+.list-vehicle { min-width: 0; display: flex; justify-content: center; align-items: center; gap: 8rpx; padding: 8rpx 0; font-size: 32rpx; font-weight: 700; overflow-wrap: anywhere; }
+.list-vehicle .van-icon { flex: none; font-size: 19rpx; }
+.record-search { display: flex; align-items: center; gap: 12rpx; min-height: 70rpx; padding: 0 18rpx; border-radius: 14rpx; background: #f6faf6; color: #506761; }
+.record-search input { flex: 1; min-width: 0; height: 68rpx; color: #162c29; font-size: 26rpx; }
+.year-summary { background: #e0edf1; border: 1px solid #d1e1e7; border-radius: 16rpx; padding: 11rpx 16rpx 22rpx; }
+.year-picker { display: inline-flex; gap: 8rpx; align-items: center; min-height: 67rpx; font-size: 31rpx; font-weight: 700; }
+.year-top,.year-actions { display: flex; align-items: center; }
+.year-top { justify-content: space-between; gap: 10rpx; }
+.year-actions { gap: 4rpx; }
+.year-picker .van-icon,.record-type-picker .van-icon,.expense-dates .van-icon { font-size: 18rpx; }
+.year-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); align-items: center; margin-top: 9rpx; }
+.year-arrow { width: 68rpx; height: 66rpx; font-size: 27rpx; border-radius: 10rpx; background: #edf5f7; }
+.year-metric { display: grid; justify-items: center; gap: 6rpx; padding: 0 5rpx; min-width: 0; text-align: center; }
+.year-metric + .year-metric { border-left: 1px solid #c7d6d8; }
+.year-metric text { font-size: 20rpx; color: #506761; overflow-wrap: anywhere; }
+.year-metric .year-value { font-size: 36rpx; line-height: 1.15; font-weight: 700; color: #162c29; }
+.year-metric:first-child .year-value { color: #087e49; }
+.fuel-timeline { padding-left: 36rpx; margin: 22rpx 0 0 14rpx; border-left: 4rpx solid #b5d9cb; }
+.fuel-event { position: relative; margin-bottom: 20rpx; }
+.timeline-symbol { position: absolute; left: -58rpx; top: 25rpx; width: 40rpx; height: 40rpx; line-height: 40rpx; text-align: center; border-radius: 50%; background: #e3f0f6; color: #22648b; font-size: 24rpx; }
+.fuel-expanded .timeline-symbol { background: #d4ebf4; color: #155b81; }
+.fuel-card,.expense-card { background: #f9fdf9; border: 1px solid #e2ece5; border-radius: 15rpx; min-width: 0; overflow: hidden; }
+.fuel-line,.expense-line,.month-heading { display: grid; box-sizing: border-box; width: 100%; align-items: center; gap: 11rpx; }
+.fuel-line { grid-template-columns: 91rpx minmax(0,1fr) minmax(0,.9fr) 22rpx; min-height: 92rpx; padding: 12rpx 18rpx; }
+.fuel-expanded .fuel-card { border-color: #c6e0d1; }
+.fuel-expanded .fuel-line { background: #f0faf2; }
+.record-day { border-left: 6rpx solid #1b9764; padding-left: 10rpx; line-height: 1.2; font-size: 29rpx; font-weight: 700; white-space: nowrap; }
+.record-reading,.record-mileage { min-width: 0; text-align: right; overflow-wrap: anywhere; font-size: 31rpx; font-weight: 700; }
+.row-unit { font-size: 21rpx; margin-left: 4rpx; color: #506761; font-weight: 400; white-space: nowrap; }
+.list-chevron { font-size: 20rpx; }
+.above-average { color: #b63539; }
+.record-expansion { padding: 17rpx 20rpx 8rpx; border-top: 1px solid #e4eee7; background: #fff; font-size: 24rpx; }
+.fuel-values,.trip-interval { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: start; }
+.fuel-values > view,.trip-interval > view { display: grid; gap: 6rpx; min-width: 0; color: #506761; font-size: 21rpx; overflow-wrap: anywhere; }
+.fuel-values > view:nth-child(2),.trip-interval > view:nth-child(2) { text-align: center; }
+.fuel-values > view:last-child,.trip-interval > view:nth-child(3) { text-align: right; }
+.measure-label { line-height: 1.2; }
+.fuel-values .measure-value { color: #162c29; font-weight: 700; font-size: 30rpx; }
+.fuel-flags { display: flex; flex-wrap: wrap; gap: 8rpx 11rpx; margin-top: 14rpx; overflow-wrap: anywhere; }
+.fuel-flags text { padding: 4rpx 10rpx; border-radius: 8rpx; background: #edf1f4; color: #3f5968; font-size: 21rpx; line-height: 1.35; }
+.fuel-flags .flag-full { color: #126747; background: #e5f3ea; }
+.fuel-flags .flag-warning { color: #a23f26; background: #fbeee7; }
+.row-note { margin-top: 11rpx; color: #506761; overflow-wrap: anywhere; white-space: pre-line; }
+.detail-foot { display: flex; justify-content: space-between; align-items: center; gap: 10rpx; color: #506761; font-size: 22rpx; }
+.record-expansion .detail-foot { margin-top: 6rpx; }
+.record-ops { display: flex; gap: 5rpx; flex: none; }
+.record-ops > view { width: 76rpx; height: 76rpx; color: #087e49; font-size: 33rpx; }
+.record-ops > view:last-child { color: #b63539; }
+.trip-interval { grid-template-columns: repeat(3,minmax(0,1fr)) 26rpx; gap: 9rpx; align-items: center; margin-top: 10rpx; min-height: 84rpx; box-sizing: border-box; padding: 10rpx 14rpx 10rpx 18rpx; background: #e7f4ef; border: 1px solid #d0e7df; border-radius: 13rpx; color: #235249; }
+.trip-interval-pressed { background: #dbeee6; }
+.trip-interval .measure-value { color: #235249; font-size: 27rpx; font-weight: 700; }
+.expense-record-filters { display: grid; gap: 15rpx; margin-bottom: 19rpx; }
+.expense-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 8rpx 11rpx; font-size: 22rpx; }
+.expense-dates picker { padding: 8rpx 0; }
+.expense-dates .list-vehicle { max-width: 100%; font-size: 24rpx; margin-left: auto; }
+.filter-total { display: flex; align-items: center; gap: 9rpx; }
+.filter-total picker { max-width: 44%; min-width: 0; }
+.record-type-picker { font-size: 24rpx; font-weight: 700; overflow-wrap: anywhere; padding: 7rpx 0; }
+.clear-filters { color: #126747; width: 54rpx; min-width: 54rpx; height: 53rpx; }
+.expense-total { min-width: 0; margin-left: auto; font-size: 27rpx; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.expense-month { margin-bottom: 31rpx; }
+.month-heading { grid-template-columns: minmax(0,1fr) minmax(0,1fr); min-height: 64rpx; font-size: 24rpx; font-weight: 700; }
+.month-heading > text:last-child { color: #506761; text-align: right; font-weight: 400; overflow-wrap: anywhere; }
+.month-entries { display: grid; gap: 7rpx; }
+.expense-line { grid-template-columns: 36rpx minmax(0,1fr) minmax(100rpx,auto); min-height: 98rpx; padding: 14rpx 19rpx; }
+.expense-dot { width: 31rpx; height: 31rpx; border: 7rpx solid currentColor; border-radius: 50%; box-sizing: border-box; }
+.expense-copy { display: grid; gap: 6rpx; min-width: 0; overflow-wrap: anywhere; font-size: 25rpx; font-weight: 700; }
+.expense-copy > text:nth-child(2) { color: #506761; font-size: 22rpx; font-weight: 400; white-space: pre-line; }
+.expense-amount { max-width: 216rpx; text-align: right; overflow-wrap: anywhere; font-size: 31rpx; font-weight: 700; }
+.expense-detail { padding-left: 19rpx; padding-right: 14rpx; border-top: 1px solid #e6efe7; }
+.no-records { padding: 50rpx 0; text-align: center; color: #506761; font-size: 23rpx; }
+.van-icon-arrow-down::before { content: "\e65e"; }
+.van-icon-arrow-up::before { content: "\e65f"; }
+.van-icon-replay::before { content: "\e70d"; }
+.van-icon-search::before { content: "\e710"; }

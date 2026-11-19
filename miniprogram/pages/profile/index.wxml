@@ -14,6 +14,7 @@
 
   <view wx:if="{{!isGuest}}" class="section surface"><view class="section-title">生活工具</view>
     <view class="tool-entry" role="button" bindtap="openLedger"><view class="tool-icon"><text class="van-icon van-icon-balance-list-o"></text></view><view class="tool-copy"><view class="tool-title">家庭记账</view><view class="tool-subtitle">记录家庭收入与支出</view></view><text class="van-icon van-icon-arrow"></text></view>
+    <view class="tool-entry" role="button" bindtap="openVehicle"><view class="tool-icon"><text class="van-icon van-icon-logistics"></text></view><view class="tool-copy"><view class="tool-title">车辆管理</view><view class="tool-subtitle">记录加油和用车费用</view></view><text class="van-icon van-icon-arrow"></text></view>
     <view class="tool-entry" role="button" bindtap="openCommute"><view class="tool-icon"><text class="van-icon van-icon-logistics"></text></view><view class="tool-copy"><view class="tool-title">通勤记录</view><view class="tool-subtitle">记录每日上班通勤耗时</view></view><text class="van-icon van-icon-arrow"></text></view>
     <view class="tool-entry" role="button" bindtap="openExpense"><view class="tool-icon"><text class="van-icon van-icon-balance-list-o"></text></view><view class="tool-copy"><view class="tool-title">专项开支</view><view class="tool-subtitle">婚礼、装修、搬家这类阶段性采购记录</view></view><text class="van-icon van-icon-arrow"></text></view>
   </view>

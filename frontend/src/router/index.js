@@ -92,6 +92,7 @@ const routes = [
         component: () => import('../views/SpecialExpenseView.vue'),
       },
       { path: '/ledger', name: 'Ledger', component: () => import('../views/LedgerView.vue') },
+      { path: '/vehicles', name: 'Vehicles', component: () => import('../views/VehicleView.vue'), meta: { bareShell: true } },
       { path: '/commute', name: 'Commute', component: () => import('../views/CommuteView.vue') },
       {
         path: '/recipe/:id',

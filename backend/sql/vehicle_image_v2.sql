@@ -1,0 +1,1 @@
+ALTER TABLE vehicle ADD COLUMN image_path VARCHAR(128) DEFAULT NULL AFTER owned_since;

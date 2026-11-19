@@ -21,6 +21,8 @@ const expense = computed(() => Number(summary.value.totals.find(x => x.entry_typ
 const money = (value) => Number(value || 0).toFixed(2)
 const name = (id) => members.value.find(m => m.id === id)?.nickname || members.value.find(m => m.id === id)?.username || '已离开成员'
 const canManage = (item) => item.createdBy === user.userId || user.canManageMembers
+const sourceRoute = item => item.sourceType === 'TODO' ? `/todo/${item.sourceId}` : item.sourceType?.startsWith('VEHICLE_') ? '/vehicles' : '/expenses'
+const sourceLabel = item => item.sourceType === 'TODO' ? '待办' : item.sourceType?.startsWith('VEHICLE_') ? '车辆' : '专项'
 async function load(reset = true) {
   if (busy.value && !reset) return
   const version = ++requestVersion
@@ -47,7 +49,7 @@ async function save() {
   await load()
 }
 async function remove(item) {
-  try { await showConfirmDialog({ title:'删除账单', message:item.sourceType ? `确认删除「${item.description}」的账单吗？关联的待办或专项开支会保留。` : `确认删除「${item.description}」吗？` }); await deleteLedger(item.id); showSuccessToast('已删除'); await load() }
+  try { await showConfirmDialog({ title:'删除账单', message:item.sourceType ? `确认删除「${item.description}」的账单吗？关联的原记录会保留。` : `确认删除「${item.description}」吗？` }); await deleteLedger(item.id); showSuccessToast('已删除'); await load() }
   catch (e) { if (e?.message) showFailToast(e.message) }
 }
 watch(month, () => load())
@@ -63,7 +65,7 @@ onMounted(async () => { try { members.value = (await listMembers()).data || [] }
     <div class="heading"><h2>{{ sourceTodoId ? '待办账单' : '账单明细' }}</h2><span>{{ total }} 笔</span></div>
     <div class="filters"><select v-model="filters.entryType" aria-label="收支类型" @change="load()"><option value="">全部收支</option><option value="EXPENSE">支出</option><option value="INCOME">收入</option></select><select v-model="filters.category" aria-label="分类" @change="load()"><option value="">全部分类</option><option v-for="category in categories" :key="category">{{ category }}</option></select><select v-model="filters.payerId" aria-label="成员" @change="load()"><option value="">全部成员</option><option v-for="member in members" :key="member.id" :value="member.id">{{ member.nickname || member.username }}</option></select></div>
     <div v-if="error" class="error" @click="load()">{{ error }}，点击重试</div><p v-else-if="!busy && !items.length" class="muted">{{ sourceTodoId ? '暂无关联账单' : '本月暂无账单' }}</p>
-    <article v-for="item in items" :key="item.id" class="entry"><div><strong>{{ item.description }}</strong><p>{{ item.occurredOn }} · {{ item.category }} · {{ name(item.payerId) }}<span v-if="item.sourceCycleLabel"> · {{ item.sourceCycleLabel }}</span></p><p v-if="item.remark">{{ item.remark }}</p></div><div class="entry-right"><strong>{{ item.entryType === 'INCOME' ? '+' : '-' }}¥{{ money(item.amount) }}</strong><div v-if="canManage(item)"><button v-if="!item.relatedExpenseId" @click="open(item)">编辑</button><button @click="remove(item)">删除</button></div><button v-if="item.sourceType" @click="router.push(item.sourceType === 'TODO' ? `/todo/${item.sourceId}` : '/expenses')">查看{{ item.sourceType === 'TODO' ? '待办' : '专项' }}</button></div></article>
+    <article v-for="item in items" :key="item.id" class="entry"><div><strong>{{ item.description }}</strong><p>{{ item.occurredOn }} · {{ item.category }} · {{ name(item.payerId) }}<span v-if="item.sourceCycleLabel"> · {{ item.sourceCycleLabel }}</span></p><p v-if="item.remark">{{ item.remark }}</p></div><div class="entry-right"><strong>{{ item.entryType === 'INCOME' ? '+' : '-' }}¥{{ money(item.amount) }}</strong><div v-if="canManage(item)"><button v-if="!item.relatedExpenseId" @click="open(item)">编辑</button><button @click="remove(item)">删除</button></div><button v-if="item.sourceType" @click="router.push(sourceRoute(item))">查看{{ sourceLabel(item) }}</button></div></article>
     <button v-if="items.length < total" class="more" :disabled="busy" @click="load(false)">加载更多</button>
     <van-popup v-model:show="editing" class="ledger-popup" position="bottom" round><form class="sheet" @submit.prevent="save"><div class="heading"><h2>{{ form.id ? '编辑账单' : '记一笔' }}</h2><button type="button" @click="editing = false" aria-label="关闭"><van-icon name="cross" /></button></div><div class="types"><button type="button" :class="{active:form.entryType==='EXPENSE'}" @click="form.entryType='EXPENSE'">支出</button><button v-if="!form.sourceType" type="button" :class="{active:form.entryType==='INCOME'}" @click="form.entryType='INCOME'">收入</button></div><label>金额<input v-model="form.amount" type="number" min="0.01" step="0.01" required /></label><label>内容<input v-model="form.description" maxlength="200" required /></label><label>分类<select v-model="form.category"><option v-for="category in categories" :key="category">{{ category }}</option></select></label><label>日期<input v-model="form.occurredOn" type="date" required /></label><label>付款人<select v-model="form.payerId"><option v-for="member in members" :key="member.id" :value="member.id">{{ member.nickname || member.username }}</option></select></label><label>备注<input v-model="form.remark" maxlength="500" /></label><button class="add save" type="submit" :disabled="busy">保存</button></form></van-popup>
   </section>

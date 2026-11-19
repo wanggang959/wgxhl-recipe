@@ -9,6 +9,7 @@ import com.wgxhl.recipe.todo.dto.TodoSummaryDTO;
 import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.todo.service.TodoService;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.ledger.dto.CompleteWithLedgerRequest;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -60,6 +61,11 @@ public class TodoController {
     @PostMapping("/complete")
     public ApiResponse<Void> complete(@RequestBody IdDTO dto, HttpServletRequest request) {
         return todoService.complete(dto.getId(), currentUser(request));
+    }
+
+    @PostMapping("/complete-with-ledger")
+    public ApiResponse<Void> completeWithLedger(@RequestBody CompleteWithLedgerRequest dto, HttpServletRequest request) {
+        return todoService.completeWithLedger(dto, currentUser(request));
     }
 
     @PostMapping("/delete")

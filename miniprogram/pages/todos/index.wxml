@@ -38,3 +38,4 @@
   </block>
 </view>
 <notice-panel visible="{{noticeOpen}}" bind:close="closeNotifications" bind:change="refreshUnread" />
+<ledger-completion todo="{{ledgerTodo}}" bind:close="closeLedger" bind:done="ledgerDone" />

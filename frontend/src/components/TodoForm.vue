@@ -74,6 +74,7 @@ const form = reactive({
   noticeMinutes: [0],
   relatedType: '',
   relatedId: '',
+  ledgerSetting: { enabled: false, category: '订阅', description: '', estimatedAmount: '' },
 })
 
 const selectedNotice = computed({
@@ -110,6 +111,7 @@ watch(
       noticeMinutes: value.noticeMinutes?.length ? value.noticeMinutes : defaultNotice(value.category),
       relatedType: value.relatedType || '',
       relatedId: value.relatedId || '',
+      ledgerSetting: { enabled: Boolean(value.ledgerSetting?.enabled), category: value.ledgerSetting?.category || '订阅', description: value.ledgerSetting?.description || '', estimatedAmount: value.ledgerSetting?.estimatedAmount ?? '' },
     })
   },
   { immediate: true, deep: true },
@@ -198,6 +200,7 @@ function submit() {
     lunarDueLeap: form.category === 'BIRTHDAY' && form.dueCalendar === 'LUNAR' ? Boolean(form.lunarDueLeap) : false,
     birthdayYear: buildBirthdayYear(),
     dueTime: buildBirthdayDueTime(),
+    ledgerSetting: { ...form.ledgerSetting, estimatedAmount: form.ledgerSetting.estimatedAmount === '' ? null : Number(form.ledgerSetting.estimatedAmount) },
   })
 }
 </script>
@@ -280,6 +283,12 @@ function submit() {
       <span>每隔多少天</span>
       <input v-model.number="form.repeatIntervalDays" type="number" min="1" max="3650" step="1" required placeholder="输入 1 至 3650 天" />
     </label>
+    <div class="switch-row"><label><input v-model="form.ledgerSetting.enabled" type="checkbox" />纳入记账</label></div>
+    <template v-if="form.ledgerSetting.enabled">
+      <label><span>账单分类</span><select v-model="form.ledgerSetting.category"><option v-for="item in ['餐饮','买菜','居家','交通','购物','订阅','缴费','医疗','娱乐','其他']" :key="item" :value="item">{{ item }}</option></select></label>
+      <label><span>账单内容</span><input v-model.trim="form.ledgerSetting.description" maxlength="200" required placeholder="例如：服务器续费" /></label>
+      <label><span>预估金额</span><input v-model="form.ledgerSetting.estimatedAmount" type="number" min="0.01" max="9999999999.99" step="0.01" placeholder="选填" /></label>
+    </template>
     <div class="switch-row">
       <label><input v-model="form.notifySite" type="checkbox" />站内通知</label>
       <label><input v-model="form.notifyEmail" type="checkbox" />邮箱通知</label>

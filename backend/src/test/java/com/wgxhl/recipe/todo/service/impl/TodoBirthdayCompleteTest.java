@@ -64,7 +64,8 @@ class TodoBirthdayCompleteTest {
                 userPushSubscriptionService,
                 householdMemberService,
                 mailDeliveryService,
-                deliveryGuard
+                deliveryGuard,
+                org.mockito.Mockito.mock(com.wgxhl.recipe.ledger.service.LedgerService.class)
         );
         ReflectionTestUtils.setField(todoService, "baseMapper", todoMapper);
     }

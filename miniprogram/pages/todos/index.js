@@ -14,7 +14,7 @@ async function allPages(path, query = {}) {
   return records
 }
 Page({
-  data:{ loading:false, loadingMore:false, hasSnapshot:false, error:'', items:[], summary:null, page:0, total:0, plans:[], planPage:0, planTotal:0, planError:'', planLoading:false, groups:[], category:'', range:'all', todayCount:0, dueSoonCount:0, unread:0, noticeOpen:false,
+  data:{ loading:false, loadingMore:false, hasSnapshot:false, error:'', items:[], summary:null, page:0, total:0, plans:[], planPage:0, planTotal:0, planError:'', planLoading:false, groups:[], category:'', range:'all', todayCount:0, dueSoonCount:0, unread:0, noticeOpen:false, ledgerTodo:null,
     ranges:[{value:'all',label:'全部'},{value:'today',label:'今日'},{value:'three',label:'近三天'},{value:'week',label:'近一周'}],
     categories:[{value:'',label:'全部'},{value:'COOK',label:'做饭'},{value:'GROCERY',label:'采购'},{value:'LIFE',label:'生活'},{value:'BIRTHDAY',label:'生日'},{value:'SERVER',label:'服务器'},{value:'DOMAIN',label:'域名'},{value:'PAYMENT',label:'缴费'},{value:'OTHER',label:'其他'}] },
   updateGroups() { this.setData(groupItems(this.data.items, this.data.plans, this.data.category, this.data.range)) },
@@ -103,6 +103,7 @@ Page({
     const item=this.data.items.find(entry=>entry.id===e.currentTarget.dataset.id)
     if (!item || this.data.actionBusy) return
     if (item.canComplete === false) { wx.showToast({title:item.completeDisabledReason || '暂时不能完成',icon:'none'}); return }
+    if (item.ledgerSetting?.enabled) { this.setData({ledgerTodo:item}); this.getTabBar()?.setData({hidden:true}); return }
     const repeat=item.category === 'BIRTHDAY' || (item.repeatType && item.repeatType !== 'NONE')
     wx.showModal({title:repeat ? '进入下一周期' : '填写下个周期',content:repeat ? `确认完成「${item.title}」并进入下一周期吗？` : `确认处理「${item.title}」并填写下一次到期时间吗？`,confirmText:'确认',success:async ({confirm})=>{
       if (!confirm) return
@@ -113,10 +114,12 @@ Page({
       finally { this.setData({actionBusy:false}) }
     }})
   },
+  closeLedger(){this.setData({ledgerTodo:null});this.getTabBar()?.setData({hidden:false})},
+  ledgerDone(){this.closeLedger();this.refreshAll()},
   remove(e) {
     const item=this.data.items.find(entry=>entry.id===e.currentTarget.dataset.id)
     if (!item || this.data.actionBusy) return
-    wx.showModal({title:'删除待办',content:`确认删除「${item.title}」吗？`,confirmText:'删除',confirmColor:'#d64335',success:async ({confirm})=>{
+    wx.showModal({title:'删除待办',content:item.ledgerSetting?`确认删除「${item.title}」吗？已产生的家庭账单会保留。`:`确认删除「${item.title}」吗？`,confirmText:'删除',confirmColor:'#d64335',success:async ({confirm})=>{
       if (!confirm) return
       this.setData({actionBusy:true})
       try { await api.post('/todo/delete',{id:item.id}); wx.showToast({title:'已删除'}); await this.load(true) }

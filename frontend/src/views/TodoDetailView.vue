@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { closeToast, showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { completeTodo, deleteTodo, getTodoDetail } from '../api/todo'
 import TodoDetail from '../components/TodoDetail.vue'
+import TodoLedgerComplete from '../components/TodoLedgerComplete.vue'
 import { useUserStore } from '../stores/user'
 import { markTodoRefreshRequired } from '../utils/todoRefresh'
 import { clearTodoDetail, readTodoDetail, saveTodoDetail } from '../utils/todoDetailCache'
@@ -12,6 +13,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
+const ledgerTodo = ref(null)
 const todo = ref(readTodoDetail(userStore.userId, userStore.user?.householdId, route.params.id))
 let requestVersion = 0
 
@@ -61,6 +63,7 @@ async function finish(item) {
       showFailToast(item.completeDisabledReason || '暂时不能完成')
       return
     }
+    if (item.ledgerSetting?.enabled) { ledgerTodo.value = item; return }
     if (isRepeatingTodo(item)) {
       await showConfirmDialog({
         title: item.category === 'BIRTHDAY' ? '完成生日提醒' : '进入下一周期',
@@ -98,7 +101,7 @@ async function remove() {
   try {
     await showConfirmDialog({
       title: '删除待办',
-      message: `确认删除「${todo.value?.title || ''}」吗？`,
+      message: todo.value?.ledgerSetting ? `确认删除「${todo.value.title}」吗？已产生的家庭账单会保留。` : `确认删除「${todo.value?.title || ''}」吗？`,
     })
     await deleteTodo(route.params.id)
     clearTodoDetail()
@@ -123,9 +126,12 @@ async function remove() {
     @complete-blocked="completeBlocked"
     @delete="remove"
   />
+  <button v-if="todo?.ledgerSetting" class="ledger-link" @click="router.push({ path:'/ledger', query:{ todoId:todo.id } })">查看关联账单</button>
+  <TodoLedgerComplete :todo="ledgerTodo" @close="ledgerTodo = null" @done="markTodoRefreshRequired(); loadTodo()" />
 </template>
 
 <style scoped>
+.ledger-link { margin-top: 12px; padding: 9px 14px; border: 1px solid #f3cda8; border-radius: 6px; background: #fff9f2; color: #d86717; }
 .loading {
   margin-top: 40px;
 }

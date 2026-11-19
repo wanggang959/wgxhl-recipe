@@ -76,7 +76,8 @@ class TodoServiceImplNotifyTest {
                 userPushSubscriptionService,
                 householdMemberService,
                 mailDeliveryService,
-                deliveryGuard
+                deliveryGuard,
+                org.mockito.Mockito.mock(com.wgxhl.recipe.ledger.service.LedgerService.class)
         );
         org.mockito.Mockito.lenient().when(deliveryGuard.claim(any(), any(), any(), any(), any())).thenReturn(true);
         ReflectionTestUtils.setField(todoService, "baseMapper", todoMapper);

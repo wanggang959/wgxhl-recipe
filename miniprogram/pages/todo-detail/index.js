@@ -30,6 +30,7 @@ Page({
     finally { if(version===this.requestVersion)this.setData({loading:false}) }
   },
   retry() { this.load() },
-  edit() { if (this.data.canManage) wx.navigateTo({url:`/pages/todo-form/index?id=${encodeURIComponent(this.id)}`}) }
+  edit() { if (this.data.canManage) wx.navigateTo({url:`/pages/todo-form/index?id=${encodeURIComponent(this.id)}`}) },
+  openLedger() { wx.navigateTo({url:`/pages/ledger/index?todoId=${encodeURIComponent(this.id)}`}) }
 })
 

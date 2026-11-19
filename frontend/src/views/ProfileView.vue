@@ -980,6 +980,10 @@ onMounted(() => {
 
     <section v-if="userStore.isLogin" class="form-card">
       <h2>生活工具</h2>
+      <button v-if="!userStore.isGuest" type="button" class="tool-entry" @click="router.push('/ledger')">
+        <span class="tool-entry-icon"><van-icon name="balance-list-o" /></span>
+        <span><strong>家庭记账</strong><small>记录家庭收入与支出</small></span><van-icon name="arrow" />
+      </button>
       <button v-if="userStore.userId !== 'guest'" type="button" class="tool-entry" @click="router.push('/commute')">
         <span class="tool-entry-icon"><van-icon name="logistics" /></span>
         <span><strong>通勤记录</strong><small>记录每日上班通勤耗时</small></span><van-icon name="arrow" />

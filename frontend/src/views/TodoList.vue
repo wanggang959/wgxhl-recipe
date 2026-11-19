@@ -8,6 +8,7 @@ import { pageUser } from '../api/user'
 import { deleteWantedRecipe, pageWantedRecipe } from '../api/want'
 import EmptyState from '../components/EmptyState.vue'
 import TodoCard from '../components/TodoCard.vue'
+import TodoLedgerComplete from '../components/TodoLedgerComplete.vue'
 import { useUserStore } from '../stores/user'
 import { getRecipeImage } from '../utils/imageUrl'
 import { consumeTodoRefreshRequired } from '../utils/todoRefresh'
@@ -30,6 +31,7 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const isGuest = computed(() => userStore.isGuest)
+const ledgerTodo = ref(null)
 
 /** 与后端一致：创建人、负责人可操作，家庭管理员可代管 */
 function canManageTodo(todo) {
@@ -363,6 +365,7 @@ async function finish(item) {
       showFailToast(item.completeDisabledReason || '暂时不能完成')
       return
     }
+    if (item.ledgerSetting?.enabled) { ledgerTodo.value = item; return }
     if (isRepeatingTodo(item)) {
       await showConfirmDialog({
         title: item.category === 'BIRTHDAY' ? '完成生日提醒' : '进入下一周期',
@@ -399,7 +402,7 @@ async function remove(item) {
   try {
     await showConfirmDialog({
       title: '删除待办',
-      message: `确认删除「${item.title}」吗？`,
+      message: item.ledgerSetting ? `确认删除「${item.title}」吗？已产生的家庭账单会保留。` : `确认删除「${item.title}」吗？`,
     })
     await deleteTodo(item.id)
     list.value = list.value.filter((entry) => entry.id !== item.id)
@@ -508,6 +511,7 @@ async function remove(item) {
       </section>
     </div>
   </section>
+  <TodoLedgerComplete :todo="ledgerTodo" @close="ledgerTodo = null" @done="loadTodo({ showLoading: false })" />
 </template>
 
 <style scoped>

@@ -1,7 +1,7 @@
 <view wx:if="{{visible}}" class="notice-layer" bindtap="close">
   <view class="notice-panel" catchtap="swallow">
     <view class="notice-header"><view><view class="eyebrow">家庭通知</view><view class="notice-heading">提醒中心</view><view class="notice-subtitle">{{unread ? unread + ' 条未读' : '暂无未读'}}</view></view><view class="close-button" role="button" aria-label="关闭通知" bindtap="close">×</view></view>
-    <view class="toolbar"><text class="count">{{total}} 条消息</text><view wx:if="{{!readonly}}" class="mark-all {{!unread || busy ? 'disabled' : ''}}" role="button" bindtap="markAll">全部已读</view></view>
+    <view class="toolbar"><text class="count">{{total}} 条消息</text><view wx:if="{{!readonly}}" class="toolbar-actions"><view class="delete-read {{total <= unread || busy || loading ? 'disabled' : ''}}" role="button" bindtap="deleteRead"><text class="van-icon van-icon-delete-o"></text> 删除已读</view><view class="mark-all {{!unread || busy ? 'disabled' : ''}}" role="button" bindtap="markAll">全部已读</view></view></view>
     <scroll-view class="notice-scroll" scroll-y enhanced show-scrollbar="{{false}}" bindscrolltolower="loadMore">
       <view wx:if="{{error}}" class="empty">{{error}}<view class="retry" bindtap="retry">重新加载</view></view>
       <view wx:elif="{{loading && !items.length}}" class="empty">正在加载</view>

@@ -64,6 +64,9 @@ const projectForm = reactive({
 })
 
 const itemForm = reactive({
+  syncToLedger: false,
+  ledgerLinked: false,
+  ledgerDeleted: false,
   id: '',
   projectId: '',
   itemName: '',
@@ -341,6 +344,9 @@ async function toggleArchiveProject(project) {
 }
 
 function resetItemForm() {
+  itemForm.syncToLedger = false
+  itemForm.ledgerLinked = false
+  itemForm.ledgerDeleted = false
   itemForm.id = ''
   itemForm.projectId = selectedProjectId.value
   itemForm.itemName = ''
@@ -363,6 +369,9 @@ function openItemForm(item = null) {
   if (!canWrite.value || !selectedProjectId.value) return
   originalItemPlannedTime.value = item?.plannedTime || ''
   if (item) {
+    itemForm.syncToLedger = false
+    itemForm.ledgerLinked = Boolean(item.ledgerLinked)
+    itemForm.ledgerDeleted = Boolean(item.ledgerDeleted)
     itemForm.id = item.id
     itemForm.projectId = item.projectId
     itemForm.itemName = item.itemName || ''
@@ -452,7 +461,7 @@ async function removeItem(item) {
   try {
     await showConfirmDialog({
       title: '删除开支项',
-      message: `确认删除「${item.itemName}」吗？`,
+      message: item.ledgerLinked && !item.ledgerDeleted ? `确认删除「${item.itemName}」吗？关联的家庭账单会保留。` : `确认删除「${item.itemName}」吗？`,
     })
     await deleteExpenseItem(item.id)
     showSuccessToast('已删除')
@@ -764,6 +773,8 @@ function dateText(value) {
           <van-field v-model="itemForm.budgetAmount" label="预算" type="number" />
           <van-field v-model="itemForm.actualAmount" label="实际" type="number" />
         </div>
+        <label v-if="!itemForm.ledgerLinked || itemForm.ledgerDeleted" class="ledger-toggle"><input v-model="itemForm.syncToLedger" type="checkbox" /> {{ itemForm.ledgerDeleted ? '恢复记入家庭账本' : '同时记入家庭账本' }}</label>
+        <div v-else class="ledger-toggle">已记入家庭账本</div>
         <van-field v-model="itemForm.quantity" label="数量" placeholder="例如：100份、1套" />
         <div class="sheet-grid">
           <label>

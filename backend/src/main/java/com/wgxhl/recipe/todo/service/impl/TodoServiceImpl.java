@@ -28,6 +28,9 @@ import com.wgxhl.recipe.todo.service.TodoService;
 import com.wgxhl.recipe.todo.task.ReminderDeliveryGuard;
 import com.wgxhl.recipe.todo.task.ReminderWindow;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.ledger.service.LedgerService;
+import com.wgxhl.recipe.ledger.entity.LedgerEntry;
+import com.wgxhl.recipe.ledger.dto.CompleteWithLedgerRequest;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
 import com.wgxhl.recipe.user.service.impl.AppUserServiceImpl;
 import com.wgxhl.recipe.mail.MailDeliveryService;
@@ -85,6 +88,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
     private final HouseholdMemberService householdMemberService;
     private final MailDeliveryService mailDeliveryService;
     private final ReminderDeliveryGuard deliveryGuard;
+    private final LedgerService ledgerService;
 
     public TodoServiceImpl(TodoNoticeRuleMapper todoNoticeRuleMapper,
                            TodoOwnerMapper todoOwnerMapper,
@@ -94,7 +98,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
                            UserPushSubscriptionService userPushSubscriptionService,
                            HouseholdMemberService householdMemberService,
                            MailDeliveryService mailDeliveryService,
-                           ReminderDeliveryGuard deliveryGuard) {
+                           ReminderDeliveryGuard deliveryGuard,
+                           LedgerService ledgerService) {
         this.todoNoticeRuleMapper = todoNoticeRuleMapper;
         this.todoOwnerMapper = todoOwnerMapper;
         this.todoSendLogMapper = todoSendLogMapper;
@@ -104,6 +109,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         this.householdMemberService = householdMemberService;
         this.mailDeliveryService = mailDeliveryService;
         this.deliveryGuard = deliveryGuard;
+        this.ledgerService = ledgerService;
     }
 
     @Override
@@ -255,6 +261,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         }
         String repeatError = CustomDayRepeat.validate(entity, null);
         if (repeatError != null) return ApiResponse.fail(repeatError);
+        String ledgerError = ledgerService.validateSetting(entity.getLedgerSetting());
+        if (ledgerError != null) return ApiResponse.fail(ledgerError);
         if (actor != null) {
             entity.setCreateUserId(actor.getId());
         }
@@ -269,6 +277,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             entity.setOwnerId(firstOwnerId(entity.getOwnerIds()));
         }
         save(entity);
+        ledgerService.saveSetting(entity.getId(), entity.getLedgerSetting());
         replaceOwners(entity.getId(), entity.getOwnerIds());
         replaceRules(entity.getId(), resolveNoticeMinutes(entity));
         enrich(Collections.singletonList(entity));
@@ -294,23 +303,27 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         }
         String repeatError = CustomDayRepeat.validate(entity, existing);
         if (repeatError != null) return ApiResponse.fail(repeatError);
+        String ledgerError = ledgerService.validateSetting(entity.getLedgerSetting());
+        if (ledgerError != null) return ApiResponse.fail(ledgerError);
         if (!StringUtils.hasText(entity.getRepeatType())) entity.setRepeatType(existing.getRepeatType());
         if ("CUSTOM_DAYS".equals(entity.getRepeatType()) && entity.getRepeatIntervalDays() == null) entity.setRepeatIntervalDays(existing.getRepeatIntervalDays());
         if (!CollectionUtils.isEmpty(entity.getOwnerIds())) {
             entity.setOwnerId(firstOwnerId(entity.getOwnerIds()));
         }
         updateById(entity);
+        ledgerService.saveSetting(entity.getId(), entity.getLedgerSetting());
         replaceOwners(entity.getId(), entity.getOwnerIds());
         replaceRules(entity.getId(), resolveNoticeMinutes(entity));
         return ApiResponse.success("已更新待办", null);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<Void> complete(String id, AppUser actor) {
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("待办id不能为空");
         }
-        Todo todo = super.getById(id);
+        Todo todo = getOne(new LambdaQueryWrapper<Todo>().eq(Todo::getId, id).last("FOR UPDATE"));
         if (todo == null) {
             return ApiResponse.fail("待办不存在");
         }
@@ -343,6 +356,23 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public ApiResponse<Void> completeWithLedger(CompleteWithLedgerRequest request, AppUser actor) {
+        if (request == null || !StringUtils.hasText(request.getId())) return ApiResponse.fail("待办id不能为空");
+        Todo locked = getOne(new LambdaQueryWrapper<Todo>().eq(Todo::getId, request.getId()).last("FOR UPDATE"));
+        if (locked == null) return ApiResponse.fail("待办不存在");
+        if (isGuest(actor)) return ApiResponse.fail(403, "游客不能操作待办");
+        String denied = manageDeniedReason(locked, actor);
+        if (denied != null) return ApiResponse.fail(403, denied);
+        ApiResponse<LedgerEntry> prepared = ledgerService.prepareTodoRecord(locked, request);
+        if (prepared.getStatus() != 200) return ApiResponse.fail(prepared.getStatus(), prepared.getMessage());
+        ApiResponse<Void> completed = complete(locked.getId(), actor);
+        if (completed.getStatus() != 200) return completed;
+        ledgerService.insertPrepared(prepared.getData());
+        return ApiResponse.success("已完成并记账", null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<Void> delete(String id, AppUser actor) {
         if (!StringUtils.hasText(id)) {
             return ApiResponse.fail("待办id不能为空");
@@ -359,6 +389,7 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
             return ApiResponse.fail(403, deleteDenied);
         }
         removeById(id);
+        ledgerService.deleteSetting(id);
         todoNoticeRuleMapper.delete(new LambdaQueryWrapper<TodoNoticeRule>().eq(TodoNoticeRule::getTodoId, id));
         todoOwnerMapper.delete(new LambdaQueryWrapper<TodoOwner>().eq(TodoOwner::getTodoId, id));
         return ApiResponse.success("已删除", null);
@@ -1054,6 +1085,8 @@ public class TodoServiceImpl extends ServiceImpl<TodoMapper, Todo> implements To
         if (CollectionUtils.isEmpty(todos)) {
             return;
         }
+
+        ledgerService.enrich(todos);
 
         List<String> todoIds = todos.stream()
                 .map(Todo::getId)

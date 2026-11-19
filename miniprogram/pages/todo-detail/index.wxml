@@ -16,5 +16,6 @@
       <view wx:if="{{todo.description}}" class="row"><text class="label">备注</text><text class="value">{{todo.description}}</text></view>
     </view>
     <button wx:if="{{canManage}}" class="edit" bindtap="edit">编辑待办</button>
+    <button wx:if="{{todo.ledgerSetting}}" class="edit" bindtap="openLedger">查看关联账单</button>
   </view>
 </view>

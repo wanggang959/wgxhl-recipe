@@ -42,6 +42,15 @@ public class SpecialExpenseItem {
     @TableField(exist = false)
     private Boolean clearPlannedTime;
 
+    @TableField(exist = false)
+    private Boolean syncToLedger;
+
+    @TableField(exist = false)
+    private Boolean ledgerLinked;
+
+    @TableField(exist = false)
+    private Boolean ledgerDeleted;
+
     private String purchaseChannel;
 
     private String purchaseLink;

@@ -84,6 +84,7 @@ Page({
   openHousehold() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/household/index'}) },
   openCommute() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/commute/index'}) },
   openExpense() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/expense/index'}) },
+  openLedger() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/ledger/index'}) },
   openBaseManage() { if(!this.data.isGuest)wx.navigateTo({url:'/pages/base-manage/index'}) },
   addMember() { if(this.data.canManage)wx.navigateTo({url:'/pages/member-form/index'}) },
   editMember(e) {

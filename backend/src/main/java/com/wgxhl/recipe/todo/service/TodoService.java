@@ -8,6 +8,7 @@ import com.wgxhl.recipe.todo.dto.TodoSummaryDTO;
 import com.wgxhl.recipe.todo.dto.ReminderRecoveryDTO;
 import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.ledger.dto.CompleteWithLedgerRequest;
 
 import java.util.List;
 import java.time.LocalDateTime;
@@ -27,6 +28,8 @@ public interface TodoService extends IService<Todo> {
     ApiResponse<Void> update(Todo entity, AppUser actor);
 
     ApiResponse<Void> complete(String id, AppUser actor);
+
+    ApiResponse<Void> completeWithLedger(CompleteWithLedgerRequest request, AppUser actor);
 
     ApiResponse<Void> delete(String id, AppUser actor);
 

@@ -50,6 +50,16 @@ Page({
     catch(error) { wx.showToast({title:error.message || '操作失败',icon:'none'}) }
     finally { this.setData({busy:false}) }
   },
+  deleteRead() {
+    if (this.data.readonly || this.data.busy || this.data.loading || this.data.total <= this.data.unread) return
+    wx.showModal({title:'删除已读',content:'确认删除所有已读消息吗？未读消息会保留。',confirmText:'删除',confirmColor:'#d64335',success:async ({confirm}) => {
+      if (!confirm || this.data.readonly || this.data.busy || this.data.loading) return
+      this.setData({busy:true})
+      try { await api.post('/notification/deleteRead'); await this.load(true); wx.showToast({title:'已删除已读消息',icon:'none'}) }
+      catch(error) { wx.showToast({title:error.message || '删除失败',icon:'none'}) }
+      finally { this.setData({busy:false}) }
+    }})
+  },
   remove(e) {
     if (this.data.readonly || this.data.busy) return
     const item = this.data.items.find(notice => notice.id === e.currentTarget.dataset.id)

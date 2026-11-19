@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import com.wgxhl.recipe.ledger.entity.TodoLedgerSetting;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -105,4 +106,7 @@ public class Todo {
 
     @TableField(exist = false)
     private String completeDisabledReason;
+
+    @TableField(exist = false)
+    private TodoLedgerSetting ledgerSetting;
 }

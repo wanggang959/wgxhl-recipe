@@ -16,6 +16,8 @@ import com.wgxhl.recipe.todo.entity.Todo;
 import com.wgxhl.recipe.todo.service.TodoService;
 import com.wgxhl.recipe.user.entity.AppUser;
 import com.wgxhl.recipe.user.mapper.AppUserMapper;
+import com.wgxhl.recipe.ledger.service.LedgerService;
+import com.wgxhl.recipe.ledger.entity.LedgerEntry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -43,13 +45,15 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
     private final SpecialExpenseProjectMapper projectMapper;
     private final AppUserMapper appUserMapper;
     private final TodoService todoService;
+    private final LedgerService ledgerService;
 
     public SpecialExpenseItemServiceImpl(SpecialExpenseProjectMapper projectMapper,
                                          AppUserMapper appUserMapper,
-                                         TodoService todoService) {
+                                         TodoService todoService, LedgerService ledgerService) {
         this.projectMapper = projectMapper;
         this.appUserMapper = appUserMapper;
         this.todoService = todoService;
+        this.ledgerService = ledgerService;
     }
 
     @Override
@@ -111,8 +115,11 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
         if (validate.getStatus() != 200) {
             return ApiResponse.fail(validate.getMessage());
         }
+        LedgerEntry record = Boolean.TRUE.equals(entity.getSyncToLedger()) ? ledgerService.prepareExpense(entity) : null;
+        if (record != null) { String error = ledgerService.validate(record); if (error != null) return ApiResponse.fail(error); }
         save(entity);
         syncTodo(entity, actor);
+        if (record != null) ledgerService.syncExpense(entity.getId(), record, null);
         enrich(Collections.singletonList(entity));
         return ApiResponse.success("已新增开支项", entity);
     }
@@ -138,6 +145,17 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
         if (validate.getStatus() != 200) {
             return validate;
         }
+        LedgerEntry previousRecord = ledgerService.expenseEntry(existing.getId());
+        boolean shouldSync = Boolean.TRUE.equals(entity.getSyncToLedger()) || (previousRecord != null && !Boolean.TRUE.equals(previousRecord.getDeleted()) && entity.getActualAmount() != null && entity.getActualAmount().signum() > 0);
+        LedgerEntry record = shouldSync ? ledgerService.prepareExpense(entity) : null;
+        if (record != null && previousRecord != null) {
+            if (entity.getPurchaseDate() == null) record.setOccurredOn(previousRecord.getOccurredOn());
+            if ("TODO".equals(previousRecord.getSourceType())) {
+                record.setCategory(previousRecord.getCategory());
+                record.setDescription(previousRecord.getDescription());
+            }
+        }
+        if (record != null) { String error = ledgerService.validate(record); if (error != null) return ApiResponse.fail(error); }
         if (Boolean.TRUE.equals(entity.getClearPlannedTime())) {
             if (entity.getPlannedTime() != null) return ApiResponse.fail("清除计划时间时不能同时设置新时间");
             if (StringUtils.hasText(existing.getTodoId())) {
@@ -156,11 +174,13 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
                     .set(SpecialExpenseItem::getPlannedTime, null)
                     .set(SpecialExpenseItem::getTodoId, null).update();
             if (!cleared) throw new IllegalStateException("清除计划时间失败");
+            if (record != null) ledgerService.syncExpense(entity.getId(), record, previousRecord);
             return ApiResponse.success("已更新开支项", null);
         }
         entity.setTodoId(existing.getTodoId());
         updateById(entity);
         syncTodo(entity, actor);
+        if (record != null) ledgerService.syncExpense(entity.getId(), record, previousRecord);
         return ApiResponse.success("已更新开支项", null);
     }
 
@@ -292,6 +312,8 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
             });
         }
         Map<String, String> projectNames = new HashMap<>();
+        java.util.Set<String> linked = ledgerService.linkedExpenseIds(items.stream().map(SpecialExpenseItem::getId).collect(Collectors.toList()));
+        java.util.Set<String> deleted = ledgerService.deletedExpenseIds(items.stream().map(SpecialExpenseItem::getId).collect(Collectors.toList()));
         List<String> projectIds = items.stream()
                 .map(SpecialExpenseItem::getProjectId)
                 .filter(StringUtils::hasText)
@@ -302,6 +324,8 @@ public class SpecialExpenseItemServiceImpl extends ServiceImpl<SpecialExpenseIte
                     projectNames.put(project.getId(), project.getProjectName()));
         }
         for (SpecialExpenseItem item : items) {
+            item.setLedgerLinked(linked.contains(item.getId()));
+            item.setLedgerDeleted(deleted.contains(item.getId()));
             item.setOwnerName(userNames.get(item.getOwnerId()));
             item.setPayerName(userNames.get(item.getPayerId()));
             item.setProjectName(projectNames.get(item.getProjectId()));

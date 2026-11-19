@@ -1,1 +1,1 @@
-{"navigationBarTitleText":"家庭待办","enablePullDownRefresh":true,"usingComponents":{"notice-panel":"/components/notice-panel/index"}}
+{"navigationBarTitleText":"家庭待办","enablePullDownRefresh":true,"usingComponents":{"notice-panel":"/components/notice-panel/index","ledger-completion":"/components/ledger-completion/index"}}

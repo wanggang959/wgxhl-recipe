@@ -30,6 +30,7 @@ import com.wgxhl.recipe.expense.entity.SpecialExpenseProject;
 import com.wgxhl.recipe.expense.mapper.SpecialExpenseItemMapper;
 import com.wgxhl.recipe.expense.mapper.SpecialExpenseProjectMapper;
 import com.wgxhl.recipe.user.entity.AppUser;
+import com.wgxhl.recipe.ledger.service.LedgerService;
 import com.wgxhl.recipe.user.service.AppUserService;
 import com.wgxhl.recipe.want.entity.UserWantedRecipe;
 import com.wgxhl.recipe.want.mapper.UserWantedRecipeMapper;
@@ -64,6 +65,7 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
     private final SpecialExpenseProjectMapper specialExpenseProjectMapper;
     private final JwtAuthUtil jwtAuthUtil;
     private final AppUserService appUserService;
+    private final LedgerService ledgerService;
 
     public HouseholdLeaveServiceImpl(HouseholdService householdService,
                                      HouseholdMemberService householdMemberService,
@@ -80,7 +82,7 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
                                      SpecialExpenseItemMapper specialExpenseItemMapper,
                                      SpecialExpenseProjectMapper specialExpenseProjectMapper,
                                      JwtAuthUtil jwtAuthUtil,
-                                     AppUserService appUserService) {
+                                     AppUserService appUserService, LedgerService ledgerService) {
         this.householdService = householdService;
         this.householdMemberService = householdMemberService;
         this.householdInviteService = householdInviteService;
@@ -97,6 +99,7 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
         this.specialExpenseProjectMapper = specialExpenseProjectMapper;
         this.jwtAuthUtil = jwtAuthUtil;
         this.appUserService = appUserService;
+        this.ledgerService = ledgerService;
     }
 
     @Override
@@ -243,6 +246,7 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
         todoSendLogMapper.delete(new LambdaQueryWrapper<com.wgxhl.recipe.todo.entity.TodoSendLog>()
                 .eq(com.wgxhl.recipe.todo.entity.TodoSendLog::getTodoId, todo.getId()));
         todoOwnerMapper.delete(new LambdaQueryWrapper<TodoOwner>().eq(TodoOwner::getTodoId, todo.getId()));
+        ledgerService.deleteSetting(todo.getId());
         notificationMapper.delete(new LambdaQueryWrapper<Notification>()
                 .eq(Notification::getRelatedId, todo.getId())
                 .eq(Notification::getNotificationType, "TODO"));
@@ -250,6 +254,7 @@ public class HouseholdLeaveServiceImpl implements HouseholdLeaveService {
     }
 
     private void deleteHouseholdData(String householdId) {
+        ledgerService.deleteHouseholdData();
         List<Todo> todos = todoMapper.selectList(new LambdaQueryWrapper<>());
         for (Todo todo : todos) {
             if (RELATED_EXPENSE_ITEM.equals(todo.getRelatedType())) {

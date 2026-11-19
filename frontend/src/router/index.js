@@ -91,6 +91,7 @@ const routes = [
         name: 'SpecialExpense',
         component: () => import('../views/SpecialExpenseView.vue'),
       },
+      { path: '/ledger', name: 'Ledger', component: () => import('../views/LedgerView.vue') },
       { path: '/commute', name: 'Commute', component: () => import('../views/CommuteView.vue') },
       {
         path: '/recipe/:id',
@@ -171,6 +172,7 @@ router.beforeEach((to) => {
       || to.path === '/todo'
       || to.path.startsWith('/todo/')
       || to.path === '/expenses'
+      || to.path === '/ledger'
       || to.path === '/commute'
     if (guestFamilyOnly) return '/recipes'
     const guestWriteBlocked = to.path === '/account/email'
